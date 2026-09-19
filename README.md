@@ -279,34 +279,44 @@ Khi khách hàng thay đổi RAM từ **8GB lên 16GB**, hệ thống có thể:
 
 ## KPI 1: Thời Gian Phản Hồi API Trung Bình (API Latency - $KPI_1$)
 
-Chỉ số này đo lường hiệu năng của hệ thống Backend Express.js/MongoDB trong việc xử lý và trả về dữ liệu cho các truy vấn xem danh mục, lọc thuộc tính sản phẩm và kiểm tra tồn kho.
+**Mục tiêu:** Đánh giá hiệu năng của Backend Express.js/MongoDB khi xử lý các tác vụ như duyệt danh mục, lọc thuộc tính sản phẩm và kiểm tra tồn kho.
 
-- **Chỉ số mục tiêu:** $T_{\text{avg}} < 200\text{ ms}$ trong điều kiện tải thông thường và $T_{\text{max}} < 500\text{ ms}$ tại ngưỡng 100 truy vấn đồng thời.
+**Target:**
 
-- **Công thức xác định:**
+- $T_{\text{avg}} < 200\text{ ms}$ trong điều kiện tải bình thường.
+- $T_{\text{max}} < 500\text{ ms}$ khi có 100 request đồng thời.
+
+### Công thức
 
 $$
-T_{\text{avg}} =
+T_{\text{avg}}
+=
 \frac{1}{m}
 \sum_{i=1}^{m}
-(t_{\text{res},i} - t_{\text{req},i})
+\left(
+t_{\text{res},i}
+-
+t_{\text{req},i}
+\right)
 $$
 
 Trong đó:
 
-- $m$: Tổng số yêu cầu API ghi nhận trong khoảng thời gian kiểm thử.
-- $t_{\text{req},i}$: Thời điểm client phát yêu cầu $i$.
-- $t_{\text{res},i}$: Thời điểm client nhận hoàn tất phản hồi $i$.
+- $m$: Tổng số request API được đo.
+- $t_{\text{req},i}$: Thời điểm client gửi request thứ $i$.
+- $t_{\text{res},i}$: Thời điểm client nhận được response thứ $i$.
 
 ---
 
 ## KPI 2: Độ Trễ Đồng Bộ Tồn Kho Đa Kho (Inventory Sync Latency - $KPI_2$)
 
-Chỉ số này đo lường khoảng thời gian tính từ khi một giao dịch thanh toán đơn hàng hoàn tất cho đến khi số lượng tồn kho của chi nhánh tương ứng được cập nhật chính xác trên toàn bộ hệ thống.
+**Mục tiêu:** Đo thời gian từ khi thanh toán thành công đến khi số lượng tồn kho được cập nhật trong MongoDB.
 
-- **Chỉ số mục tiêu:** $T_{\text{sync}} \le 1.5\text{ giây}$.
+**Target:**
 
-- **Công thức xác định:**
+$T_{\text{sync}} \le 1.5\text{ giây}$
+
+### Công thức
 
 $$
 T_{\text{sync}}
@@ -318,112 +328,140 @@ $$
 
 Trong đó:
 
-- $t_{\text{payment_success}}$: Mốc thời gian nhận Webhook xác nhận thanh toán thành công.
-- $t_{\text{updated_db}}$: Mốc thời gian hệ thống hoàn tất ghi nhận trừ tồn kho trong MongoDB.
+- $t_{\text{payment_success}}$: Thời điểm nhận được webhook xác nhận thanh toán thành công.
+- $t_{\text{updated_db}}$: Thời điểm hoàn tất cập nhật giảm tồn kho trong MongoDB.
 
 ---
 
 ## KPI 3: Năng Suất Xử Lý Đơn Hàng Đồng Thời (Order Concurrency Throughput - $KPI_3$)
 
-Chỉ số này đo lường khả năng xử lý an toàn các yêu cầu tạo đơn hàng đồng thời tại các thời điểm cao điểm mua sắm mà không gây ra lỗi tranh chấp dữ liệu (Race Conditions) hoặc làm sập máy chủ.
+**Mục tiêu:** Đánh giá khả năng xử lý nhiều đơn hàng đồng thời của hệ thống Node.js/Express.js.
 
-- **Chỉ số mục tiêu:** Tốc độ xử lý tối thiểu $Th \ge 100\text{ đơn hàng/giây}$ (Transactions Per Second - TPS) với tỷ lệ giao dịch lỗi $ER \le 0.1%$.
+**Target:**
 
-- **Công thức xác định:**
+- $Th \ge 100$ đơn hàng/giây (TPS).
+- $ER \le 0.1%$.
 
-$$
-Th =
-\frac{N_{\text{successful\_orders}}}
-{\Delta t}
-$$
+### Công thức Throughput
 
 $$
-ER =
-\left(
-\frac{N_{\text{failed\_orders}}}
-{N_{\text{total\_attempts}}}
-\right)
+Th
+=
+\frac{
+N_{\text{successful\_orders}}
+}{
+\Delta t
+}
+$$
+
+### Công thức Error Rate
+
+$$
+ER
+=
+\frac{
+N_{\text{failed\_orders}}
+}{
+N_{\text{total\_attempts}}
+}
 \times 100\%
 $$
 
 Trong đó:
 
-- $N_{\text{successful_orders}}$: Số đơn hàng ghi nhận thành công vào CSDL trong khoảng thời gian $\Delta t$.
-- $N_{\text{failed_orders}}$: Số đơn gặp lỗi hệ thống.
-- $N_{\text{total_attempts}}$: Tổng số yêu cầu tạo đơn gửi tới.
+- $N_{\text{successful_orders}}$: Số đơn hàng được xử lý thành công.
+- $N_{\text{failed_orders}}$: Số đơn hàng xử lý thất bại.
+- $N_{\text{total_attempts}}$: Tổng số yêu cầu tạo đơn hàng.
+- $\Delta t$: Khoảng thời gian đo hiệu suất.
 
 ---
 
 ## KPI 4: Tỷ Lệ Hoàn Thành Luồng Mua Hàng (Checkout Completion Rate - $KPI_4$)
 
-Chỉ số này đánh giá mức độ tối ưu hóa về mặt giao diện (UI) và trải nghiệm người dùng (UX) của ứng dụng React.js, đo lường tỷ lệ chuyển đổi từ bước thêm sản phẩm vào giỏ hàng đến khi tạo đơn thành công.
+**Mục tiêu:** Đo tỷ lệ người dùng hoàn tất quá trình mua hàng sau khi tạo giỏ hàng.
 
-- **Chỉ số mục tiêu:** $CR \ge 55%$.
+**Target:**
 
-- **Công thức xác định:**
+$CR \ge 55%$
+
+### Công thức
 
 $$
-CR =
-\left(
-\frac{N_{\text{completed\_orders}}}
-{N_{\text{cart\_creations}}}
-\right)
+CR
+=
+\frac{
+N_{\text{completed\_orders}}
+}{
+N_{\text{cart\_creations}}
+}
 \times 100\%
 $$
 
 Trong đó:
 
-- $N_{\text{completed_orders}}$: Tổng số lượt đặt hàng thành công.
-- $N_{\text{cart_creations}}$: Tổng số lượt người dùng thêm sản phẩm vào giỏ hàng.
+- $N_{\text{completed_orders}}$: Số đơn hàng được hoàn tất thành công.
+- $N_{\text{cart_creations}}$: Tổng số lượt tạo giỏ hàng.
 
 ---
 
 ## KPI 5: Mức Độ Sẵn Sàng Của Hệ Thống (System Availability / Uptime - $KPI_5$)
 
-Chỉ số này đo lường độ ổn định vận hành liên tục của hạ tầng máy chủ ứng dụng web và cơ sở dữ liệu.
+**Mục tiêu:** Đánh giá mức độ sẵn sàng và khả năng duy trì hoạt động liên tục của hệ thống.
 
-- **Chỉ số mục tiêu:** $A \ge 99.5%$.
+**Target:**
 
-- **Công thức xác định:**
+$A \ge 99.5%$
+
+### Công thức
 
 $$
-A =
-\left(
-\frac{T_{\text{total}} - T_{\text{downtime}}}
-{T_{\text{total}}}
-\right)
+A
+=
+\frac{
+T_{\text{total}}
+-
+T_{\text{downtime}}
+}{
+T_{\text{total}}
+}
 \times 100\%
 $$
 
 Trong đó:
 
-- $T_{\text{total}}$: Tổng thời gian theo dõi hệ thống.
-- $T_{\text{downtime}}$: Tổng thời gian hệ thống ngừng hoạt động do lỗi kỹ thuật.
+- $T_{\text{total}}$: Tổng thời gian hệ thống được theo dõi.
+- $T_{\text{downtime}}$: Tổng thời gian hệ thống không khả dụng.
+- $A$: Tỷ lệ sẵn sàng của hệ thống.
 
 ---
 
 ## KPI 6: Độ Chính Xác Tra Cứu Bảo Hành (Warranty Query Accuracy Rate - $KPI_6$)
 
-Chỉ số này đo lường tính chính xác của module quản lý Serial/IMEI trong việc xuất thông tin bảo hành cho người dùng và nhân viên.
+**Mục tiêu:** Đánh giá độ chính xác của chức năng tra cứu bảo hành dựa trên Serial/IMEI của sản phẩm.
 
-- **Chỉ số mục tiêu:** $Acc_{\text{warranty}} = 100%$ với thời gian phản hồi truy vấn $T_{\text{query}} < 300\text{ ms}$.
+**Target:**
 
-- **Công thức xác định:**
+- $Acc_{\text{warranty}} = 100%$
+- $T_{\text{query}} < 300\text{ ms}$
+
+### Công thức
 
 $$
 Acc_{\text{warranty}}
 =
-\left(
-\frac{N_{\text{correct\_warranty\_results}}}
-{N_{\text{total\_warranty\_queries}}}
-\right)
+\frac{
+N_{\text{correct\_warranty\_results}}
+}{
+N_{\text{total\_warranty\_queries}}
+}
 \times 100\%
 $$
 
 Trong đó:
 
-- $N_{\text{correct_warranty_results}}$: Số lượt truy vấn trả về thông tin bảo hành chính xác.
-- $N_{\text{total_warranty_queries}}$: Tổng số lượt truy vấn bảo hành được thực hiện.
+- $N_{\text{correct_warranty_results}}$: Số lượt tra cứu trả về thông tin bảo hành chính xác.
+- $N_{\text{total_warranty_queries}}$: Tổng số lượt tra cứu bảo hành.
+- $T_{\text{query}}$: Thời gian phản hồi của một yêu cầu tra cứu bảo hành.
 
 ---
 
