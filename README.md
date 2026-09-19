@@ -282,10 +282,14 @@ Khi khách hàng thay đổi RAM từ **8GB lên 16GB**, hệ thống có thể:
 Chỉ số này đo lường hiệu năng của hệ thống Backend Express.js/MongoDB trong việc xử lý và trả về dữ liệu cho các truy vấn xem danh mục, lọc thuộc tính sản phẩm và kiểm tra tồn kho.
 
 - **Chỉ số mục tiêu:** $T_{\text{avg}} < 200\text{ ms}$ trong điều kiện tải thông thường và $T_{\text{max}} < 500\text{ ms}$ tại ngưỡng 100 truy vấn đồng thời.
+
 - **Công thức xác định:**
 
 $$
-T_{\text{avg}} = \frac{1}{m} \sum_{i=1}^{m} (t_{\text{res},i} - t_{\text{req},i})
+T_{\text{avg}} =
+\frac{1}{m}
+\sum_{i=1}^{m}
+(t_{\text{res},i} - t_{\text{req},i})
 $$
 
 Trong đó:
@@ -301,10 +305,15 @@ Trong đó:
 Chỉ số này đo lường khoảng thời gian tính từ khi một giao dịch thanh toán đơn hàng hoàn tất cho đến khi số lượng tồn kho của chi nhánh tương ứng được cập nhật chính xác trên toàn bộ hệ thống.
 
 - **Chỉ số mục tiêu:** $T_{\text{sync}} \le 1.5\text{ giây}$.
+
 - **Công thức xác định:**
 
 $$
-T_{\text{sync}} = t_{\text{updated\_db}} - t_{\text{payment\_success}}
+T_{\text{sync}}
+=
+t_{\text{updated\_db}}
+-
+t_{\text{payment\_success}}
 $$
 
 Trong đó:
@@ -319,14 +328,22 @@ Trong đó:
 Chỉ số này đo lường khả năng xử lý an toàn các yêu cầu tạo đơn hàng đồng thời tại các thời điểm cao điểm mua sắm mà không gây ra lỗi tranh chấp dữ liệu (Race Conditions) hoặc làm sập máy chủ.
 
 - **Chỉ số mục tiêu:** Tốc độ xử lý tối thiểu $Th \ge 100\text{ đơn hàng/giây}$ (Transactions Per Second - TPS) với tỷ lệ giao dịch lỗi $ER \le 0.1%$.
+
 - **Công thức xác định:**
 
 $$
-Th = \frac{N_{\text{successful\_orders}}}{\Delta t}
+Th =
+\frac{N_{\text{successful\_orders}}}
+{\Delta t}
 $$
 
 $$
-ER = \left( \frac{N_{\text{failed\_orders}}}{N_{\text{total\_attempts}}} \right) \times 100\%
+ER =
+\left(
+\frac{N_{\text{failed\_orders}}}
+{N_{\text{total\_attempts}}}
+\right)
+\times 100\%
 $$
 
 Trong đó:
@@ -342,10 +359,16 @@ Trong đó:
 Chỉ số này đánh giá mức độ tối ưu hóa về mặt giao diện (UI) và trải nghiệm người dùng (UX) của ứng dụng React.js, đo lường tỷ lệ chuyển đổi từ bước thêm sản phẩm vào giỏ hàng đến khi tạo đơn thành công.
 
 - **Chỉ số mục tiêu:** $CR \ge 55%$.
+
 - **Công thức xác định:**
 
 $$
-CR = \left( \frac{N_{\text{completed\_orders}}}{N_{\text{cart\_creations}}} \right) \times 100\%
+CR =
+\left(
+\frac{N_{\text{completed\_orders}}}
+{N_{\text{cart\_creations}}}
+\right)
+\times 100\%
 $$
 
 Trong đó:
@@ -360,10 +383,16 @@ Trong đó:
 Chỉ số này đo lường độ ổn định vận hành liên tục của hạ tầng máy chủ ứng dụng web và cơ sở dữ liệu.
 
 - **Chỉ số mục tiêu:** $A \ge 99.5%$.
+
 - **Công thức xác định:**
 
 $$
-A = \left( \frac{T_{\text{total}} - T_{\text{downtime}}}{T_{\text{total}}} \right) \times 100\%
+A =
+\left(
+\frac{T_{\text{total}} - T_{\text{downtime}}}
+{T_{\text{total}}}
+\right)
+\times 100\%
 $$
 
 Trong đó:
@@ -378,10 +407,12 @@ Trong đó:
 Chỉ số này đo lường tính chính xác của module quản lý Serial/IMEI trong việc xuất thông tin bảo hành cho người dùng và nhân viên.
 
 - **Chỉ số mục tiêu:** $Acc_{\text{warranty}} = 100%$ với thời gian phản hồi truy vấn $T_{\text{query}} < 300\text{ ms}$.
+
 - **Công thức xác định:**
 
 $$
-Acc_{\text{warranty}} =
+Acc_{\text{warranty}}
+=
 \left(
 \frac{N_{\text{correct\_warranty\_results}}}
 {N_{\text{total\_warranty\_queries}}}
