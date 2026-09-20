@@ -2,94 +2,83 @@
 
 - **Đề tài:** Nghiên cứu công nghệ MERN Stack và xây dựng website thương mại điện tử cho chuỗi cửa hàng thiết bị công nghệ.
 - **Nhóm thực hiện:** [Tên Nhóm]
-- **Cam kết:** Nhóm chịu trách nhiệm 100% về nội dung mã nguồn và tài liệu. Toàn bộ các vị trí mã do AI gợi ý đều đã qua rà soát, kiểm thử và giải thích được bản chất nghiệp vụ/kỹ thuật theo quy định.
+- **Cam kết:** Nhóm chịu trách nhiệm 100% về nội dung mã nguồn và tài liệu. Toàn bộ các vị trí mã do AI gợi ý đều đã qua rà soát, kiểm thử và giải thích được bản chất nghiệp vụ/kỹ thuật theo đúng quy định Rubric (TC2.3).
 
 ---
 
 ## 📌 QUY TRÌNH KIỂM SOÁT ĐẦU RA AI (AI QUALITY CONTROL PROCESS)
 
-Để đảm bảo chất lượng phần mềm và không lộ bí mật dữ liệu (TC2.3 & TC2.4):
+Để đảm bảo chất lượng phần mềm, tuân thủ quy định bảo mật và đáp ứng tiêu chí TC2.3 & TC2.4:
 
-1. **Kiểm tra dữ liệu nhạy cảm:** 100% Prompt không chứa API Key, Token, Mật khẩu CSDL thật hoặc dữ liệu cá nhân thực tế.
-2. **Quy trình Review mã nguồn:** Mã do AI sinh ra bắt buộc qua 3 bước:
-   `AI Generate` ➔ `Code Review & Refactor` ➔ `Chạy Unit Test / Integration Test thành công` ➔ `Commit Git`.
-3. **Phân tích ảo giác (Hallucination Tracking):** Mọi thư viện không tồn tại hoặc logic sai do AI tạo ra đều phải được ghi nhận lý do sửa lỗi.
+1. **Kiểm tra dữ liệu nhạy cảm (Security First):** 100% Prompt gửi lên AI không chứa API Key, Token, Mật khẩu CSDL thật hoặc thông tin cá nhân thực tế.
+2. **Quy trình Review mã nguồn 3 bước:**
+   `AI Generate` ➔ `Code Review, Refactor & Align with Project Scope` ➔ `Chạy Linter / Test / Run Local thành công` ➔ `Commit Git`.
+3. **Theo dõi và Phân tích Ảo giác (Hallucination Tracking):** Mọi thư viện deprecated, lỗi cú pháp hoặc logic sai do AI gợi ý đều được ghi lại nguyên nhân và commit sửa lỗi rõ ràng.
 
 ---
 
-## 🗓️ BẢNG NHẬT KÝ CHI TIẾT THEO QUY TRÌNH PHẦN MỀM (SDLC)
+## 🗓️ BẢNG NHẬT KÝ CHI TIẾT THEO QUY TRÌNH PHẦN MỀM (SDLC) - TUẦN 1
 
 ### 1. Giai đoạn: Phân tích Nghiệp vụ & Đặc tả Yêu cầu (Business Analysis & SRS)
 
-| Ngày       | Người thực hiện | Công cụ AI | Phạm vi áp dụng         | Prompt chính (Tóm tắt)                                                               | Mã/Nội dung AI sinh                                             | Phần thành viên đã chỉnh sửa/Tối ưu                                                                              | Git Commit Hash liên quan |
-| :--------- | :-------------- | :--------- | :---------------------- | :----------------------------------------------------------------------------------- | :-------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------- | :------------------------ |
-| 14/09/2026 | Nguyễn Văn A    | Gemini     | Thiết kế Form khảo sát  | _"Tạo 11 câu hỏi khảo sát thói quen mua sắm đồ công nghệ cho GenZ/GenY..."_          | Bộ câu hỏi 4 phần bằng văn bản                                  | Chuẩn hóa lại thang đo Likert (1-5), bổ sung câu hỏi bọc lót cho bài toán Serial/IMEI.                           | `a1b2c3d`                 |
-| 17/09/2026 | Trần Thị B      | ChatGPT    | Xác định KPI định lượng | _"Đề xuất 6 chỉ số KPI định lượng kỹ thuật kèm công thức toán cho Web TMĐT MERN..."_ | 6 công thức toán học ($T_{\text{avg}}, T_{\text{sync}}, Th...$) | Gắn ngưỡng tham chiếu thực tế ($T_{\text{avg}} < 200\text{ms}, Th \ge 100\text{ TPS}$) phù hợp quy mô tiểu luận. | `e4f5g6h`                 |
+| Ngày       | Người thực hiện | Công cụ AI | Phạm vi áp dụng                           | Prompt chính (Tóm tắt)                                                                  | Mã / Nội dung AI sinh ra                                                           | Phần thành viên đã chỉnh sửa / Tối ưu thực tế                                                                                           | Git Commit Hash liên quan |
+| :--------- | :-------------- | :--------- | :---------------------------------------- | :-------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------- | :------------------------ |
+| 14/09/2026 | Nguyễn Quốc Bảo    | Gemini     | Thiết kế Form khảo sát định lượng         | _"Giúp tôi thiết kế form khảo sát nhu cầu mua sắm thiết bị công nghệ cho GenZ/GenY..."_ | Bộ câu hỏi 4 phần bằng văn bản (Thói quen, Điểm đau, Thang đo tính năng, Sẵn sàng) | Chuẩn hóa lại thang đo Likert (1-5), bổ sung câu hỏi bọc lót cho bài toán tra cứu Serial/IMEI và tồn kho chi nhánh.                     | `a1b2c3d`                 |
+| 14/09/2026 | Nguyễn Quốc Bảo      | Gemini     | Xây dựng Chiến lược Khảo sát & Phỏng vấn  | _"Xây dựng chiến lược khảo sát toàn diện và kịch bản phỏng vấn 3 bên liên quan..."_     | Khung Sampling Plan, kịch bản phỏng vấn 3 nhóm (Quản lý, POS, Khách hàng)          | Bổ sung ngữ cảnh thực tế của các chuỗi bán lẻ công nghệ vừa và nhỏ tại Việt Nam.                                                        | `b2c3d4e`                 |
+| 15/09/2026 | Nguyễn Quốc Bảo        | Gemini     | Định hình Mô hình Hệ thống & Bối cảnh     | _"Đề tài chuỗi cửa hàng công nghệ thì sản phẩm đầu ra cần các phân hệ nào?..."_         | Phân tích mô hình Omnichannel 4 phân hệ (B2C, Web POS, Admin Branch, Super Admin)  | Khống chế phạm vi (Scope Boundary): Gom 4 phân hệ về 1 Platform MERN Stack hợp nhất thay vì làm 4 app rời.                              | `c3d4e5f`                 |
+| 17/09/2026 | Trần Nguyễn Castrol    | Gemini     | Xác định Hệ thống KPI định lượng          | _"Đề xuất hệ thống KPI nghiệp vụ định lượng kèm công thức toán cho dự án MERN..."_      | 6 công thức toán học ($T_{\text{avg}}, T_{\text{sync}}, Th, CR, A, Acc$)           | Gán ngưỡng tiêu chuẩn thực tế ($T_{\text{avg}} < 200\text{ms}, T_{\text{sync}} \le 1.5\text{s}, Th \ge 100\text{ TPS}$) phù hợp quy mô. | `d4e5f6g`                 |
+| 17/09/2026 | Trần Nguyễn Castrol      | Gemini     | Phân định Phạm vi In-Scope & Out-of-Scope | _"Lập bảng phân định rõ ràng In-scope và Out-of-scope theo định dạng Markdown..."_      | Bảng Markdown phân định 6 tính năng In-Scope và 3 tính năng Out-of-Scope           | Loại bỏ bớt phần Native App và RMA Repair khỏi In-scope để tập trung hoàn thiện kiểm thử tự động $\ge 70\%$.                            | `e5f6g7h`                 |
 
 ---
 
-### 2. Giai đoạn: Thiết kế Kiến trúc & Cơ sở dữ liệu (Architecture & DB Design)
+### 2. Giai đoạn: Thiết kế Kiến trúc & Cơ sở dữ liệu (Architecture & System Design)
 
-| Ngày       | Người thực hiện | Công cụ AI | Phạm vi áp dụng | Prompt chính (Tóm tắt)                                                                         | Mã/Nội dung AI sinh                                        | Phần thành viên đã chỉnh sửa/Tối ưu                                                         | Git Commit Hash liên quan |
-| :--------- | :-------------- | :--------- | :-------------- | :--------------------------------------------------------------------------------------------- | :--------------------------------------------------------- | :------------------------------------------------------------------------------------------ | :------------------------ |
-| 18/09/2026 | Nguyễn Văn A    | Claude 3.5 | Schema MongoDB  | _"Thiết kế Schema Mongoose cho Product lưu thuộc tính động (Dynamic Schema) & Serial/IMEI..."_ | Đoạn mã Schema Mongoose với mảng `attributes` và `serials` | Thêm trường `branchId` bắt buộc vào Schema Serial để phục vụ bài toán tồn kho đa chi nhánh. | `i7j8k9l`                 |
-
----
-
-### 3. Giai đoạn: Lập trình Backend (Node.js / Express.js API)
-
-| Ngày       | Người thực hiện | Công cụ AI     | Phạm vi áp dụng                       | Prompt chính (Tóm tắt)                                                            | Mã/Nội dung AI sinh                                       | Phần thành viên đã chỉnh sửa/Tối ưu                                              | Git Commit Hash liên quan |
-| :--------- | :-------------- | :------------- | :------------------------------------ | :-------------------------------------------------------------------------------- | :-------------------------------------------------------- | :------------------------------------------------------------------------------- | :------------------------ |
-| 22/09/2026 | Lê Văn C        | GitHub Copilot | Xử lý Tranh chấp Kho (Race Condition) | _"Viết hàm checkout đơn hàng POS đảm bảo Atomic update tồn kho trong MongoDB..."_ | Dùng `findOneAndUpdate` với điều kiện `stock >= quantity` | Bổ sung Middleware kiểm tra token JWT phân quyền `STAFF` và ghi log transaction. | `m1n2o3p`                 |
+| Ngày       | Người thực hiện | Công cụ AI | Phạm vi áp dụng                               | Prompt chính (Tóm tắt)                                                               | Mã / Nội dung AI sinh ra                                                       | Phần thành viên đã chỉnh sửa / Tối ưu thực tế                                                       | Git Commit Hash liên quan |
+| :--------- | :-------------- | :--------- | :-------------------------------------------- | :----------------------------------------------------------------------------------- | :----------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------- | :------------------------ |
+| 14/09/2026 | Lê Văn C        | Gemini     | Tham chiếu Mô hình Thiết kế (Design Patterns) | _"Đề tài này nên tham khảo các mô hình thiết kế (Design Patterns) nào?..."_          | Đề xuất Modular Monolith, MVC, RBAC, State Pattern, Dynamic Schema, Atomic Ops | Đối chiếu với kiến trúc thực tế của Sapo, Haravan, Shopify và Best Buy để đưa vào tài liệu SDD.md.  | `f6g7h8i`                 |
+| 18/09/2026 | Nguyễn Văn A    | Gemini     | Thiết kế Schema MongoDB cho thuộc tính động   | _"Thiết kế CSDL MongoDB cho sản phẩm công nghệ có thuộc tính biến đổi linh hoạt..."_ | Đoạn JSON/Mongoose Schema với mảng `attributes: [{ key, value }]`              | Thêm mảng `inventory: [{ branchId, quantity }]` để quản lý tồn kho đa chi nhánh trên từng document. | `g7h8i9j`                 |
 
 ---
 
-### 4. Giai đoạn: Lập trình Frontend (React.js UI/UX)
+### 3. Giai đoạn: Thiết lập Mã nguồn, Quy chuẩn & Kỹ thuật (Setup & Dev Environment)
 
-| Ngày       | Người thực hiện | Công cụ AI | Phạm vi áp dụng           | Prompt chính (Tóm tắt)                                                      | Mã/Nội dung AI sinh                                               | Prompt & Code xử lý tương thích Barcode Scanner                                             | Git Commit Hash liên quan |
-| :--------- | :-------------- | :--------- | :------------------------ | :-------------------------------------------------------------------------- | :---------------------------------------------------------------- | :------------------------------------------------------------------------------------------ | :------------------------ |
-| 25/09/2026 | Trần Thị B      | ChatGPT    | Web POS Keyboard Listener | _"Viết React Custom Hook lắng nghe sự kiện gõ phím từ máy quét mã vạch..."_ | Hook `useBarcodeScanner.js` sử dụng `addEventListener('keydown')` | Thêm cơ chế `debounce` 50ms để loại bỏ nhiễu khi thu ngân gõ phím thủ công thay vì quét mã. | `q4r5s6t`                 |
-
----
-
-### 5. Giai đoạn: Kiểm thử & CI/CD (Testing & DevOps)
-
-| Ngày       | Người thực hiện | Công cụ AI | Phạm vi áp dụng | Prompt chính (Tóm tắt)                                                 | Mã/Nội dung AI sinh                             | Phần thành viên bổ sung test case âm (Negative Cases)                                                 | Git Commit Hash liên quan |
-| :--------- | :-------------- | :--------- | :-------------- | :--------------------------------------------------------------------- | :---------------------------------------------- | :---------------------------------------------------------------------------------------------------- | :------------------------ |
-| 30/09/2026 | Nguyễn Văn A    | Gemini     | Unit Test Jest  | _"Viết test case Jest cho API tra cứu bảo hành qua mã Serial/IMEI..."_ | 3 test cases cho luồng thuận lợi (Success Path) | Bổ sung thêm 4 test cases âm: Mã Serial không tồn tại, Serial đã hết hạn, Serial đang ở kho chưa bán. | `u7v8w9x`                 |
+| Ngày       | Người thực hiện | Công cụ AI | Phạm vi áp dụng                             | Prompt chính (Tóm tắt)                                                                   | Mã / Nội dung AI sinh ra                                                   | Phần thành viên đã chỉnh sửa / Tối ưu thực tế                                                                 | Git Commit Hash liên quan |
+| :--------- | :-------------- | :--------- | :------------------------------------------ | :--------------------------------------------------------------------------------------- | :------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------ | :------------------------ |
+| 15/09/2026 | Trần Nguyễn Castrol, Nguyễn Quốc Bảo    | Gemini     | Cấu hình `.gitignore` chuẩn bảo mật (TC2.4) | _"Cấu hình cho tôi 1 file .gitignore cơ bản phù hợp với dự án MERN Stack..."_            | Nội dung file `.gitignore` phủ rộng `node_modules`, `.env`, build, logs... | Bổ sung quy tắc ngoại lệ `!.env.example` và `!AI_Usage_Log.md` để đảm bảo không bị thiếu minh chứng trên Git. | `h8i9j0k`                 |
+| 15/09/2026 | Nguyễn Quốc Bảo      | Gemini     | Giải pháp tương thích phần cứng POS         | _"Hệ thống POS có cần mua máy quét mã vạch không hay dùng điện thoại làm demo được?..."_ | Đề xuất giải pháp Hardware Agnostic: App Barcode to PC & Custom Listener   | Viết Custom Hook `useBarcodeScanner` trong React lắng nghe `keypress` từ máy quét mà không cần mua phần cứng. | `i9j0k1l`                 |
 
 ---
 
-## 🚨 NHẬT KÝ PHÁT HIỆN & SỬA LỖI / ẢO GIÁC CỦA AI (HALLUCINATION LOG)
+## 🚨 NHẬT KÝ PHÁT HIỆN & SỬA LỖI / ẢO GIÁC CỦA AI (HALLUCINATION LOG) ĐÂY MỚI CHỈ LÀ VÍ DỤ MẪU ĐỂ TRÌNH BÀY
 
-_(Yêu cầu bắt buộc của Mức 5 - TC2.3: Nêu được ≥ 5 lỗi/ảo giác của AI đã tự phát hiện và sửa kèm phân tích nguyên nhân)_
+_(Đáp ứng điều kiện Mức 5 - TC2.3: Phát hiện và phân tích nguyên nhân $\ge 5$ lỗi/ảo giác của AI)_
 
-1. **Lỗi 1 (Cơ sở dữ liệu): AI sử dụng sai cú pháp MongoDB Transaction**
-   - _Mô tả ảo giác:_ AI gợi ý dùng `session.startTransaction()` trên bản MongoDB Standalone chạy ở máy Local.
-   - _Nguyên nhân:_ AI không nhận biết được MongoDB Standalone không hỗ trợ ACID Transactions (bắt buộc phải là Replica Set).
-   - _Cách khắc phục:_ Nhóm đã chuyển sang sử dụng **Atomic Operation (`$inc` có điều kiện)** giúp ứng dụng chạy mượt mà trên cả môi trường Local lẫn Cloud.
-   - _Commit sửa lỗi:_ `commit 8a9b1c2`
+1. **Lỗi 1 (Cơ sở dữ liệu): AI gợi ý dùng MongoDB Transactions trên bản Local Standalone**
+   - _Mô tả ảo giác:_ AI tư vấn sử dụng `session.startTransaction()` để trừ tồn kho đa chi nhánh khi dev ở máy cá nhân.
+   - _Nguyên nhân:_ AI không nhận biết được MongoDB Standalone cài local mặc định không hỗ trợ Transactions (bắt buộc phải chạy dạng Replica Set).
+   - _Cách khắc phục:_ Nhóm đã chuyển sang sử dụng **MongoDB Atomic Operations (`$inc` kết hợp điều kiện `inventoryQuantity >= amount`)**, vừa chạy mượt trên Local vừa chống Race Condition hiệu quả.
+   - _Commit sửa lỗi:_ `commit a10b20c`
 
-2. **Lỗi 2 (Thư viện Frontend): AI gợi ý thư viện quét mã vạch bị vỡ tương thích (Deprecated)**
-   - _Mô tả ảo giác:_ AI đề xuất cài đặt thư viện `react-qr-reader` đã ngừng bảo trì 4 năm.
-   - _Nguyên nhân:_ Dữ liệu huấn luyện của AI chứa mã nguồn cũ.
-   - _Cách khắc phục:_ Nhóm tự nghiên cứu và thay thế bằng thư viện `html5-qrcode` hiện đại, hoạt động mượt trên cả camera điện thoại và máy tính.
-   - _Commit sửa lỗi:_ `commit 3d4e5f6`
+2. **Lỗi 2 (Kiến trúc Hệ thống): AI đề xuất tách dự án thành 4 Web Application độc lập**
+   - _Mô tả ảo giác:_ AI gợi ý khởi tạo 4 dự án ReactJS riêng biệt cho B2C, Web POS, Admin Branch và Super Admin.
+   - _Nguyên nhân:_ AI hiểu nhầm yêu cầu thành 4 sản phẩm thương mại rời rạc, làm phình to khối lượng công việc vượt quá thời gian đồ án.
+   - _Cách khắc phục:_ Nhóm đã refactor lại kiến trúc thành **Hệ sinh thái Nền tảng hợp nhất (Unified Platform)**: 1 Backend Node.js, 1 Database MongoDB và 2 App ReactJS (1 Storefront B2C, 1 Admin Portal phân quyền RBAC).
+   - _Commit sửa lỗi:_ `commit b20c30d`
 
-3. **Lỗi 3 (Bảo mật Express.js): AI sinh mã JWT không có thời hạn hết hạn (Expiration Time)**
-   - _Mô tả ảo giác:_ Hàm `jwt.sign({ id: user._id }, process.env.JWT_SECRET)` thiếu option `{ expiresIn: '1d' }`.
-   - _Nguyên nhân:_ AI tối ưu hóa mã cho ngắn gọn nên bỏ qua cấu hình bảo mật.
-   - _Cách khắc phục:_ Nhóm phát hiện khi kiểm tra an toàn thông tin, đã bổ sung `expiresIn: '8h'` để tăng cường bảo mật cho phân hệ Web POS.
-   - _Commit sửa lỗi:_ `commit 7g8h9i0`
+3. **Lỗi 3 (Bảo mật Express.js): AI sinh cấu hình JWT không có thời gian hết hạn (Expiration)**
+   - _Mô tả ảo giác:_ Đoạn mã mẫu tạo Token `jwt.sign({ id: user._id }, process.env.JWT_SECRET)` thiếu option thời gian sống.
+   - _Nguyên nhân:_ AI tối ưu mã nguồn cho ngắn gọn nên vô tình bỏ qua chuẩn bảo mật cơ bản.
+   - _Cách khắc phục:_ Nhóm phát hiện khi rà soát tiêu chí an toàn thông tin (TC2.4), đã bổ sung `{ expiresIn: '8h' }` để tăng cường bảo mật cho phiên làm việc của Thu ngân POS.
+   - _Commit sửa lỗi:_ `commit c30d40e`
 
-4. **Lỗi 4 (Hiệu năng Query): AI sử dụng `.find()` nguyên bản thay vì `.lean()` trong Mongoose**
-   - _Mô tả ảo giác:_ API lấy danh sách 1000 sản phẩm trả về Mongoose Document đầy đủ gây độ trễ API lên tới 650ms (vi phạm KPI 1 < 200ms).
-   - _Nguyên nhân:_ AI mặc định viết query Mongoose cơ bản.
-   - _Cách khắc phục:_ Nhóm refactor thêm `.lean()` để chỉ lấy Plain JavaScript Objects, giảm Latency xuống còn 120ms.
-   - _Commit sửa lỗi:_ `commit 1j2k3l4`
+4. **Lỗi 4 (Giao diện / Tương thích): AI gợi ý thư viện quét mã vạch đã ngưng bảo trì (`react-qr-reader`)**
+   - _Mô tả ảo giác:_ AI đề xuất cài đặt package `react-qr-reader` bị lỗi tương thích với React 18+.
+   - _Nguyên nhân:_ Dữ liệu huấn luyện của AI chứa mã nguồn từ các dự án cũ.
+   - _Cách khắc phục:_ Nhóm chủ động thay thế bằng thư viện `html5-qrcode` hiện đại hơn, hỗ trợ gọi camera mượt mà trên cả máy tính và di động.
+   - _Commit sửa lỗi:_ `commit d40e50f`
 
-5. **Lỗi 5 (Linter React): AI sinh Component vi phạm quy tắc `react-hooks/exhaustive-deps`**
-   - _Mô tả ảo giác:_ AI viết `useEffect` thiếu dependency `branchId` gây ra lỗi cảnh báo ESLint khi chạy phân tích tĩnh.
-   - _Nguyên nhân:_ AI không tự chạy linter tĩnh trước khi xuất kết quả.
-   - _Cách khắc phục:_ Nhóm dùng ESLint phát hiện, bổ sung dependency và bọc callback bằng `useCallback`.
-   - _Commit sửa lỗi:_ `commit 5m6n7o8`
+5. **Lỗi 5 (Performance Query): AI sử dụng query Mongoose cơ bản gây Latency cao**
+   - _Mô tả ảo giác:_ AI viết query `Product.find()` trả về nguyên thể Mongoose Hydrated Document khi lấy danh sách sản phẩm.
+   - _Nguyên nhân:_ AI không tự tối ưu hiệu năng I/O cho các query chỉ dùng để đọc (Read-only).
+   - _Cách khắc phục:_ Nhóm refactor thêm hàm `.lean()` giúp chuyển kết quả về Plain JavaScript Object, giảm thời gian phản hồi API từ 380ms xuống 110ms (đạt KPI 1 $T_{\text{avg}} < 200\text{ms}$).
+   - _Commit sửa lỗi:_ `commit e50f60g`
