@@ -1,0 +1,2 @@
+https://www.systemdesignhandbook.com/guides/design-e-commerce-system-design/#product-sku-and-variant-modeling
+https://skemato.com/blog/ecommerce-database-design-example
