@@ -8,6 +8,9 @@ https://docs.google.com/forms/d/e/1FAIpQLSfmQ0mdVcos8phe0_KOve9C-nEW-wFnnB1b37VP
 Sơ đồ thiết kế hệ thống
 https://drive.google.com/file/d/1kE493xqPRv5_fGjVSE1P3Dd5LPSXbyHJ/view?usp=sharing
 
+Link Figma thiết kế giao diện
+https://www.figma.com/design/AzjuTDB1lAW6TJexT4aG1l/Technology-E-commerce-PDP?node-id=11-1147&t=NviSccm6Psforth2-1
+
 ## KẾT QUẢ KHẢO SÁT
 
 ## CHÂN DUNG NGƯỜI DÙNG (PERSONAS)
