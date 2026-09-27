@@ -1,0 +1,59 @@
+name: Backend CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+      - 'fix/**'
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  backend-ci:
+    name: Build, Lint, Audit & Test Coverage
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: code/server
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+          cache-dependency-path: code/server/package-lock.json
+
+      - name: Clean Install Dependencies
+        run: npm ci
+
+      - name: Linter Check (TC2.4 Static Analysis)
+        run: npm run lint
+
+      - name: Security Audit (TC2.4 & TC2.6 Vulnerability Scan)
+        run: npm audit --audit-level=high
+
+      - name: Run Automated Tests & Generate Coverage (TC2.5)
+        env:
+          NODE_ENV: test
+          PORT: 5001
+          JWT_SECRET: test_jwt_secret_key_ci_environment_only_12345
+          JWT_EXPIRES_IN: 15m
+          REFRESH_TOKEN_EXPIRES_IN: 14d
+        run: npm run test:coverage
+
+      - name: Upload Coverage Artifact (TC2.5 Artifacts)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-report
+          path: code/server/coverage/
+          retention-days: 14
