@@ -90,4 +90,7 @@ coverage/
 !AI_Usage_Log.md
 
 # Convenience junction
-/server
+/server
+
+# Prompt reference
+prompt.md
