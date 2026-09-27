@@ -88,3 +88,6 @@ coverage/
 !.env.example
 # Giữ lại nhật ký AI theo yêu cầu tiêu chí TC2.3
 !AI_Usage_Log.md
+
+# Convenience junction
+/server

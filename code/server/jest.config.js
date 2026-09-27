@@ -1,0 +1,14 @@
+export default {
+  testEnvironment: 'node',
+  transform: {},
+  verbose: true,
+  testMatch: ['**/tests/**/*.test.js'],
+  collectCoverageFrom: [
+    'src/modules/auth/**/*.js',
+    'src/middlewares/**/*.js',
+    'src/utils/**/*.js',
+    '!src/server.js'
+  ],
+  coverageReporters: ['text', 'lcov', 'html'],
+  testTimeout: 30000
+};

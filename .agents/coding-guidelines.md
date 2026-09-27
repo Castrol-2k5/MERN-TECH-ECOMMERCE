@@ -230,9 +230,37 @@ Trước khi tạo Pull Request cần đảm bảo:
 
 ---
 
-## 4. QUY TẮC BẢO MẬT SECRET (TC2.4)
+## 4. QUY CHUẨN KIỂM THỬ TỰ ĐỘNG (AUTOMATED TESTING CONVENTIONS - TC2.5)
 
-### 4.1. Không Commit File `.env`
+Mọi tính năng (Feature) mới sau khi hoàn thành bắt buộc phải có bộ kiểm thử tự động đi kèm trước khi mở Pull Request vào nhánh chính:
+
+1. **Quy định tỷ lệ độ phủ (Code Coverage Mandate):**
+   - Độ phủ dòng lệnh (Line/Statement Coverage) cho các mô-đun nghiệp vụ cốt lõi (Auth, Products, Orders/POS, Inventory) bắt buộc đạt **≥ 70%** (Đáp ứng tiêu chí Mức 5 của TC2.5).
+   - Bộ test phải được cấu hình chạy tự động trong script npm: `"test:coverage": "jest --coverage"`.
+
+2. **Cấu trúc thư mục & Quy ước đặt tên file Test:**
+   - File test đặt trong thư mục `server/tests/` hoặc nằm cùng thư mục module theo định dạng: `*.test.js` hoặc `*.spec.js`.
+   - Phân định rõ tầng kiểm thử:
+     - `tests/unit/`: Kiểm thử hàm đơn lẻ, Service Logic, Helpers, Token generators (Mock database).
+     - `tests/integration/`: Kiểm thử toàn bộ luồng API từ Routes -> Controller -> DB thông qua `supertest` kết hợp `mongodb-memory-server`.
+
+3. **Cấu trúc chuẩn một kịch bản Test (AAA Pattern - Arrange, Act, Assert):**
+   - Mỗi test case phải thể hiện rõ:
+     - **Arrange:** Chuẩn bị dữ liệu mẫu và môi trường giả lập.
+     - **Act:** Thực thi endpoint API hoặc hàm cần kiểm tra.
+     - **Assert:** Khẳng định mã HTTP trả về, cấu trúc JSON contract và dữ liệu trong CSDL.
+
+4. **Yêu cầu bao phủ ca kiểm thử (Test Case Matrix):**
+   - **Happy Path (Ca thuận lợi):** Đảm bảo tính năng hoạt động chính xác với dữ liệu hợp lệ.
+   - **Negative Path (Ca âm):** Kiểm tra mã lỗi trả về (400, 401, 403, 404) khi dữ liệu sai định dạng, thiếu trường bắt buộc, tài khoản bị khóa hoặc token hết hạn.
+   - **Edge / Boundary Cases (Ca biên & Bảo mật):** Thử nghiệm truyền chuỗi rỗng, vượt quá độ dài ký tự tối đa, giả mạo role, thao túng branchId của chi nhánh khác.
+   - **100% Test Case phải truy vết được tới Acceptance Criteria (AC)** đã đặc tả trong SRS/SDD.
+
+---
+
+## 5. QUY TẮC BẢO MẬT SECRET (TC2.4)
+
+### 5.1. Không Commit File `.env`
 
 Không được commit các file chứa thông tin nhạy cảm:
 
@@ -253,7 +281,7 @@ Các file này phải được khai báo trong `.gitignore`.
 
 ---
 
-### 4.2. Sử dụng Environment Variables
+### 5.2. Sử dụng Environment Variables
 
 Mọi cấu hình nhạy cảm phải được đọc từ `process.env`.
 
@@ -279,7 +307,7 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 ---
 
-### 4.3. Kiểm tra Secret bằng Gitleaks
+### 5.3. Kiểm tra Secret bằng Gitleaks
 
 Sử dụng **Gitleaks** để quét Secret trước khi Push/PR.
 
@@ -305,7 +333,7 @@ Secret phải được loại bỏ khỏi source code và thay thế bằng Envi
 
 ---
 
-## 5. CODE QUALITY CHECKLIST
+## 6. CODE QUALITY CHECKLIST
 
 Trước khi Merge Pull Request, Developer phải kiểm tra:
 
@@ -326,7 +354,7 @@ Trước khi Merge Pull Request, Developer phải kiểm tra:
 
 ---
 
-## 6. MỤC TIÊU CHẤT LƯỢNG MÃ NGUỒN
+## 7. MỤC TIÊU CHẤT LƯỢNG MÃ NGUỒN
 
 | Tiêu chí                                  | Mục tiêu |
 | ----------------------------------------- | -------- |
