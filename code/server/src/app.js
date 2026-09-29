@@ -10,6 +10,8 @@ import { globalErrorHandler } from './middlewares/error.middleware.js';
 import { protect } from './middlewares/auth.middleware.js';
 import { authorize, scopeBranch } from './middlewares/rbac.middleware.js';
 import authRoutes from './modules/auth/auth.routes.js';
+import branchRoutes from './modules/branches/branch.routes.js';
+import categoryRoutes from './modules/categories/category.routes.js';
 
 const app = express();
 
@@ -48,6 +50,8 @@ app.get(`${env.API_PREFIX}/health`, (req, res) => {
 
 // Mount Module Routes
 app.use(`${env.API_PREFIX}/auth`, authRoutes);
+app.use(`${env.API_PREFIX}/branches`, branchRoutes);
+app.use(`${env.API_PREFIX}/categories`, categoryRoutes);
 
 // Internal routes for integration testing RBAC and data scoping
 app.get(`${env.API_PREFIX}/test/admin-only`, protect, authorize('SUPER_ADMIN'), (req, res) => {
