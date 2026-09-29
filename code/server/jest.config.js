@@ -5,6 +5,8 @@ export default {
   testMatch: ['**/tests/**/*.test.js'],
   collectCoverageFrom: [
     'src/modules/auth/**/*.js',
+    'src/modules/branches/**/*.js',
+    'src/modules/categories/**/*.js',
     'src/middlewares/**/*.js',
     'src/utils/**/*.js',
     '!src/server.js'
