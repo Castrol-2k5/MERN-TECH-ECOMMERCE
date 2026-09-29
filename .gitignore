@@ -93,4 +93,7 @@ coverage/
 /server
 
 # Prompt reference
-prompt.md
+prompt.md
+
+# AI Plan artifacts
+.ai_plans/
