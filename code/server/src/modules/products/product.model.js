@@ -58,6 +58,7 @@ const productSkuSchema = new Schema({
   sku: {
     type: String,
     required: [true, 'Mã SKU là bắt buộc'],
+    uppercase: true,
     trim: true
   },
   price: {
@@ -117,7 +118,7 @@ const productSchema = new Schema(
     },
     isSerialManaged: {
       type: Boolean,
-      default: false
+      default: true
     },
     isActive: {
       type: Boolean,

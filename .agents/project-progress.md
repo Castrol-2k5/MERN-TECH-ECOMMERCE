@@ -15,8 +15,9 @@
 | **2. Auth & RBAC 3 Tầng (JWT, Session, Scoping)** | Hoàn thành | 93.16% Line Coverage (17 ACs) | **TC2.2, TC2.4, TC2.5** |
 | **3. Branch Module & GeoSpatial GPS ($near)** | Hoàn thành | 90.14% Line Coverage (11 Cases) | **TC2.2, TC2.4, TC2.5** |
 | **4. Category Module (Hierarchy & Dynamic Specs)** | Hoàn thành | 91.76% Line Coverage (11 Cases) | **TC2.2, TC2.4, TC2.5** |
-| **5. Pipeline CI/CD GitHub Actions** | Hoàn thành | 100% Green Build Pipeline | **TC2.4, TC2.5, TC2.6** |
-| **Tổng thể Hệ thống (Toàn bộ Backend)** | **Hoàn thành Giai đoạn 1** | **88.34% Line Coverage (69/69 Tests)** | **Mức 5 Xuất sắc** |
+| **5. Product Module (Dynamic Filter & Hybrid Schema)** | Hoàn thành | 87.82% Line Coverage (19 Cases) | **TC2.2, TC2.4, TC2.5** |
+| **6. Pipeline CI/CD GitHub Actions** | Hoàn thành | 100% Green Build Pipeline | **TC2.4, TC2.5, TC2.6** |
+| **Tổng thể Hệ thống (Toàn bộ Backend)** | **Hoàn thành Giai đoạn 1** | **88.37% Line Coverage (88/88 Tests)** | **Mức 5 Xuất sắc** |
 
 ---
 
@@ -70,6 +71,19 @@
 
 ---
 
+### 2.5. Phân Hệ Quản Lý Sản Phẩm (`/api/v1/products`) - Hybrid Dynamic Schema
+* **Mô hình Hybrid Schema:** Kết hợp thông tin sản phẩm chuẩn, mảng thuộc tính động `attributes` (`{ key, value }`), `options` và mảng biến thể `skus` nhúng (triệt tiêu phép `$lookup`).
+* **Đảm bảo tính toàn vẹn thuộc tính (Integrity Rule):** So khớp `attributes.key` gửi lên với `Category.attributeKeys`. Báo lỗi `HTTP 400 Bad Request` với mã `INVALID_ATTRIBUTE_KEY` nếu xuất hiện thông số sai lệch.
+* **Dynamic Filter Engine:** Tự động trích xuất các tham số query động (VD: `?ram=16GB&cpu=Intel i7`) và thực thi lọc tối ưu bằng toán tử `$all` kết hợp `$elemMatch` trên **Multikey Compound Index** `{ "attributes.key": 1, "attributes.value": 1 }`, cam kết $T_{avg} < 200ms$ cùng `.lean()`.
+* **Đầy đủ CRUD & RBAC:**
+  - `GET /products`: Tìm kiếm từ khóa, lọc theo danh mục, thương hiệu, khoảng giá SKU (`skus.salePrice`) và bộ lọc thuộc tính động.
+  - `GET /products/:slug`: Xem chi tiết sản phẩm và populate danh mục kèm `attributeKeys`.
+  - `POST /products`: Tạo mới sản phẩm (Quyền `SUPER_ADMIN`, validate `salePrice <= price`).
+  - `PUT /products/:id`: Cập nhật sản phẩm & thông số kỹ thuật (Quyền `SUPER_ADMIN`).
+  - `DELETE /products/:id`: Xóa mềm sản phẩm (`isActive: false`, Quyền `SUPER_ADMIN`).
+
+---
+
 ## 3. THỐNG KÊ CHẤT LƯỢNG MÃ NGUỒN & KIỂM THỬ (RUBRIC METRICS)
 
 ### 3.1. Phân Tích Tĩnh Mã Nguồn (TC2.4)
@@ -81,10 +95,10 @@
 Hệ thống sử dụng **Jest**, **Supertest** kết hợp **`mongodb-memory-server`** chạy độc lập siêu tốc không phụ thuộc database ngoài:
 
 ```text
-Test Suites: 6 passed, 6 total
-Tests:       69 passed, 69 total (100% Pass Rate)
+Test Suites: 7 passed, 7 total
+Tests:       88 passed, 88 total (100% Pass Rate)
 Snapshots:   0 total
-Time:        ~30s
+Time:        ~32s
 ```
 
 #### Bảng Thống Kê Độ Phủ Mã Nguồn (`npm run test:coverage`):
@@ -92,7 +106,7 @@ Time:        ~30s
 ----------------------------|---------|----------|---------|---------|
 File                        | % Stmts | % Branch | % Funcs | % Lines |
 ----------------------------|---------|----------|---------|---------|
-All files                   |   88.04 |    62.24 |   97.22 |   88.34 |
+All files                   |   88.08 |    65.10 |   95.91 |   88.37 |
  middlewares                |   73.25 |    55.12 |   81.81 |   73.49 |
   auth.middleware.js        |   70.58 |    71.42 |     100 |   70.58 |
   rbac.middleware.js        |   88.00 |    62.06 |     100 |   88.00 |
@@ -115,10 +129,16 @@ All files                   |   88.04 |    62.24 |   97.22 |   88.34 |
   category.model.js         |  100.00 |   100.00 |     100 |  100.00 |
   category.routes.js        |  100.00 |   100.00 |     100 |  100.00 |
   category.service.js       |   87.27 |    71.15 |     100 |   87.27 |
- utils                      |   93.75 |    18.75 |     100 |   96.66 |
+ modules/products           |   87.57 |    70.43 |    92.30 |   87.82 |
+  product.controller.js     |  100.00 |   100.00 |     100 |  100.00 |
+  product.dto.js            |  100.00 |   100.00 |     100 |  100.00 |
+  product.model.js          |  100.00 |   100.00 |     100 |  100.00 |
+  product.routes.js         |  100.00 |   100.00 |     100 |  100.00 |
+  product.service.js        |   83.05 |    69.91 |   88.88 |   83.18 |
+ utils                      |   96.87 |    25.00 |     100 |  100.00 |
 ----------------------------|---------|----------|---------|---------|
 ```
-* **Nhận xét:** Tất cả các mô-đun nghiệp vụ cốt lõi đều đạt **Line Coverage từ 88% - 93%**, vượt xa yêu cầu tối thiểu 70% của rubric Mức 5.
+* **Nhận xét:** Toàn bộ các mô-đun nghiệp vụ cốt lõi đều đạt **Line Coverage từ 87% - 93%**, vượt xa yêu cầu tối thiểu 70% của rubric Mức 5.
 
 ### 3.3. Pipeline Tự Động Hóa CI/CD (TC2.6)
 * Đã thiết lập workflow `.github/workflows/ci.yml` chạy trên `ubuntu-latest` với `Node.js 20.x`.
@@ -128,8 +148,7 @@ All files                   |   88.04 |    62.24 |   97.22 |   88.34 |
 
 ## 4. KẾ HOẠCH BƯỚC TIẾP THEO (NEXT STEPS)
 
-1. **Phân hệ Sản phẩm & Tồn kho (`Product & Inventory Modules`):**
-   - Hiện thực hóa API tạo sản phẩm với cấu trúc Dynamic Attributes, Options và SKUs.
+1. **Phân hệ Tồn kho Đa Chi nhánh (`Branch Inventory Module`):**
    - Hiện thực hóa API phân bổ tồn kho đa chi nhánh (`branch_inventories`) kết hợp kỹ thuật Atomic Updates (`$inc`, `$gte`).
 2. **Phân hệ Quản lý Serial/IMEI & Máy quét POS (`Serial Module`):**
    - Hiện thực hóa API quét mã vạch kiểm tra trạng thái `IN_STOCK`.

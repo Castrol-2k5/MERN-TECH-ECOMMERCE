@@ -12,6 +12,7 @@ import { authorize, scopeBranch } from './middlewares/rbac.middleware.js';
 import authRoutes from './modules/auth/auth.routes.js';
 import branchRoutes from './modules/branches/branch.routes.js';
 import categoryRoutes from './modules/categories/category.routes.js';
+import productRoutes from './modules/products/product.routes.js';
 
 const app = express();
 
@@ -52,6 +53,7 @@ app.get(`${env.API_PREFIX}/health`, (req, res) => {
 app.use(`${env.API_PREFIX}/auth`, authRoutes);
 app.use(`${env.API_PREFIX}/branches`, branchRoutes);
 app.use(`${env.API_PREFIX}/categories`, categoryRoutes);
+app.use(`${env.API_PREFIX}/products`, productRoutes);
 
 // Internal routes for integration testing RBAC and data scoping
 app.get(`${env.API_PREFIX}/test/admin-only`, protect, authorize('SUPER_ADMIN'), (req, res) => {

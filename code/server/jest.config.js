@@ -7,6 +7,7 @@ export default {
     'src/modules/auth/**/*.js',
     'src/modules/branches/**/*.js',
     'src/modules/categories/**/*.js',
+    'src/modules/products/**/*.js',
     'src/middlewares/**/*.js',
     'src/utils/**/*.js',
     '!src/server.js'
