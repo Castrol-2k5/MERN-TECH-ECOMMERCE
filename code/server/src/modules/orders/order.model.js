@@ -91,6 +91,23 @@ const orderSchema = new Schema(
       ref: 'User',
       default: null
     },
+    customerInfo: {
+      fullName: {
+        type: String,
+        trim: true,
+        default: ''
+      },
+      phone: {
+        type: String,
+        trim: true,
+        default: ''
+      },
+      address: {
+        type: String,
+        trim: true,
+        default: ''
+      }
+    },
     branchId: {
       type: Schema.Types.ObjectId,
       ref: 'Branch',
@@ -150,5 +167,6 @@ orderSchema.index({ orderCode: 1 }, { unique: true });
 orderSchema.index({ branchId: 1, createdAt: -1 });
 orderSchema.index({ customerId: 1 });
 orderSchema.index({ orderStatus: 1 });
+orderSchema.index({ paymentStatus: 1 });
 
 export const Order = mongoose.model('Order', orderSchema);

@@ -47,3 +47,10 @@ export const protect = catchAsync(async (req, res, next) => {
 
   next();
 });
+
+export const optionalProtect = catchAsync(async (req, res, next) => {
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    return protect(req, res, next);
+  }
+  next();
+});

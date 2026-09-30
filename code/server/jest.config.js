@@ -10,6 +10,7 @@ export default {
     'src/modules/products/**/*.js',
     'src/modules/inventory/**/*.js',
     'src/modules/serials/**/*.js',
+    'src/modules/orders/**/*.js',
     'src/middlewares/**/*.js',
     'src/utils/**/*.js',
     '!src/server.js'

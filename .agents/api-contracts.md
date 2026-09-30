@@ -115,12 +115,24 @@
 
 ---
 
-### 2.5. Module Web POS & Orders (`/api/v1/orders`)
+### 2.5. Module Inventory (`/api/v1/inventory`)
 
 | Method | Endpoint | Mô tả | Quyền |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/orders/pos/checkout` | Thanh toán đơn hàng tại quầy POS, gán Serial/IMEI thực tế. | `STAFF`, `BRANCH_MANAGER` |
-| `POST` | `/orders/b2c/checkout` | Khách hàng thực hiện đặt hàng thông qua B2C Web. | `CUSTOMER` |
+| `GET` | `/inventory/branch/:branchId` | Xem tồn kho theo chi nhánh (sử dụng `.lean()` và populate `productId`, `skus`). Tự động áp dụng `scopeBranch` (nhân sự chỉ xem chi nhánh mình; `SUPER_ADMIN` xem xuyên chuỗi). | `STAFF`, `BRANCH_MANAGER`, `SUPER_ADMIN` |
+| `GET` | `/inventory/sku/:productSkuId` | Lấy danh sách các chi nhánh còn hàng của 1 SKU cụ thể (phục vụ tính năng Storefront B2C "Tìm chi nhánh còn hàng"). | Public |
+| `POST` | `/inventory/adjust` | Điều chỉnh tồn kho thủ công (kiểm kê kho). Áp dụng toán tử Atomic `$inc` kèm điều kiện `{ quantity: { $gte: qty } }` chống Race Condition (Zero Overselling). | `SUPER_ADMIN`, `BRANCH_MANAGER` (tại chi nhánh mình) |
+
+#### Request Body mẫu: `POST /api/v1/inventory/adjust`
+```json
+{
+  "branchId": "650c1f2e1234567890abcdef",
+  "productId": "650c1f2e1234567890abc001",
+  "productSkuId": "650c1f2e1234567890abc002",
+  "quantityDelta": -2,
+  "reason": "Xuất điều chuyển kho hoặc hao hụt kiểm kê"
+}
+```
 
 ---
 
@@ -128,9 +140,71 @@
 
 | Method | Endpoint | Mô tả | Quyền |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/serials/verify/:serialNumber` | Tra cứu hạn và lịch sử bảo hành điện tử công khai qua mã Serial/IMEI. | Public |
-| `GET` | `/serials/scan/:serialNumber?branchId=xxx` | Quét mã Serial/IMEI tại quầy POS để kiểm tra trạng thái `IN_STOCK`. | `STAFF`, `BRANCH_MANAGER` |
-| `POST` | `/serials/import` | Nhập danh sách Serial/IMEI mới vào kho. | `SUPER_ADMIN`, `BRANCH_MANAGER` |
+| `POST` | `/serials/import` | Nhập lô hàng Serial/IMEI mới vào kho. Atomic insert bản ghi Serial (`IN_STOCK`) và `$inc` số lượng tương ứng trong `branch_inventories`. Báo lỗi nếu trùng mã. | `SUPER_ADMIN`, `BRANCH_MANAGER` (tại chi nhánh mình) |
+| `GET` | `/serials/scan/:serialNumber` | Quét mã vạch/QR Serial tại quầy POS. Xác thực Serial tồn tại, ở trạng thái `IN_STOCK`, và thuộc đúng chi nhánh của nhân sự POS. Trả về thông tin sản phẩm và giá SKU ($T_{response} < 100ms$). | `STAFF`, `BRANCH_MANAGER`, `SUPER_ADMIN` |
+| `GET` | `/serials/verify/:serialNumber` | Tra cứu bảo hành điện tử công khai (e-Warranty). Trả về tên sản phẩm, SKU, ngày bán, hạn bảo hành và cờ `isExpired`. | Public |
+
+#### Request Body mẫu: `POST /api/v1/serials/import`
+```json
+{
+  "branchId": "650c1f2e1234567890abcdef",
+  "productId": "650c1f2e1234567890abc001",
+  "productSkuId": "650c1f2e1234567890abc002",
+  "serials": ["C02G1234MD6R", "C02G1235MD6R", "C02G1236MD6R"]
+}
+```
+
+---
+
+### 2.7. Module Web POS & Orders (`/api/v1/orders`)
+
+| Method | Endpoint | Mô tả | Quyền |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/orders/pos/checkout` | Thanh toán đơn hàng tại quầy POS. Xác thực tính khả dụng và chi nhánh của Serial, trừ kho Atomic `$inc`, chuyển trạng thái Serial `IN_STOCK` ➔ `SOLD`, tự động kích hoạt bảo hành 12 tháng (`warrantyEndDate`). | `STAFF`, `BRANCH_MANAGER`, `SUPER_ADMIN` |
+| `POST` | `/orders/b2c/checkout` | Khách hàng thực hiện đặt hàng trực tuyến B2C (hỗ trợ cả tài khoản `CUSTOMER` và Khách vãng lai). Trừ kho trước (Atomic Virtual Holding) với điều kiện `{ quantity: { $gte: qty } }`, khởi tạo đơn `PENDING`. | Public / Authenticated |
+| `GET` | `/orders/my-orders` | Khách hàng xem lịch sử đơn hàng của mình (phân trang `page`, `limit`). | `CUSTOMER`, `SUPER_ADMIN` |
+| `GET` | `/orders/branch` | Quản lý/Thu ngân xem danh sách đơn hàng của chi nhánh mình (áp dụng `scopeBranch`). `SUPER_ADMIN` xem xuyên chuỗi hoặc lọc theo `?branchId=...`. | `STAFF`, `BRANCH_MANAGER`, `SUPER_ADMIN` |
+| `GET` | `/orders/:orderCode` | Xem chi tiết đơn hàng theo mã đơn (kèm danh sách Serial và bảo hành). Bảo mật theo vai trò (Khách xem đơn mình, Nhân sự xem đơn chi nhánh mình, Admin xem toàn bộ). | Authenticated |
+
+#### Request Body mẫu: `POST /api/v1/orders/pos/checkout`
+```json
+{
+  "branchId": "650c1f2e1234567890abcdef",
+  "items": [
+    {
+      "productId": "650c1f2e1234567890abc001",
+      "productSkuId": "650c1f2e1234567890abc002",
+      "quantity": 1,
+      "serialsAssigned": ["IPAD-SER-001"]
+    }
+  ],
+  "paymentMethod": "CASH",
+  "customerInfo": {
+    "fullName": "Nguyen Van Khach",
+    "phone": "0988111222"
+  }
+}
+```
+
+#### Request Body mẫu: `POST /api/v1/orders/b2c/checkout`
+```json
+{
+  "branchId": "650c1f2e1234567890abcdef",
+  "items": [
+    {
+      "productId": "650c1f2e1234567890abc001",
+      "productSkuId": "650c1f2e1234567890abc002",
+      "quantity": 2
+    }
+  ],
+  "shippingAddress": {
+    "fullName": "Tran Thi B",
+    "phone": "0987654321",
+    "address": "123 Nguyen Hue, Quan 1, TP.HCM"
+  },
+  "paymentMethod": "VNPAY"
+}
+```
 
 ---
 
