@@ -8,6 +8,8 @@ export default {
     'src/modules/branches/**/*.js',
     'src/modules/categories/**/*.js',
     'src/modules/products/**/*.js',
+    'src/modules/inventory/**/*.js',
+    'src/modules/serials/**/*.js',
     'src/middlewares/**/*.js',
     'src/utils/**/*.js',
     '!src/server.js'

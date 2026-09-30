@@ -59,11 +59,14 @@ export const scopeBranch = (req, res, next) => {
     if (req.body && typeof req.body === 'object') {
       req.body.branchId = branchId.toString();
     }
+    if (req.params && typeof req.params === 'object' && req.params.branchId) {
+      req.params.branchId = branchId.toString();
+    }
 
     return next();
   }
 
   // CUSTOMER: no branch isolation restriction, or handled separately
-  req.scopedBranchId = req.query.branchId || req.body.branchId || null;
+  req.scopedBranchId = req.query?.branchId || req.body?.branchId || req.params?.branchId || null;
   next();
 };
