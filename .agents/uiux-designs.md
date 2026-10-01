@@ -149,3 +149,102 @@
 - **Components cốt lõi:**
   - `Revenue Chart`: Biểu đồ so sánh doanh thu các chi nhánh.
   - `Channel Breakdown`: Tỷ lệ doanh thu giữa B2C Web Online vs Web POS tại quầy.
+
+---
+
+## 🔐 4. PHÂN HỆ XÁC THỰC & TÀI KHOẢN (AUTHENTICATION & ACCOUNT)
+
+### P-00: Đăng nhập Hệ thống (Unified Login - Route: `/login`)
+- **Nhiệm vụ:** Điểm đăng nhập chung cho cả Khách hàng B2C và Nhân sự nội bộ (Staff, Branch Manager, Super Admin), phân luồng điều hướng tự động dựa trên `role` của JWT Token.
+- **Layout:** Cấu trúc Card căn giữa màn hình (Split card hoặc Centered Card với Brand Hero background).
+- **Components cốt lõi:**
+  - `Brand Header`: Logo TechOne, tiêu đề chào mừng ("Đăng nhập tài khoản của bạn").
+  - `Login Form`:
+    - Ô nhập `identifier` (Email hoặc Số điện thoại).
+    - Ô nhập `password` (Hỗ trợ nút Toggle ẩn/hiện mật khẩu).
+    - Checkbox "Ghi nhớ đăng nhập" (Chỉ áp dụng tạo Persistent Cookie cho role CUSTOMER).
+    - Link điều hướng "Quên mật khẩu?".
+    - Nút CTA Primary Blue: `[ĐĂNG NHẬP]`.
+  - `Role-based Redirect Handlers`:
+    - Nếu `role === 'CUSTOMER'`: Chuyển hướng về Trang chủ `/` hoặc trang trước đó trong History.
+    - Nếu `role === 'STAFF'` hoặc `'BRANCH_MANAGER'`: Chuyển hướng thẳng vào `/portal/pos`.
+    - Nếu `role === 'SUPER_ADMIN'`: Chuyển hướng vào `/portal/admin/products` hoặc `/portal/admin/analytics`.
+  - `Social Login Block` (Dành riêng cho B2C): Nút đăng nhập nhanh với Google.
+  - `Bottom Link`: "Chưa có tài khoản? [Đăng ký ngay]".
+
+---
+
+### P-16: Đăng ký Tài khoản B2C (Customer Register - Route: `/register`)
+- **Nhiệm vụ:** Cho phép khách hàng cá nhân tạo tài khoản thành viên để tích lũy đơn hàng và theo dõi bảo hành.
+- **Layout:** Centered Card tối giản, tập trung vào tỷ lệ chuyển đổi form.
+- **Components cốt lõi:**
+  - `Registration Form`:
+    - Ô nhập `fullName` (Họ và tên khách hàng).
+    - Ô nhập `phone` (Validate chuẩn định dạng số điện thoại Việt Nam 10 chữ số).
+    - Ô nhập `email` (Validate định dạng email chuẩn RFC).
+    - Ô nhập `password` kèm thanh đo độ mạnh mật khẩu (Password Strength Indicator: độ dài >= 6 ký tự, bao gồm chữ và số).
+    - Ô nhập `confirmPassword` (Xác thực trùng khớp mật khẩu).
+    - Checkbox chấp thuận "Điều khoản dịch vụ & Chính sách bảo mật".
+  - `Action CTA`: Nút `[TẠO TÀI KHOẢN]` (Gửi request `POST /api/v1/auth/register`, role mặc định luôn là `CUSTOMER`).
+  - `Footer Link`: "Đã có tài khoản? [Đăng nhập]".
+
+---
+
+### P-17: Quên & Đặt lại Mật khẩu (Password Recovery - Route: `/forgot-password`, `/reset-password`)
+- **Nhiệm vụ:** Khôi phục quyền truy cập tài khoản khi người dùng quên mật khẩu.
+- **Layout:** 2 trạng thái màn hình (Hai View/Step dạng Card):
+  - **View 1: Yêu cầu khôi phục (`/forgot-password`)**:
+    - Ô nhập Email hoặc Số điện thoại đã đăng ký.
+    - Nút `[GỬI LIÊN KẾT XÁC THỰC]`.
+    - Alert Box: Thông báo gửi thành công và hướng dẫn người dùng kiểm tra hộp thư đến.
+  - **View 2: Đặt lại mật khẩu mới (`/reset-password?token=...`)**:
+    - Tự động kiểm tra tính hợp lệ của `token` xác thực trên URL.
+    - Form nhập `newPassword` và `confirmNewPassword`.
+    - Nút `[CẬP NHẬT MẬT KHẨU MỚI]`.
+    - Modal thông báo thành công kèm nút điều hướng quay về `/login`.
+
+---
+
+## 📦 5. PHÂN HỆ TRẢI NGHIỆM ĐƠN HÀNG B2C & VẬN HÀNH NỘI BỘ
+
+### P-18: Quản lý Đơn hàng & Chi tiết Đơn B2C (Customer Orders & Details - Route: `/account/orders`, `/account/orders/:id` - Role: `CUSTOMER`)
+- **Nhiệm vụ:** Giúp khách hàng tra cứu lịch sử mua hàng, theo dõi tiến độ giao hàng/nhận hàng và lấy mã Serial/IMEI thiết bị đã mua.
+- **Components cốt lõi:**
+  - `Order Filter Tabs`: Tab lọc trạng thái đơn hàng (`Tất cả`, `Chờ thanh toán`, `Đang xử lý`, `Đang giao hàng`, `Đã hoàn tất`, `Đã hủy`).
+  - `Order List Card Item`: Mỗi đơn hiển thị Mã đơn (`orderCode`), Ngày đặt, Tổng tiền, Huy hiệu phương thức thanh toán (`VNPAY`, `COD`), Trạng thái đơn hàng.
+  - `Order Detail Drawer / Page View`:
+    - **Timeline Tiến độ:** Stepper trực quan 4 bước (`Đã đặt hàng` -> `Đã xác nhận & Phân bổ chi nhánh` -> `Đang giao hàng` -> `Giao thành công`).
+    - **Thông tin Chi nhánh xử lý:** Tên chi nhánh, Địa chỉ, Hotline hỗ trợ.
+    - **Danh sách mặt hàng chi tiết:** Ảnh, Tên SKU, Đơn giá, Số lượng, và **Mã Serial/IMEI đã gán** cho máy (kèm nút bấm "Tra cứu bảo hành" chuyển nhanh sang `P-07`).
+    - **Hóa đơn & Thanh toán:** Tạm tính, Phí vận chuyển, Giảm giá voucher, Tổng thanh toán.
+
+---
+
+### P-19: Xác nhận Đặt hàng Thành công (Checkout Success - Route: `/checkout/success` - Role: Public / `CUSTOMER`)
+- **Nhiệm vụ:** Hiển thị biên nhận đặt hàng thành công sau khi hoàn tất quy trình checkout trực tuyến hoặc thanh toán qua cổng VNPAY/Stripe.
+- **Layout:** Cấu trúc Hero Card trung tâm kèm biểu tượng trạng thái trực quan.
+- **Components cốt lõi:**
+  - `Status Indicator`: Icon Check xanh lá (`#16A34A`), Tiêu đề "Đặt hàng thành công!".
+  - `Order Meta Summary`: Mã đơn hàng (`orderCode` - có nút Sao chép), Email nhận thông báo, Tổng tiền đã thanh toán.
+  - `Fulfillment Instructions`:
+    - *Nếu chọn Click & Collect (Nhận tại cửa hàng):* Hiển thị Địa chỉ chi nhánh nhận máy, Bản đồ mini/Chỉ đường, Mã PIN nhận hàng hoặc QR Code để nhân viên quầy quét nhanh.
+    - *Nếu chọn Giao tận nơi:* Hiển thị Địa chỉ giao hàng dự kiến, Đơn vị vận chuyển và Thời gian nhận hàng ước tính (2h - 48h).
+  - `Next Actions Block`: Nút CTA `[THEO DÕI ĐƠN HÀNG]` (Điều hướng sang `P-18`) và nút Secondary `[TIẾP TỤC MUA SẮM]` (Quay về `P-01`).
+
+---
+
+### P-20: Điều chuyển Tồn kho Liên Chi nhánh (Stock Transfer - Route: `/portal/branch/transfers` - Role: `BRANCH_MANAGER`, `SUPER_ADMIN`)
+- **Nhiệm vụ:** Quản lý quy trình luân chuyển thiết bị giữa các chi nhánh khi có sự lệch tồn kho (cân bằng kho chuỗi), áp dụng máy trạng thái `TRANSIT` cho Serial/IMEI.
+- **Layout:** High-density Dashboard chia 2 tab: `Yêu cầu chuyển hàng (Outbound)` và `Tiếp nhận hàng chuyển đến (Inbound)`.
+- **Components cốt lõi:**
+  - `Transfer Request Modal / Form`:
+    - Chọn Chi nhánh gửi (`sourceBranchId`) và Chi nhánh nhận (`destinationBranchId`).
+    - Chọn Sản phẩm & SKU cần điều chuyển.
+    - Nhập danh sách mã Serial/IMEI cụ thể xuất đi (Bằng tay hoặc qua máy quét mã vạch).
+    - Nút `[TẠO PHIẾU ĐIỀU CHUYỂN]`: Chuyển trạng thái các Serial được chọn từ `IN_STOCK` sang `TRANSIT`.
+  - `Transfer Queue Table`:
+    - Cột hiển thị: Mã phiếu điều chuyển (`TRF-XXXX`), Chi nhánh xuất, Chi nhánh nhận, Số lượng thiết bị, Người tạo, Ngày tạo, Trạng thái (`CHỜ VẬN CHUYỂN`, `ĐANG TRÊN ĐƯỜNG`, `ĐÃ NHẬP KHO`).
+  - `Inbound Receiving Verification Drawer`:
+    - Khi hàng đến chi nhánh đích, Quản lý chi nhánh mở drawer để quét kiểm tra đối chiếu từng Serial/IMEI thực tế trên kiện hàng.
+    - Counter kiểm đếm trực tiếp: `Đã quét: X / Y máy`.
+    - Nút `[XÁC NHẬN NHẬP KHO]`: Tự động chuyển trạng thái Serial từ `TRANSIT` sang `IN_STOCK` tại chi nhánh đích và cập nhật lại số lượng tồn kho `quantity` tương ứng trong bảng `branch_inventories`.

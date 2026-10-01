@@ -14,7 +14,8 @@ import {
   Barcode,
   Truck,
   ShieldCheck,
-  BarChart3
+  BarChart3,
+  ArrowLeftRight
 } from 'lucide-react';
 
 export const PortalLayout = () => {
@@ -42,6 +43,12 @@ export const PortalLayout = () => {
       label: 'Tiếp Nhận Bảo Hành',
       badge: 'E-Warranty',
       icon: Wrench
+    },
+    {
+      to: '/portal/branch/transfers',
+      label: 'Điều Chuyển Kho',
+      badge: 'P-20',
+      icon: ArrowLeftRight
     }
   ];
 

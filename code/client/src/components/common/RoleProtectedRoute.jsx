@@ -1,12 +1,16 @@
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 
 export const RoleProtectedRoute = ({ allowedRoles = ['STAFF', 'BRANCH_MANAGER', 'SUPER_ADMIN'] }) => {
-  // Giả định auth state trong Redux hoặc fallback cho phép dev
+  const location = useLocation();
   const auth = useSelector((state) => state.auth);
-  const user = auth?.user || { role: 'STAFF', fullName: 'Nhân viên Quầy TechOne' };
+  const user = auth?.user;
 
-  if (allowedRoles.length > 0 && user && !allowedRoles.includes(user.role)) {
+  if (!auth?.isAuthenticated || !user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
     return <Navigate to="/" replace />;
   }
 
