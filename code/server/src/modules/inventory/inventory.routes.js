@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { InventoryController } from './inventory.controller.js';
-import { adjustStockSchema } from './inventory.dto.js';
+import { adjustStockSchema, createTransferSchema, receiveTransferSchema } from './inventory.dto.js';
 import { validateDto } from '../../middlewares/validate.middleware.js';
 import { protect } from '../../middlewares/auth.middleware.js';
 import { authorize, scopeBranch } from '../../middlewares/rbac.middleware.js';
@@ -29,4 +29,29 @@ router.post(
   InventoryController.adjustStock
 );
 
+// Protected: Điều chuyển tồn kho liên chi nhánh (Stock Transfers)
+router.post(
+  '/transfers',
+  protect,
+  authorize(USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER),
+  validateDto(createTransferSchema),
+  InventoryController.createTransfer
+);
+
+router.get(
+  '/transfers',
+  protect,
+  authorize(USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER, USER_ROLES.STAFF),
+  InventoryController.getTransfers
+);
+
+router.patch(
+  '/transfers/:id/receive',
+  protect,
+  authorize(USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER, USER_ROLES.STAFF),
+  validateDto(receiveTransferSchema),
+  InventoryController.receiveTransfer
+);
+
 export default router;
+

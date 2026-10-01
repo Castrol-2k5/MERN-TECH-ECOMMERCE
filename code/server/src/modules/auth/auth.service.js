@@ -226,4 +226,65 @@ export class AuthService {
 
     return user;
   }
+
+  /**
+   * Request password reset token
+   */
+  static async forgotPassword({ identifier }) {
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier);
+    const query = isEmail
+      ? { email: identifier.trim().toLowerCase() }
+      : { phone: identifier.trim() };
+
+    const user = await User.findOne(query);
+    if (!user) {
+      return {
+        message: 'Nếu thông tin tài khoản tồn tại trong hệ thống, bạn sẽ nhận được hướng dẫn đặt lại mật khẩu.'
+      };
+    }
+
+    if (!user.isActive) {
+      throw new AppError('Tài khoản đã bị tạm khóa. Vui lòng liên hệ quản trị viên.', 403, 'ACCOUNT_LOCKED');
+    }
+
+    const resetToken = generateRefreshToken();
+    user.passwordResetToken = hashToken(resetToken);
+    user.passwordResetExpires = new Date(Date.now() + 15 * 60 * 1000);
+    await user.save({ validateBeforeSave: false });
+
+    return {
+      message: 'Yêu cầu khôi phục mật khẩu đã được xử lý thành công.',
+      resetToken
+    };
+  }
+
+  /**
+   * Reset password using token
+   */
+  static async resetPassword({ token, newPassword }) {
+    const hashedToken = hashToken(token);
+    const user = await User.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpires: { $gt: Date.now() }
+    }).select('+passwordHash');
+
+    if (!user) {
+      throw new AppError(
+        'Mã xác thực không hợp lệ hoặc đã hết hạn (chỉ có hiệu lực trong 15 phút).',
+        400,
+        'INVALID_OR_EXPIRED_TOKEN'
+      );
+    }
+
+    user.passwordHash = newPassword;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
+
+    await Session.deleteMany({ userId: user._id });
+
+    return {
+      message: 'Đặt lại mật khẩu mới thành công. Vui lòng đăng nhập lại.'
+    };
+  }
 }

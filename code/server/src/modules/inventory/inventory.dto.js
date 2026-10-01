@@ -26,3 +26,45 @@ export const adjustStockSchema = z
       .min(1, 'Lý do điều chỉnh không được để trống')
   })
   .strict();
+
+export const createTransferSchema = z
+  .object({
+    sourceBranchId: z
+      .string({ required_error: 'Chi nhánh xuất chuyển là bắt buộc' })
+      .trim()
+      .regex(/^[0-9a-fA-F]{24}$/, 'Chi nhánh xuất chuyển không hợp lệ'),
+    destinationBranchId: z
+      .string({ required_error: 'Chi nhánh tiếp nhận là bắt buộc' })
+      .trim()
+      .regex(/^[0-9a-fA-F]{24}$/, 'Chi nhánh tiếp nhận không hợp lệ'),
+    productId: z
+      .string({ required_error: 'Mã sản phẩm là bắt buộc' })
+      .trim()
+      .regex(/^[0-9a-fA-F]{24}$/, 'Mã sản phẩm không hợp lệ'),
+    productSkuId: z
+      .string({ required_error: 'Mã biến thể SKU là bắt buộc' })
+      .trim()
+      .regex(/^[0-9a-fA-F]{24}$/, 'Mã biến thể SKU không hợp lệ'),
+    quantity: z
+      .number({ required_error: 'Số lượng điều chuyển là bắt buộc' })
+      .int()
+      .min(1, 'Số lượng tối thiểu là 1'),
+    serialNumbers: z
+      .array(z.string().trim().toUpperCase())
+      .default([]),
+    notes: z.string().trim().optional().default('')
+  })
+  .refine((data) => data.sourceBranchId !== data.destinationBranchId, {
+    message: 'Chi nhánh nhận phải khác chi nhánh xuất chuyển',
+    path: ['destinationBranchId']
+  });
+
+export const receiveTransferSchema = z
+  .object({
+    scannedSerials: z
+      .array(z.string().trim().toUpperCase())
+      .optional()
+      .default([])
+  })
+  .strict();
+

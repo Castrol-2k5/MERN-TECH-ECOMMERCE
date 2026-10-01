@@ -116,4 +116,26 @@ export class AuthController {
       }
     });
   });
+
+  static forgotPassword = catchAsync(async (req, res) => {
+    const result = await AuthService.forgotPassword(req.body);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: result.message,
+      data: {
+        resetToken: result.resetToken
+      }
+    });
+  });
+
+  static resetPassword = catchAsync(async (req, res) => {
+    const result = await AuthService.resetPassword(req.body);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: result.message,
+      data: {}
+    });
+  });
 }

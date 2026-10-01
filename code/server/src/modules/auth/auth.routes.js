@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { AuthController } from './auth.controller.js';
-import { registerSchema, loginSchema } from './auth.dto.js';
+import { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } from './auth.dto.js';
 import { validateDto } from '../../middlewares/validate.middleware.js';
 import { protect } from '../../middlewares/auth.middleware.js';
 import { authRateLimiter } from '../../middlewares/rateLimiter.middleware.js';
@@ -10,6 +10,8 @@ const router = Router();
 // Public auth routes with rate limiting
 router.post('/register', authRateLimiter, validateDto(registerSchema), AuthController.register);
 router.post('/login', authRateLimiter, validateDto(loginSchema), AuthController.login);
+router.post('/forgot-password', authRateLimiter, validateDto(forgotPasswordSchema), AuthController.forgotPassword);
+router.post('/reset-password', authRateLimiter, validateDto(resetPasswordSchema), AuthController.resetPassword);
 
 // Token management & session routes
 router.post('/refresh-token', AuthController.refreshToken);

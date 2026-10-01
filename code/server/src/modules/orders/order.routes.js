@@ -33,6 +33,12 @@ router.get(
   OrderController.getMyOrders
 );
 
+router.get(
+  '/my-orders/:id',
+  protect,
+  OrderController.getMyOrderDetail
+);
+
 // 4. Quản lý/Nhân viên POS xem danh sách đơn hàng chi nhánh (scopeBranch)
 router.get(
   '/branch',

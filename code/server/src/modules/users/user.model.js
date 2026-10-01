@@ -57,6 +57,16 @@ const userSchema = new Schema(
     isActive: {
       type: Boolean,
       default: true
+    },
+    passwordResetToken: {
+      type: String,
+      default: null,
+      select: false
+    },
+    passwordResetExpires: {
+      type: Date,
+      default: null,
+      select: false
     }
   },
   {

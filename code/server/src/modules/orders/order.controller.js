@@ -39,6 +39,16 @@ export class OrderController {
     });
   });
 
+  static getMyOrderDetail = catchAsync(async (req, res) => {
+    const order = await OrderService.getMyOrderDetail(req.params.id, req.user.id);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Lấy chi tiết đơn hàng cá nhân thành công',
+      data: { order }
+    });
+  });
+
   static getBranchOrders = catchAsync(async (req, res) => {
     const targetBranchId = req.scopedBranchId || req.query.branchId;
     const result = await OrderService.getBranchOrders(targetBranchId, req.query);

@@ -34,4 +34,34 @@ export class InventoryController {
       data: result
     });
   });
+
+  static createTransfer = catchAsync(async (req, res) => {
+    const transfer = await InventoryService.createTransfer(req.body, req.user);
+
+    return sendSuccess(res, {
+      statusCode: 201,
+      message: 'Tạo phiếu điều chuyển kho thành công',
+      data: { transfer }
+    });
+  });
+
+  static getTransfers = catchAsync(async (req, res) => {
+    const transfers = await InventoryService.getTransfers(req.query, req.user);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Lấy danh sách phiếu điều chuyển kho thành công',
+      data: { transfers }
+    });
+  });
+
+  static receiveTransfer = catchAsync(async (req, res) => {
+    const transfer = await InventoryService.receiveTransfer(req.params.id, req.body, req.user);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Tiếp nhận nhập kho thành công',
+      data: { transfer }
+    });
+  });
 }

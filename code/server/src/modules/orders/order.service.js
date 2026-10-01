@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import crypto from 'crypto';
 import { Order, ORDER_TYPES, PAYMENT_STATUS, ORDER_STATUS, PAYMENT_METHODS } from './order.model.js';
 import { BranchInventory } from '../inventory/inventory.model.js';
@@ -324,6 +325,33 @@ export class OrderService {
       limit,
       totalPages: Math.ceil(total / limit)
     };
+  }
+
+  /**
+   * Khách hàng xem chi tiết 1 đơn hàng của mình kèm mảng items.serialsAssigned
+   */
+  static async getMyOrderDetail(orderIdOrCode, customerId) {
+    if (!orderIdOrCode) {
+      throw new AppError('Mã đơn hàng hoặc ID không được để trống.', 400, 'VALIDATION_ERROR');
+    }
+
+    const isMongoId = mongoose.Types.ObjectId.isValid(orderIdOrCode);
+    const query = { customerId };
+    if (isMongoId) {
+      query.$or = [{ _id: orderIdOrCode }, { orderCode: orderIdOrCode.toUpperCase() }];
+    } else {
+      query.orderCode = orderIdOrCode.toUpperCase();
+    }
+
+    const order = await Order.findOne(query)
+      .populate('branchId', 'name branchCode address phone')
+      .lean();
+
+    if (!order) {
+      throw new AppError('Không tìm thấy đơn hàng của bạn.', 404, 'ORDER_NOT_FOUND');
+    }
+
+    return order;
   }
 
   /**

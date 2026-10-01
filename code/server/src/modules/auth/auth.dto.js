@@ -47,4 +47,33 @@ export const loginSchema = z
       .string({ required_error: 'Mật khẩu là bắt buộc' })
       .min(1, 'Mật khẩu không được để trống')
   })
+export const forgotPasswordSchema = z
+  .object({
+    identifier: z
+      .string({ required_error: 'Email hoặc Số điện thoại là bắt buộc' })
+      .trim()
+      .min(1, 'Email hoặc Số điện thoại không được để trống')
+      .refine(
+        (val) => {
+          const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+          const isPhone = VN_PHONE_REGEX.test(val);
+          return isEmail || isPhone;
+        },
+        {
+          message: 'Tài khoản phải là Email hợp lệ hoặc Số điện thoại Việt Nam hợp lệ'
+        }
+      )
+  })
+  .strict();
+
+export const resetPasswordSchema = z
+  .object({
+    token: z
+      .string({ required_error: 'Mã xác thực token là bắt buộc' })
+      .trim()
+      .min(1, 'Mã xác thực token không được để trống'),
+    newPassword: z
+      .string({ required_error: 'Mật khẩu mới là bắt buộc' })
+      .min(6, 'Mật khẩu mới tối thiểu 6 ký tự')
+  })
   .strict();

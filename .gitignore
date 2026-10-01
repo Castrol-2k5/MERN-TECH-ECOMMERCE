@@ -96,4 +96,5 @@ coverage/
 prompt.md
 
 # AI Plan artifacts
-.ai_plans/
+.ai_plans/
+.codegraph/
