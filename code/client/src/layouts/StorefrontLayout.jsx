@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import {
   Search,
   MapPin,
@@ -13,20 +13,29 @@ import {
   Menu,
   X,
   Scale,
+  LogOut,
+  Package,
+  LayoutDashboard
 } from 'lucide-react';
+import { logout } from '../store/slices/authSlice.js';
+import axiosClient from '../services/axiosClient.js';
 import branchService from '../features/branches/services/branchService.js';
 import categoryService from '../features/categories/services/categoryService.js';
 
 export const StorefrontLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const dispatch = useDispatch();
   const totalCartQuantity = useSelector((state) => state.cart.totalQuantity);
   const compareCount = useSelector((state) => state.compare.products.length);
+  const authUser = useSelector((state) => state.auth?.user);
+  const isAuthenticated = useSelector((state) => state.auth?.isAuthenticated);
 
   const [branches, setBranches] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState(null);
   const [categories, setCategories] = useState([]);
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -191,19 +200,92 @@ export const StorefrontLayout = () => {
               </div>
             </Link>
 
-            {/* User Account */}
-            <button
-              onClick={() => alert('Chức năng Đăng nhập đang được đồng bộ.')}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-slate-50 text-slate-700 border border-transparent hover:border-slate-200 transition-all cursor-pointer"
-            >
-              <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
-                <User className="w-4 h-4" />
+            {/* User Account / Auth Dropdown */}
+            {isAuthenticated && authUser ? (
+              <div className="relative">
+                <button
+                  onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-slate-50 text-slate-700 border border-transparent hover:border-slate-200 transition-all cursor-pointer"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 font-bold flex items-center justify-center shrink-0 text-xs">
+                    {authUser.fullName?.charAt(0)?.toUpperCase() || 'U'}
+                  </div>
+                  <div className="hidden xl:flex flex-col text-xs leading-tight text-left">
+                    <span className="text-slate-400 font-medium">{authUser.role}</span>
+                    <span className="text-slate-800 font-bold max-w-[120px] truncate">
+                      {authUser.fullName}
+                    </span>
+                  </div>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden xl:block" />
+                </button>
+
+                {isUserDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 p-2 z-50 animate-fade-in text-xs">
+                    <div className="px-3 py-2 border-b border-slate-100">
+                      <p className="font-bold text-slate-900 truncate">{authUser.fullName}</p>
+                      <p className="text-[11px] text-slate-400 truncate">{authUser.email}</p>
+                      <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700">
+                        {authUser.role}
+                      </span>
+                    </div>
+
+                    <div className="py-1">
+                      <Link
+                        to="/account/orders"
+                        onClick={() => setIsUserDropdownOpen(false)}
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-slate-50 text-slate-700 font-semibold transition-colors"
+                      >
+                        <Package className="w-4 h-4 text-blue-600" />
+                        <span>Đơn hàng của tôi</span>
+                      </Link>
+
+                      {authUser.role !== 'CUSTOMER' && (
+                        <Link
+                          to={authUser.role === 'SUPER_ADMIN' ? '/portal/admin/products' : '/portal/pos'}
+                          onClick={() => setIsUserDropdownOpen(false)}
+                          className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-slate-50 text-slate-700 font-semibold transition-colors"
+                        >
+                          <LayoutDashboard className="w-4 h-4 text-purple-600" />
+                          <span>Cổng quản trị Portal</span>
+                        </Link>
+                      )}
+                    </div>
+
+                    <div className="pt-1 border-t border-slate-100">
+                      <button
+                        onClick={async () => {
+                          try {
+                            await axiosClient.post('/auth/logout');
+                          } catch {
+                            // ignore
+                          }
+                          dispatch(logout());
+                          setIsUserDropdownOpen(false);
+                          navigate('/login');
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-red-50 text-red-600 font-semibold transition-colors text-left cursor-pointer"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span>Đăng xuất</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="hidden xl:flex flex-col text-xs leading-tight text-left">
-                <span className="text-slate-400 font-medium">Tài khoản</span>
-                <span className="text-slate-800 font-bold">Đăng nhập</span>
-              </div>
-            </button>
+            ) : (
+              <Link
+                to="/login"
+                className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-slate-50 text-slate-700 border border-transparent hover:border-slate-200 transition-all cursor-pointer"
+              >
+                <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+                  <User className="w-4 h-4" />
+                </div>
+                <div className="hidden xl:flex flex-col text-xs leading-tight text-left">
+                  <span className="text-slate-400 font-medium">Tài khoản</span>
+                  <span className="text-slate-800 font-bold">Đăng nhập</span>
+                </div>
+              </Link>
+            )}
 
             {/* Cart Icon & Badge */}
             <Link
