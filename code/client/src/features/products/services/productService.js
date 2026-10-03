@@ -1,4 +1,5 @@
 import axiosClient from '../../../services/axiosClient.js';
+import { isMockEnabled, isDevOrTest } from '../../../config/dataMode.js';
 
 export const fallbackProducts = [
   {
@@ -269,71 +270,217 @@ export const fallbackProducts = [
   },
 ];
 
+export const normalizeProduct = (p) => {
+  if (!p) return null;
+
+  // 1. Skus & Prices
+  const skus = Array.isArray(p.skus) && p.skus.length > 0 ? p.skus : [];
+  const primarySku = skus[0] || {};
+
+  const price =
+    p.price !== undefined && p.price !== null
+      ? Number(p.price)
+      : primarySku.salePrice !== undefined && primarySku.salePrice !== null && primarySku.salePrice > 0
+        ? Number(primarySku.salePrice)
+        : Number(primarySku.price || 0);
+
+  const originalPrice =
+    p.originalPrice !== undefined && p.originalPrice !== null
+      ? Number(p.originalPrice)
+      : Number(primarySku.price || price || 0);
+
+  const discountPercentage =
+    p.discountPercentage !== undefined
+      ? Number(p.discountPercentage)
+      : originalPrice > price && originalPrice > 0
+        ? Math.round(((originalPrice - price) / originalPrice) * 100)
+        : 0;
+
+  // 2. Attributes normalization:
+  // In DB: attributes is [{ key: 'cpu', value: '...' }]
+  // In UI: expects object { cpu: '...', ram: '...' }
+  const attributesObj = {};
+  let attributesArr = [];
+
+  if (Array.isArray(p.attributes)) {
+    attributesArr = p.attributes;
+    p.attributes.forEach((attr) => {
+      if (attr && attr.key) {
+        attributesObj[attr.key] = attr.value;
+      }
+    });
+  } else if (p.attributes && typeof p.attributes === 'object') {
+    Object.assign(attributesObj, p.attributes);
+    attributesArr = Object.entries(p.attributes).map(([key, value]) => ({ key, value }));
+  }
+
+  // 3. Category
+  let categorySlug = 'laptop';
+  let categoryName = 'Laptop';
+  if (p.categoryId) {
+    if (typeof p.categoryId === 'object') {
+      categorySlug = p.categoryId.slug || categorySlug;
+      categoryName = p.categoryId.name || categoryName;
+    } else {
+      categorySlug = p.category || categorySlug;
+    }
+  } else if (p.category) {
+    categorySlug = typeof p.category === 'object' ? p.category.slug || 'laptop' : p.category;
+  }
+
+  // 4. Images
+  const fallbackImg =
+    'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80';
+  const images = Array.isArray(p.images) && p.images.length > 0 ? p.images : [fallbackImg];
+
+  // 5. SpecsSummary
+  const specsSummary =
+    p.specsSummary ||
+    [attributesObj.cpu, attributesObj.ram, attributesObj.storage, attributesObj.screen_size || attributesObj.screen]
+      .filter(Boolean)
+      .join(' • ') ||
+    p.name;
+
+  return {
+    ...p,
+    _id: p._id || p.id,
+    id: p._id || p.id,
+    name: p.name || 'Sản phẩm công nghệ',
+    slug: p.slug || '',
+    category: categorySlug,
+    categoryName,
+    brand: p.brand || '',
+    price,
+    originalPrice,
+    discountPercentage,
+    specsSummary,
+    images,
+    rating: p.rating || 5.0,
+    reviewsCount: p.reviewsCount || 0,
+    stockStatus: p.stockStatus || 'IN_STOCK',
+    stockLabel: p.stockLabel || 'Còn hàng',
+    attributes: attributesObj,
+    rawAttributes: attributesArr,
+    options: Array.isArray(p.options) ? p.options : [],
+    skus: skus.map((s, idx) => ({
+      ...s,
+      _id: s._id || `sku-${p._id || p.id}-${idx}`,
+      sku: s.sku || s.code || `SKU-${idx}`,
+      code: s.sku || s.code || `SKU-${idx}`,
+      price: Number(s.price || price),
+      salePrice: Number(s.salePrice || s.price || price),
+      originalPrice: Number(s.originalPrice || s.price || originalPrice),
+      stock: s.stock !== undefined ? s.stock : 10,
+    })),
+    branchInventories:
+      Array.isArray(p.branchInventories) && p.branchInventories.length > 0
+        ? p.branchInventories
+        : [
+            { branchName: 'TechOne Q1 • 128 Nguyễn Thị Minh Khai', quantity: 5, status: 'IN_STOCK', color: 'green' },
+            { branchName: 'TechOne Thủ Đức • 45 Võ Văn Ngân', quantity: 3, status: 'IN_STOCK', color: 'green' },
+            { branchName: 'TechOne Q5 • 382 Trần Hưng Đạo', quantity: 2, status: 'LOW_STOCK', color: 'orange' },
+          ],
+    promotions:
+      Array.isArray(p.promotions) && p.promotions.length > 0
+        ? p.promotions
+        : [
+            'Tặng túi chống sốc hoặc balo cao cấp',
+            'Giảm thêm đến 1.000.000đ khi thanh toán qua chuyển khoản / QR',
+            'Bảo hành chính hãng 12-24 tháng',
+          ],
+  };
+};
+
 export const productService = {
   getProducts: async (params = {}) => {
-    try {
-      const response = await axiosClient.get('/products', { params });
-      if (response?.data && Array.isArray(response.data) && response.data.length > 0) {
-        return {
-          products: response.data,
-          meta: response.meta || { total: response.data.length, page: 1, limit: 12 },
-        };
-      }
+    if (isMockEnabled()) {
       return {
         products: fallbackProducts,
         meta: { total: fallbackProducts.length, page: 1, limit: 12 },
       };
-    } catch {
+    }
+
+    try {
+      const response = await axiosClient.get('/products', { params });
+      const rawProducts = response?.data?.products || (Array.isArray(response?.data) ? response.data : []);
+      const normalizedProducts = rawProducts.map(normalizeProduct);
+
       return {
-        products: fallbackProducts,
-        meta: { total: fallbackProducts.length, page: 1, limit: 12 },
+        products: normalizedProducts,
+        meta: response?.meta || { total: normalizedProducts.length, page: 1, limit: 12 },
+      };
+    } catch (err) {
+      if (isDevOrTest()) {
+        console.error('[productService.getProducts] Lỗi kết nối Live Database / API /products:', err);
+        throw err;
+      }
+      return {
+        products: [],
+        meta: { total: 0, page: 1, limit: 12 },
+        error: err.message,
       };
     }
   },
 
   getProductBySlug: async (slug) => {
+    if (isMockEnabled()) {
+      return fallbackProducts.find((p) => p.slug === slug) || fallbackProducts[0];
+    }
+
     try {
       const response = await axiosClient.get(`/products/${slug}`);
-      if (response?.data) return response.data;
-      return fallbackProducts.find((p) => p.slug === slug) || fallbackProducts[0];
-    } catch {
-      return fallbackProducts.find((p) => p.slug === slug) || fallbackProducts[0];
+      const rawProduct = response?.data?.product || response?.data;
+      if (!rawProduct) {
+        throw new Error(`Không tìm thấy sản phẩm có slug: "${slug}"`);
+      }
+      return normalizeProduct(rawProduct);
+    } catch (err) {
+      if (isDevOrTest()) {
+        console.error(`[productService.getProductBySlug] Lỗi tải sản phẩm "${slug}":`, err);
+        throw err;
+      }
+      return null;
     }
   },
 
   createProduct: async (payload) => {
-    try {
-      const response = await axiosClient.post('/products', payload);
-      return response?.data || payload;
-    } catch {
+    if (isMockEnabled()) {
       return { _id: 'prod-' + Date.now(), ...payload };
     }
+    const response = await axiosClient.post('/products', payload);
+    return response?.data?.product || response?.data || payload;
   },
 
   updateProduct: async (id, payload) => {
-    try {
-      const response = await axiosClient.put(`/products/${id}`, payload);
-      return response?.data || payload;
-    } catch {
+    if (isMockEnabled()) {
       return { _id: id, ...payload };
     }
+    const response = await axiosClient.put(`/products/${id}`, payload);
+    return response?.data?.product || response?.data || payload;
   },
 
   deleteProduct: async (id) => {
-    try {
-      const response = await axiosClient.delete(`/products/${id}`);
-      return response?.data || { success: true };
-    } catch {
+    if (isMockEnabled()) {
       return { success: true };
     }
+    const response = await axiosClient.delete(`/products/${id}`);
+    return response?.data || { success: true };
   },
 
   toggleProductActive: async (id, isActive) => {
-    try {
-      const response = await axiosClient.patch(`/products/${id}/toggle-active`, { isActive });
-      return response?.data || { success: true, isActive };
-    } catch {
+    if (isMockEnabled()) {
       return { success: true, isActive };
+    }
+    const response = await axiosClient.put(`/products/${id}`, { isActive });
+    return response?.data || { success: true, isActive };
+  },
+
+  getCompareProducts: async () => {
+    try {
+      const res = await productService.getProducts({ limit: 4 });
+      return res.products?.slice(0, 2) || fallbackProducts.slice(0, 2);
+    } catch {
+      return fallbackProducts.slice(0, 2);
     }
   },
 

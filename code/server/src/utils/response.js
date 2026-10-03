@@ -9,7 +9,7 @@ export const sendSuccess = (res, { statusCode = 200, message = 'Thao tác thành
   if (meta !== undefined) {
     payload.meta = meta;
   }
-
+  
   return res.status(statusCode).json(payload);
 };
 

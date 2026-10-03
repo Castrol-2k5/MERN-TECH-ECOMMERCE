@@ -6,11 +6,13 @@ import ProductCard from '../../features/products/components/ProductCard.jsx';
 import Pagination from '../../features/products/components/Pagination.jsx';
 import useProducts from '../../features/products/hooks/useProducts.js';
 import Spinner from '../../components/common/Spinner.jsx';
+import { isDevOrTest } from '../../config/dataMode.js';
 import { X, Sparkles } from 'lucide-react';
 
 export const CategoryPage = () => {
   const { slug = 'laptop' } = useParams();
-  const { products, isLoading } = useProducts({ category: slug });
+  const { products, isLoading, error, refetch } = useProducts({ category: slug });
+  const isDev = isDevOrTest();
 
   const [selectedFilters, setSelectedFilters] = useState({});
   const [currentSort, setCurrentSort] = useState('popular');
@@ -136,7 +138,24 @@ export const CategoryPage = () => {
             totalResults={filteredProducts.length}
           />
 
-          {isLoading ? (
+          {error ? (
+            <div className="my-8 p-6 rounded-2xl border border-rose-200 bg-rose-50 text-rose-800 text-sm">
+              <h4 className="font-bold text-base mb-1 text-rose-900">
+                {isDev ? `⚠️ Lỗi tải sản phẩm danh mục "${slug}" từ API` : 'Không thể tải danh sách sản phẩm'}
+              </h4>
+              <p className="text-rose-700 mb-3">
+                {isDev
+                  ? `Chi tiết lỗi: ${error.message || 'Lỗi kết nối Backend'}. Vui lòng kiểm tra server hoặc chuyển sang chế độ Mock Data.`
+                  : 'Đã có lỗi xảy ra trong quá trình tải dữ liệu. Vui lòng thử lại sau.'}
+              </p>
+              <button
+                onClick={() => refetch()}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-xl shadow-xs cursor-pointer transition-colors"
+              >
+                Thử tải lại
+              </button>
+            </div>
+          ) : isLoading ? (
             <div className="py-20 flex items-center justify-center">
               <Spinner size="lg" />
             </div>
@@ -144,7 +163,9 @@ export const CategoryPage = () => {
             <div className="py-20 text-center bg-white rounded-3xl border border-slate-200 p-8">
               <p className="text-base font-bold text-slate-700">Không tìm thấy sản phẩm phù hợp</p>
               <p className="text-xs text-slate-400 mt-1">
-                Hãy thử nới lỏng các tiêu chí bộ lọc để xem thêm kết quả.
+                {isDev && products.length === 0
+                  ? 'Chưa có sản phẩm nào thuộc danh mục này trong Database. Chạy `npm run seed` ở backend để tạo dữ liệu.'
+                  : 'Hãy thử nới lỏng các tiêu chí bộ lọc để xem thêm kết quả.'}
               </p>
               <button
                 onClick={() => setSelectedFilters({})}

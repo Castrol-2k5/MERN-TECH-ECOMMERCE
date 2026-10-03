@@ -5,9 +5,11 @@ import ClickAndCollectBanner from '../../features/products/components/ClickAndCo
 import ProductCard from '../../features/products/components/ProductCard.jsx';
 import useProducts from '../../features/products/hooks/useProducts.js';
 import Spinner from '../../components/common/Spinner.jsx';
+import { isDevOrTest } from '../../config/dataMode.js';
 
 export const HomePage = () => {
-  const { products, isLoading } = useProducts();
+  const { products, isLoading, error, refetch } = useProducts();
+  const isDev = isDevOrTest();
 
   const partnerBrands = [
     'Apple',
@@ -41,9 +43,35 @@ export const HomePage = () => {
           </span>
         </div>
 
-        {isLoading ? (
+        {error ? (
+          <div className="p-6 rounded-2xl border border-rose-200 bg-rose-50 text-rose-800 text-sm">
+            <h4 className="font-bold text-base mb-1 text-rose-900">
+              {isDev ? '⚠️ Lỗi kết nối Live Database / Backend API' : 'Không thể tải danh sách sản phẩm'}
+            </h4>
+            <p className="text-rose-700 mb-3">
+              {isDev
+                ? `Chi tiết lỗi: ${error.message || 'Network Error / Không thể kết nối tới server 5000'}. Hãy đảm bảo server đang chạy (npm run dev trong code/server) hoặc dùng nút gạt bên góc phải để chuyển về Mock Data.`
+                : 'Đã có lỗi xảy ra trong quá trình tải dữ liệu. Vui lòng thử lại sau.'}
+            </p>
+            <button
+              onClick={() => refetch()}
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-xl shadow-xs cursor-pointer transition-colors"
+            >
+              Thử tải lại
+            </button>
+          </div>
+        ) : isLoading ? (
           <div className="py-16 flex items-center justify-center">
             <Spinner size="lg" />
+          </div>
+        ) : products.length === 0 ? (
+          <div className="p-10 rounded-2xl border border-dashed border-slate-300 text-center bg-slate-50">
+            <p className="text-slate-600 font-medium">Chưa có sản phẩm nào trong cơ sở dữ liệu.</p>
+            {isDev && (
+              <p className="text-xs text-slate-400 mt-1">
+                Gợi ý: Chạy lệnh <code>npm run seed</code> trong thư mục server để tạo dữ liệu mẫu, hoặc bật chế độ Mock Data ở góc màn hình.
+              </p>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">

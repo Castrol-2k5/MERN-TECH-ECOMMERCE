@@ -1,20 +1,27 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { 
   Save, 
   ExternalLink, 
   CheckCircle2, 
-  AlertCircle 
+  AlertCircle,
+  Database,
+  Beaker,
+  RefreshCw
 } from 'lucide-react';
 import productService, { fallbackProducts } from '../../features/products/services/productService';
 import ProductManagementTable from '../../features/products/components/ProductManagementTable';
 import DynamicAttributesForm from '../../features/products/components/DynamicAttributesForm';
 import SkuVariantBuilder from '../../features/products/components/SkuVariantBuilder';
+import { isMockEnabled, isDevOrTest } from '../../config/dataMode';
 
 export const AdminProductsPage = () => {
+  const auth = useSelector((state) => state.auth);
   const [products, setProducts] = useState(fallbackProducts);
   const [selectedProduct, setSelectedProduct] = useState(fallbackProducts[0]);
   const [activeTab, setActiveTab] = useState('ATTRIBUTES'); // 'INFO' | 'ATTRIBUTES' | 'SKUS' | 'SEO'
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
 
   // Editable state of currently selected product
@@ -59,20 +66,76 @@ export const AdminProductsPage = () => {
     });
   };
 
+  useEffect(() => {
+    if (isMockEnabled()) {
+      setProducts(fallbackProducts);
+      if (fallbackProducts.length > 0) {
+        handleSelectProduct(fallbackProducts[0]);
+      }
+      return;
+    }
+
+    let isMounted = true;
+    setIsLoading(true);
+
+    productService
+      .getProducts({ limit: 100 })
+      .then((res) => {
+        if (isMounted) {
+          const list = res.products || [];
+          setProducts(list);
+          if (list.length > 0) {
+            handleSelectProduct(list[0]);
+          }
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setToastMsg({
+            type: 'error',
+            message: `Lỗi kết nối Live Database: ${err.message || 'Không thể tải danh sách sản phẩm'}`,
+          });
+        }
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const handleToggleActive = async (id, isActive) => {
-    await productService.toggleProductActive(id, isActive);
-    setProducts((prev) =>
-      prev.map((item) => (item._id === id ? { ...item, isActive } : item))
-    );
-    setToastMsg({
-      type: 'success',
-      message: `Đã ${isActive ? 'kích hoạt hiển thị' : 'tạm ẩn'} sản phẩm trên Storefront!`
-    });
-    setTimeout(() => setToastMsg(null), 3000);
+    try {
+      await productService.toggleProductActive(id, isActive);
+      setProducts((prev) =>
+        prev.map((item) => (item._id === id ? { ...item, isActive } : item))
+      );
+      setToastMsg({
+        type: 'success',
+        message: `Đã ${isActive ? 'kích hoạt hiển thị' : 'tạm ẩn'} sản phẩm trên Storefront!`,
+      });
+      setTimeout(() => setToastMsg(null), 3000);
+    } catch (err) {
+      setToastMsg({
+        type: 'error',
+        message: `Lỗi cập nhật trạng thái: ${err.message || 'Yêu cầu quyền SUPER_ADMIN'}`,
+      });
+    }
   };
 
   const handleSaveProduct = async (e) => {
     e.preventDefault();
+
+    if (!isMockEnabled() && !auth?.accessToken) {
+      setToastMsg({
+        type: 'error',
+        message: 'Bạn đang ở chế độ Live Database. Vui lòng đăng nhập tài khoản Quản trị viên (SUPER_ADMIN) để lưu thay đổi.',
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
       await productService.updateProduct(selectedProduct._id, formData);
@@ -81,11 +144,14 @@ export const AdminProductsPage = () => {
       );
       setToastMsg({
         type: 'success',
-        message: 'Đã lưu thay đổi thông tin sản phẩm và schema thuộc tính thành công!'
+        message: 'Đã lưu thay đổi thông tin sản phẩm và schema thuộc tính thành công!',
       });
       setTimeout(() => setToastMsg(null), 3500);
-    } catch {
-      setToastMsg({ type: 'error', message: 'Lỗi khi lưu sản phẩm' });
+    } catch (err) {
+      setToastMsg({
+        type: 'error',
+        message: `Lỗi khi lưu sản phẩm: ${err.response?.data?.message || err.message}`,
+      });
     } finally {
       setIsSaving(false);
     }

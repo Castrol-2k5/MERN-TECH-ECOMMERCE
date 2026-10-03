@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { Truck, RotateCcw, ShieldCheck, Gift, Star, CheckCircle2 } from 'lucide-react';
@@ -8,7 +8,7 @@ import SkuVariantSelector from '../../features/products/components/SkuVariantSel
 import SpecsTable from '../../features/products/components/SpecsTable.jsx';
 import MultiBranchStockBox from '../../features/inventory/components/MultiBranchStockBox.jsx';
 import ProductCard from '../../features/products/components/ProductCard.jsx';
-import { fallbackProducts } from '../../features/products/services/productService.js';
+import productService, { fallbackProducts } from '../../features/products/services/productService.js';
 import { addToCart } from '../../store/slices/cartSlice.js';
 import Spinner from '../../components/common/Spinner.jsx';
 
@@ -22,6 +22,13 @@ export const ProductDetailPage = () => {
   const [activeTab, setActiveTab] = useState('specs');
   const [selectedBranch, setSelectedBranch] = useState(null);
   const [showOrderToast, setShowOrderToast] = useState(false);
+  const [relatedProducts, setRelatedProducts] = useState([]);
+
+  const activeSku =
+    product?.skus?.find((s) => {
+      if (!s.options) return false;
+      return Object.entries(selectedOptions).every(([k, v]) => s.options[k] === v);
+    }) || product?.skus?.[0];
 
   const handleSelectOption = (optionName, value) => {
     setSelectedOptions((prev) => ({
@@ -42,9 +49,9 @@ export const ProductDetailPage = () => {
     dispatch(
       addToCart({
         productId: product._id || product.id,
-        productSkuId: product.skus?.[0]?._id || `sku-${product._id || product.id}`,
+        productSkuId: activeSku?._id || product.skus?.[0]?._id || `sku-${product._id || product.id}`,
         name: product.name,
-        price: product.price,
+        price: activeSku?.salePrice || activeSku?.price || product.price,
         image: product.images?.[0] || '',
         quantity: 1,
       })
@@ -89,9 +96,34 @@ export const ProductDetailPage = () => {
     );
   }
 
-  const relatedProducts = fallbackProducts.filter(
-    (p) => (p._id || p.id) !== (product._id || product.id)
-  ).slice(0, 4);
+  useEffect(() => {
+    if (!product) return;
+    let isMounted = true;
+    productService
+      .getProducts({ category: product.category, limit: 5 })
+      .then((res) => {
+        if (isMounted) {
+          const list = res.products || fallbackProducts;
+          const filtered = list
+            .filter((p) => (p._id || p.id) !== (product._id || product.id))
+            .slice(0, 4);
+          setRelatedProducts(filtered.length > 0 ? filtered : fallbackProducts.slice(0, 4));
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setRelatedProducts(
+            fallbackProducts
+              .filter((p) => (p._id || p.id) !== (product._id || product.id))
+              .slice(0, 4)
+          );
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [product?._id, product?.id, product?.category]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-12 py-6">
@@ -208,7 +240,7 @@ export const ProductDetailPage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mb-12">
         <div className="lg:col-span-7">
           <MultiBranchStockBox
-            skuId={product.skus?.[0]?._id}
+            skuId={activeSku?._id || product.skus?.[0]?._id}
             onSelectBranch={setSelectedBranch}
           />
         </div>

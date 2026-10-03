@@ -1,4 +1,5 @@
 import axiosClient from '../../../services/axiosClient.js';
+import { isMockEnabled, isDevOrTest } from '../../../config/dataMode.js';
 
 export const fallbackCategories = [
   {
@@ -48,28 +49,58 @@ export const fallbackCategories = [
   },
 ];
 
+const normalizeCategory = (cat) => {
+  if (!cat) return null;
+  return {
+    _id: cat._id || cat.id,
+    name: cat.name,
+    slug: cat.slug,
+    description: cat.description || '',
+    attributeKeys: Array.isArray(cat.attributeKeys) ? cat.attributeKeys : [],
+    icon: cat.icon || 'laptop',
+    productCount: cat.productCount || 0,
+    parentId: cat.parentId || null,
+    isActive: cat.isActive !== undefined ? cat.isActive : true,
+  };
+};
+
 export const categoryService = {
   getCategories: async () => {
+    if (isMockEnabled()) {
+      return fallbackCategories;
+    }
+
     try {
       const response = await axiosClient.get('/categories');
-      if (response?.data && Array.isArray(response.data) && response.data.length > 0) {
-        return response.data;
+      const rawCategories = response?.data?.categories || (Array.isArray(response?.data) ? response.data : []);
+      return rawCategories.map(normalizeCategory);
+    } catch (err) {
+      if (isDevOrTest()) {
+        console.error('[categoryService.getCategories] Lỗi tải danh mục từ Live Database / API:', err);
+        throw err;
       }
-      return fallbackCategories;
-    } catch {
-      return fallbackCategories;
+      return [];
     }
   },
 
   getCategoryBySlug: async (slug) => {
+    if (isMockEnabled()) {
+      return fallbackCategories.find((c) => c.slug === slug) || fallbackCategories[0];
+    }
+
     try {
       const response = await axiosClient.get(`/categories/${slug}`);
-      if (response?.data) return response.data;
-      return fallbackCategories.find((c) => c.slug === slug) || fallbackCategories[0];
-    } catch {
-      return fallbackCategories.find((c) => c.slug === slug) || fallbackCategories[0];
+      const rawCategory = response?.data?.category || response?.data;
+      return normalizeCategory(rawCategory);
+    } catch (err) {
+      if (isDevOrTest()) {
+        console.error(`[categoryService.getCategoryBySlug] Lỗi tải chi tiết danh mục ${slug}:`, err);
+        throw err;
+      }
+      return null;
     }
   },
 };
 
 export default categoryService;
+

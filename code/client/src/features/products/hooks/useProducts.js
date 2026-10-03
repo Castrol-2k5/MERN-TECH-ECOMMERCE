@@ -7,9 +7,13 @@ export const useProducts = (initialParams = {}) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const paramsKey = JSON.stringify(initialParams);
+
   useEffect(() => {
     let isMounted = true;
     const loadProducts = async () => {
+      setIsLoading(true);
+      setError(null);
       try {
         const data = await productService.getProducts(initialParams);
         if (isMounted) {
@@ -28,7 +32,7 @@ export const useProducts = (initialParams = {}) => {
     return () => {
       isMounted = false;
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [paramsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const refetch = async (params = {}) => {
     setIsLoading(true);

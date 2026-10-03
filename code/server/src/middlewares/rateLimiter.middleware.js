@@ -2,7 +2,7 @@ import rateLimit from 'express-rate-limit';
 import { env } from '../config/environment.js';
 
 export const authRateLimiter =
-  env.NODE_ENV === 'test'
+  env.NODE_ENV === 'development' || env.NODE_ENV === 'test'
     ? (req, res, next) => next() // Bypass rate limiting in test suite to avoid throttling
     : rateLimit({
         windowMs: 15 * 60 * 1000, // 15 minutes
