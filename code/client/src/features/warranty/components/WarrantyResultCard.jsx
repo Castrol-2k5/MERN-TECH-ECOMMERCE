@@ -29,7 +29,9 @@ export const WarrantyResultCard = ({ data }) => {
           <h3 className="text-lg font-black text-slate-900 leading-snug">
             {data.productName}
           </h3>
-          <p className="text-xs text-slate-400 font-mono mt-0.5">SKU: {data.skuCode || 'MBA-M4-16-256'}</p>
+          {data.skuCode && (
+            <p className="text-xs text-slate-400 font-mono mt-0.5">SKU: {data.skuCode}</p>
+          )}
 
           <div className="mt-5 space-y-3 divide-y divide-slate-50 text-xs">
             <div className="pt-2 flex justify-between items-center">
@@ -53,14 +55,16 @@ export const WarrantyResultCard = ({ data }) => {
               <span className="font-bold text-slate-900">{data.warrantyEndDate}</span>
             </div>
 
-            <div className="pt-2 flex justify-between items-start">
-              <span className="text-slate-500 font-medium flex items-center gap-1 shrink-0">
-                <MapPin className="w-3.5 h-3.5 text-slate-400" /> Showroom mua:
-              </span>
-              <span className="font-bold text-slate-900 text-right max-w-[220px]">
-                {data.branchPurchased}
-              </span>
-            </div>
+            {data.branchPurchased && (
+              <div className="pt-2 flex justify-between items-start">
+                <span className="text-slate-500 font-medium flex items-center gap-1 shrink-0">
+                  <MapPin className="w-3.5 h-3.5 text-slate-400" /> Showroom mua:
+                </span>
+                <span className="font-bold text-slate-900 text-right max-w-[220px]">
+                  {data.branchPurchased}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -70,7 +74,7 @@ export const WarrantyResultCard = ({ data }) => {
             <span className="text-xs font-medium text-slate-700">Thời gian bảo hành còn lại:</span>
           </div>
           <span className="text-sm font-black text-blue-600">
-            {data.daysRemaining || 360} ngày
+            {data.daysRemaining || 0} ngày
           </span>
         </div>
       </div>
@@ -84,28 +88,36 @@ export const WarrantyResultCard = ({ data }) => {
           </span>
         </h3>
 
-        <div className="relative pl-6 space-y-8 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
-          {(data.history || []).map((event, idx) => (
-            <div key={event.id || idx} className="relative flex flex-col gap-1">
-              <div
-                className={`absolute -left-6 top-1 w-5 h-5 rounded-full border-4 border-white shadow-xs flex items-center justify-center ${
-                  idx === 0 ? 'bg-blue-600' : 'bg-emerald-500'
-                }`}
-              />
+        {data.history && data.history.length > 0 ? (
+          <div className="relative pl-6 space-y-8 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+            {data.history.map((event, idx) => (
+              <div key={event.id || idx} className="relative flex flex-col gap-1">
+                <div
+                  className={`absolute -left-6 top-1 w-5 h-5 rounded-full border-4 border-white shadow-xs flex items-center justify-center ${
+                    idx === 0 ? 'bg-blue-600' : 'bg-emerald-500'
+                  }`}
+                />
 
-              <div className="flex items-center justify-between">
-                <h4 className="font-bold text-sm text-slate-900">{event.title}</h4>
-                <span className="text-xs font-bold text-blue-600 font-mono bg-blue-50 px-2 py-0.5 rounded-md">
-                  {event.date}
-                </span>
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-sm text-slate-900">{event.title}</h4>
+                  <span className="text-xs font-bold text-blue-600 font-mono bg-blue-50 px-2 py-0.5 rounded-md">
+                    {event.date}
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-500 leading-relaxed mt-1">
+                  {event.description}
+                </p>
               </div>
-
-              <p className="text-xs text-slate-500 leading-relaxed mt-1">
-                {event.description}
-              </p>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="py-12 text-center text-slate-400 text-xs">
+            <ShieldCheck className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+            <p className="font-medium text-slate-600">Chưa có lịch sử bảo hành hoặc sửa chữa</p>
+            <p className="mt-0.5">Thiết bị chưa từng phát sinh yêu cầu bảo hành tại chuỗi cửa hàng.</p>
+          </div>
+        )}
       </div>
     </div>
   );

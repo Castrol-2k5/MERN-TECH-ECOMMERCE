@@ -74,7 +74,7 @@ export const PortalLayout = () => {
     {
       to: '/portal/admin/branches-rbac',
       label: 'Chi Nhánh & RBAC',
-      badge: '48 CN',
+      badge: 'Hệ thống',
       icon: Store
     },
     {

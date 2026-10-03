@@ -40,6 +40,22 @@ axiosClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+const formatApiError = (error) => {
+  const errData = error.response?.data;
+  if (errData && typeof errData === 'object') {
+    const message = errData.message || error.message || 'Lỗi xử lý yêu cầu';
+    const enhancedError = new Error(message);
+    enhancedError.name = 'ApiError';
+    enhancedError.errorCode = errData.errorCode;
+    enhancedError.errors = errData.errors;
+    enhancedError.status = error.response?.status;
+    enhancedError.response = error.response;
+    enhancedError.data = errData;
+    return enhancedError;
+  }
+  return error;
+};
+
 axiosClient.interceptors.response.use(
   (response) => response.data,
   async (error) => {
@@ -50,7 +66,7 @@ axiosClient.interceptors.response.use(
         originalRequest.url?.includes('/auth/login') ||
         originalRequest.url?.includes('/auth/refresh-token')
       ) {
-        return Promise.reject(error.response?.data || error);
+        return Promise.reject(formatApiError(error));
       }
 
       if (isRefreshing) {
@@ -61,7 +77,7 @@ axiosClient.interceptors.response.use(
             originalRequest.headers.Authorization = `Bearer ${token}`;
             return axiosClient(originalRequest);
           })
-          .catch((err) => Promise.reject(err));
+          .catch((err) => Promise.reject(formatApiError(err)));
       }
 
       originalRequest._retry = true;
@@ -87,13 +103,13 @@ axiosClient.interceptors.response.use(
         if (storeRef) {
           storeRef.dispatch(logout());
         }
-        return Promise.reject(refreshError);
+        return Promise.reject(formatApiError(refreshError));
       } finally {
         isRefreshing = false;
       }
     }
 
-    return Promise.reject(error.response?.data || error);
+    return Promise.reject(formatApiError(error));
   }
 );
 

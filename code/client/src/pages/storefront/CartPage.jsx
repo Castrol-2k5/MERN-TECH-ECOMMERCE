@@ -20,7 +20,7 @@ import {
   updateQuantity,
   clearCart
 } from '../../store/slices/cartSlice.js';
-import axiosClient from '../../services/axiosClient.js';
+import { toB2cCheckoutPayload } from '../../features/orders/services/orderAdapter.js';
 
 import { branchService } from '../../features/branches/services/branchService.js';
 import { orderService } from '../../features/orders/services/orderService.js';
@@ -35,9 +35,9 @@ export const CartPage = () => {
   const [branches, setBranches] = useState([]);
   const [selectedBranchId, setSelectedBranchId] = useState('');
   const [customerInfo, setCustomerInfo] = useState({
-    fullName: authUser?.fullName || 'Hoàng Khách Hàng',
-    phone: authUser?.phone || '0909000005',
-    address: '45 Võ Văn Ngân, Phường Linh Chiểu, TP. Thủ Đức, TP.HCM'
+    fullName: authUser?.fullName || '',
+    phone: authUser?.phone || '',
+    address: authUser?.address || ''
   });
   const [paymentMethod, setPaymentMethod] = useState('VNPAY');
   const [loading, setLoading] = useState(false);
@@ -87,26 +87,16 @@ export const CartPage = () => {
 
     try {
       setLoading(true);
-      const payload = {
-        branchId: selectedBranchId,
-        items: items.map((it) => ({
-          productId: it.productId,
-          productSkuId: it.productSkuId,
-          quantity: it.quantity,
-          unitPrice: it.price
-        })),
-        customerInfo: {
+      const payload = toB2cCheckoutPayload(
+        { items, selectedBranchId },
+        {
           fullName: customerInfo.fullName.trim(),
           phone: customerInfo.phone.trim(),
-          address: customerInfo.address.trim()
-        },
-        shippingAddress: {
-          fullName: customerInfo.fullName.trim(),
-          phone: customerInfo.phone.trim(),
-          address: customerInfo.address.trim()
-        },
-        paymentMethod
-      };
+          address: customerInfo.address.trim(),
+          branchId: selectedBranchId,
+          paymentMethod
+        }
+      );
 
       const createdOrder = await orderService.createB2cOrder(payload);
 

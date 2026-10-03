@@ -6,10 +6,16 @@
 const STORAGE_KEY = 'TECHONE_USE_MOCK_DATA';
 
 export const isDevOrTest = () => {
+  if (import.meta.env.PROD || import.meta.env.VITE_SHOW_DEV_TOOLS === 'false') {
+    return false;
+  }
   return import.meta.env.DEV || import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test';
 };
 
 export const isMockEnabled = () => {
+  if (!isDevOrTest()) {
+    return false;
+  }
   const localSetting = localStorage.getItem(STORAGE_KEY);
   if (localSetting !== null) {
     return localSetting === 'true';

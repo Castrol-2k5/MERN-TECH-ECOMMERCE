@@ -17,7 +17,7 @@ import {
 } from '../../store/slices/posCartSlice';
 import usePosAudio from '../../features/pos/hooks/usePosAudio';
 import useBarcodeScanner from '../../features/pos/hooks/useBarcodeScanner';
-import posService, { DEMO_POS_PRODUCTS } from '../../features/pos/services/posService';
+import posService from '../../features/pos/services/posService';
 
 import PosHeader from '../../features/pos/components/PosHeader';
 import PosBarcodeBar from '../../features/pos/components/PosBarcodeBar';
@@ -26,6 +26,7 @@ import PosCartTable from '../../features/pos/components/PosCartTable';
 import PosCheckoutPanel from '../../features/pos/components/PosCheckoutPanel';
 import SerialAssignmentModal from '../../features/pos/components/SerialAssignmentModal';
 import InvoiceK80Modal from '../../features/pos/components/InvoiceK80Modal';
+import { toPosCheckoutPayload } from '../../features/orders/services/orderAdapter';
 
 export const PosPage = () => {
   const dispatch = useDispatch();
@@ -37,7 +38,7 @@ export const PosPage = () => {
   const { playSuccessBeep, playErrorBeep } = usePosAudio();
 
   // Local state
-  const [products, setProducts] = useState(DEMO_POS_PRODUCTS);
+  const [products, setProducts] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('TẤT CẢ');
   const [isSearching, setIsSearching] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
@@ -46,10 +47,12 @@ export const PosPage = () => {
   useEffect(() => {
     let ignore = false;
     posService.searchProducts().then((data) => {
-      if (!ignore && data && data.length > 0) {
+      if (!ignore && Array.isArray(data)) {
         setProducts(data);
       }
-    }).catch(() => {});
+    }).catch(() => {
+      if (!ignore) setProducts([]);
+    });
     return () => {
       ignore = true;
     };
@@ -151,31 +154,14 @@ export const PosPage = () => {
 
     setIsCheckingOut(true);
     try {
-      const payload = {
-        branchId: '65f0a1000000000000000001',
-        items: cart.items.map(it => ({
-          productId: it.productId,
-          productSkuId: it.productSkuId,
-          quantity: it.quantity,
-          serialsAssigned: it.serialsAssigned || []
-        })),
-        paymentMethod: cart.paymentMethod,
-        customerInfo: cart.customerInfo,
-        subtotal: totals.subtotal,
-        discount: totals.discount,
-        tax: totals.tax,
-        totalAmount: totals.total,
-        finalAmount: totals.total,
-        customerPaid: totals.customerPaid,
-        change: totals.change
-      };
+      const payload = toPosCheckoutPayload(cart, authUser?.branchId);
 
       const res = await posService.checkoutPos(payload);
       playSuccessBeep();
 
       setCompletedOrder({
-        orderCode: res.orderCode,
-        createdAt: res.createdAt || new Date().toISOString(),
+        orderCode: res?.orderCode || res?.data?.orderCode,
+        createdAt: res?.createdAt || res?.data?.createdAt || new Date().toISOString(),
         items: cart.items,
         subtotal: totals.subtotal,
         discount: totals.discount,

@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import WarrantySearchBar from '../../features/warranty/components/WarrantySearchBar.jsx';
 import WarrantyResultCard from '../../features/warranty/components/WarrantyResultCard.jsx';
-import warrantyService, { fallbackWarrantyData } from '../../features/warranty/services/warrantyService.js';
+import warrantyService from '../../features/warranty/services/warrantyService.js';
 import { HelpCircle } from 'lucide-react';
 
 export const WarrantyCheckPage = () => {
-  const [warrantyData, setWarrantyData] = useState(fallbackWarrantyData);
+  const [warrantyData, setWarrantyData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [searchError, setSearchError] = useState(null);
 
@@ -17,10 +17,16 @@ export const WarrantyCheckPage = () => {
       if (data) {
         setWarrantyData(data);
       } else {
-        setSearchError('Không tìm thấy thông tin bảo hành cho mã này.');
+        setSearchError(`Không tìm thấy mã Serial/IMEI '${serial}' trong hệ thống bảo hành.`);
+        setWarrantyData(null);
       }
-    } catch {
-      setWarrantyData(fallbackWarrantyData);
+    } catch (err) {
+      setSearchError(
+        err.response?.data?.message ||
+          err.message ||
+          `Không tìm thấy mã Serial/IMEI '${serial}' trong hệ thống bảo hành.`
+      );
+      setWarrantyData(null);
     } finally {
       setIsLoading(false);
     }
@@ -31,7 +37,7 @@ export const WarrantyCheckPage = () => {
       {/* 1. Large Hero Search Bar (Figma #21:28103) */}
       <WarrantySearchBar
         onSearch={handleSearch}
-        initialValue="C02ZQ0ABQ6L7"
+        initialValue=""
         isLoading={isLoading}
       />
 

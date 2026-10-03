@@ -7,42 +7,15 @@ import ImportSummaryModal from '../../features/inventory/components/ImportSummar
 import apiClient from '../../services/api';
 import branchService from '../../features/branches/services/branchService';
 import productService from '../../features/products/services/productService';
-import { isMockEnabled, isDevOrTest } from '../../config/dataMode';
-
-const DEMO_BRANCHES = [
-  { _id: '65f0a1000000000000000001', code: 'BR-Q1', name: 'TechOne Q1 • 138 Trần Quang Khải', address: 'Quận 1, TP.HCM' },
-  { _id: '65f0a1000000000000000002', code: 'BR-TD', name: 'TechOne Thủ Đức • 214 Võ Văn Ngân', address: 'TP. Thủ Đức' },
-  { _id: '65f0a1000000000000000003', code: 'BR-Q5', name: 'TechOne Q5 • 382 Trần Hưng Đạo', address: 'Quận 5, TP.HCM' }
-];
-
-const DEMO_PRODUCTS = [
-  {
-    _id: '65f0a0000000000000000001',
-    name: 'MacBook Air 13 M4 16GB/256GB',
-    skus: [
-      { _id: 'sku-mba-1', code: 'MBA-M4-16-256-SL', sku: 'MBA-M4-16-256-SL', options: { RAM: '16GB', Color: 'Silver' }, price: 26490000 },
-      { _id: 'sku-mba-2', code: 'MBA-M4-32-512-MD', sku: 'MBA-M4-32-512-MD', options: { RAM: '32GB', Color: 'Midnight' }, price: 33490000 }
-    ]
-  },
-  {
-    _id: '65f0a0000000000000000002',
-    name: 'iPhone 16 Pro Max 256GB',
-    skus: [
-      { _id: 'sku-ip16-1', code: 'IP16PM-256-DESERT', sku: 'IP16PM-256-DESERT', options: { Color: 'Desert Titanium' }, price: 34990000 },
-      { _id: 'sku-ip16-2', code: 'IP16PM-512-NATURAL', sku: 'IP16PM-512-NATURAL', options: { Color: 'Natural Titanium' }, price: 39990000 }
-    ]
-  }
-];
+import { isMockEnabled } from '../../config/dataMode';
 
 export const SerialImportPage = () => {
   const authUser = useSelector((state) => state.auth?.user);
-  const [branches, setBranches] = useState(DEMO_BRANCHES);
-  const [products, setProducts] = useState(DEMO_PRODUCTS);
-  const [selectedBranchId, setSelectedBranchId] = useState(DEMO_BRANCHES[0]._id);
-  const [selectedSku, setSelectedSku] = useState(DEMO_PRODUCTS[0].skus[0]);
-  const [rawText, setRawText] = useState(
-    'C02ZQ0ABQ6L7\nC02ZQ0ABQ8T4\nC02ZQ0ABQ9P2\nC02ZQ0ABR1K8\nC02ZQ0ABR3V6\nC02ZQ0ABR4N1\nC02ZQ0ABR5X9'
-  );
+  const [branches, setBranches] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [selectedBranchId, setSelectedBranchId] = useState('');
+  const [selectedSku, setSelectedSku] = useState(null);
+  const [rawText, setRawText] = useState('');
   const [validationReport, setValidationReport] = useState(null);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -81,7 +54,7 @@ export const SerialImportPage = () => {
   }, [authUser?.branchId]);
 
   const selectedBranch =
-    branches.find((b) => b._id === selectedBranchId) || branches[0] || DEMO_BRANCHES[0];
+    branches.find((b) => b._id === selectedBranchId) || branches[0] || null;
 
   const handleParsedResult = useCallback((report) => {
     setValidationReport(report);

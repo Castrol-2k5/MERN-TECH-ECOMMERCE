@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSelector } from 'react-redux';
 import { ClipboardList, Camera, Calendar, CheckSquare, ShieldAlert, ArrowRight } from 'lucide-react';
 
 const getDefaultReturnDate = () => {
@@ -8,6 +9,7 @@ const getDefaultReturnDate = () => {
 };
 
 export const RmaTicketForm = ({ warrantyData, onSubmit, isSubmitting = false }) => {
+  const authUser = useSelector((state) => state.auth?.user);
   const [issueDescription, setIssueDescription] = useState('');
   const [appearanceCondition, setAppearanceCondition] = useState('Thân máy đẹp 98%, màn hình dán cường lực, không cấn móp góc');
   const [selectedAccessories, setSelectedAccessories] = useState(['Thân máy', 'Hộp gốc (Box)']);
@@ -37,13 +39,13 @@ export const RmaTicketForm = ({ warrantyData, onSubmit, isSubmitting = false }) 
 
     onSubmit({
       serialNumber: warrantyData.serialNumber,
-      productId: warrantyData.productId || '65f0a0000000000000000001',
-      customerId: warrantyData.customer?._id || '65f0c0000000000000000001',
+      productId: warrantyData.productId,
+      customerId: warrantyData.customer?._id,
       customerInfo: warrantyData.customer,
       productName: warrantyData.productName,
-      branchId: '65f0a1000000000000000001',
-      staffId: '65f0d0000000000000000001',
-      staffName: 'Trần Kỹ Thuật (KTV-02)',
+      branchId: authUser?.branchId || warrantyData.branchId,
+      staffId: authUser?._id,
+      staffName: authUser?.fullName || 'Kỹ thuật viên',
       issueDescription: issueDescription.trim(),
       appearanceCondition,
       accessories: selectedAccessories,
