@@ -1,12 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSelector } from 'react-redux';
 import { RefreshCw, Download, Store } from 'lucide-react';
 import inventoryService from '../../features/inventory/services/inventoryService';
+import branchService from '../../features/branches/services/branchService';
 import BranchStockKpiCards from '../../features/inventory/components/BranchStockKpiCards';
 import BranchStockTable from '../../features/inventory/components/BranchStockTable';
 import SerialListDrawer from '../../features/inventory/components/SerialListDrawer';
 import StockAdjustModal from '../../features/inventory/components/StockAdjustModal';
 
 export const BranchInventoryPage = () => {
+  const authUser = useSelector((state) => state.auth?.user);
+  const [branches, setBranches] = useState([]);
+  const [selectedBranchId, setSelectedBranchId] = useState('');
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -18,13 +23,32 @@ export const BranchInventoryPage = () => {
   const [activeAdjustItem, setActiveAdjustItem] = useState(null);
   const [toastMsg, setToastMsg] = useState(null);
 
+  // Fetch branches on mount
+  useEffect(() => {
+    let ignore = false;
+    branchService.getBranches().then((list) => {
+      if (!ignore && list && list.length > 0) {
+        setBranches(list);
+        const defaultBranchId =
+          authUser?.branchId && list.some((b) => b._id === authUser.branchId)
+            ? authUser.branchId
+            : list[0]._id;
+        setSelectedBranchId(defaultBranchId);
+      }
+    });
+    return () => {
+      ignore = true;
+    };
+  }, [authUser?.branchId]);
+
   const fetchInventory = useCallback(async () => {
+    if (!selectedBranchId) return;
     setLoading(true);
     try {
-      const data = await inventoryService.getBranchInventory('65f0a1000000000000000001', {
+      const data = await inventoryService.getBranchInventory(selectedBranchId, {
         search,
         category,
-        status
+        status,
       });
       setItems(data);
     } catch {
@@ -32,33 +56,41 @@ export const BranchInventoryPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [search, category, status]);
+  }, [selectedBranchId, search, category, status]);
 
   useEffect(() => {
+    if (!selectedBranchId) return;
     let active = true;
-    inventoryService.getBranchInventory('65f0a1000000000000000001', {
-      search,
-      category,
-      status
-    }).then((data) => {
-      if (active) {
-        setItems(data);
-        setLoading(false);
-      }
-    }).catch(() => {
-      if (active) setLoading(false);
-    });
+    setLoading(true);
+    inventoryService
+      .getBranchInventory(selectedBranchId, {
+        search,
+        category,
+        status,
+      })
+      .then((data) => {
+        if (active) {
+          setItems(data);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (active) setLoading(false);
+      });
 
     return () => {
       active = false;
     };
-  }, [search, category, status]);
+  }, [selectedBranchId, search, category, status]);
 
   const handleAdjustSubmit = async (payload) => {
-    const res = await inventoryService.adjustStock(payload);
+    const res = await inventoryService.adjustStock({
+      ...payload,
+      branchId: selectedBranchId,
+    });
     setToastMsg({
       type: 'success',
-      message: res?.message || 'Cập nhật điều chỉnh tồn kho thành công!'
+      message: res?.message || 'Cập nhật điều chỉnh tồn kho thành công!',
     });
     setTimeout(() => setToastMsg(null), 4000);
     fetchInventory();
@@ -71,7 +103,20 @@ export const BranchInventoryPage = () => {
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold text-blue-400 uppercase tracking-wider mb-1">
             <Store className="w-4 h-4" />
-            <span>Kho Chi Nhánh • TechOne Q1</span>
+            <span>Kho Chi Nhánh:</span>
+            {branches.length > 0 && (
+              <select
+                value={selectedBranchId}
+                onChange={(e) => setSelectedBranchId(e.target.value)}
+                className="bg-slate-800 text-slate-200 border border-slate-700 rounded-lg px-2.5 py-1 text-xs font-bold cursor-pointer hover:bg-slate-700 transition-colors"
+              >
+                {branches.map((b) => (
+                  <option key={b._id} value={b._id}>
+                    {b.branchName || b.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <h1 className="text-xl font-black text-slate-100 tracking-tight">
             Quản Lý Tồn Kho &amp; Định Vị Quầy Kệ

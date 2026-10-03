@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Store, ShieldCheck, Users } from 'lucide-react';
 import BranchListCardGrid from '../../features/branches/components/BranchListCardGrid';
 import BranchFormModal from '../../features/branches/components/BranchFormModal';
 import UserRbacTable from '../../features/users/components/UserRbacTable';
+import { branchService } from '../../features/branches/services/branchService.js';
+import { isMockEnabled } from '../../config/dataMode.js';
 
 const INITIAL_BRANCHES = [
   {
@@ -89,6 +91,24 @@ export const AdminBranchesUsersPage = () => {
   const [editingBranch, setEditingBranch] = useState(null);
   const [showBranchModal, setShowBranchModal] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
+
+  useEffect(() => {
+    let ignore = false;
+    if (isMockEnabled()) {
+      setBranches(INITIAL_BRANCHES);
+      return;
+    }
+
+    branchService.getBranches().then((list) => {
+      if (!ignore && list && list.length > 0) {
+        setBranches(list);
+      }
+    }).catch(() => {});
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   const handleSaveBranch = (saved) => {
     if (editingBranch) {

@@ -1,4 +1,5 @@
 import apiClient from '../../../services/api';
+import { isMockEnabled, isDevOrTest } from '../../../config/dataMode.js';
 
 export const fallbackSkuInventory = [
   {
@@ -190,59 +191,188 @@ export const DEMO_BRANCH_INVENTORY = [
   }
 ];
 
+const normalizeBranchStock = (item) => {
+  if (!item) return null;
+  const b = item.branch || {};
+  const qty = Number(item.quantity !== undefined ? item.quantity : 0);
+
+  let badgeVariant = 'success';
+  let statusLabel = `Còn ${qty} máy`;
+
+  if (qty <= 0) {
+    badgeVariant = 'danger';
+    statusLabel = 'Hết hàng';
+  } else if (qty <= 2) {
+    badgeVariant = 'warning';
+    statusLabel = `Còn ${qty} máy`;
+  }
+
+  return {
+    branchId: b._id || b.id || item.branchId,
+    branchName: b.name || b.branchName || 'TechOne Chi nhánh',
+    address: b.address || '',
+    phone: b.phone || '',
+    quantity: qty,
+    status: qty > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK',
+    statusLabel,
+    badgeVariant,
+  };
+};
+
+const normalizeBranchInventoryItem = (inv) => {
+  if (!inv) return null;
+  const prod = inv.productId || {};
+  const skus = Array.isArray(prod.skus) ? prod.skus : [];
+  const sku = skus.find((s) => String(s._id) === String(inv.productSkuId)) || skus[0] || {};
+  const qty = Number(inv.quantity || 0);
+
+  return {
+    _id: inv._id,
+    productId: prod._id || inv.productId,
+    productSkuId: inv.productSkuId,
+    sku: sku.sku || sku.code || 'SKU-GEN',
+    barcode: sku.sku || sku.code || '8938500000000',
+    productName: prod.name || 'Sản phẩm công nghệ',
+    category:
+      typeof prod.categoryId === 'object'
+        ? prod.categoryId?.name || 'Thiết bị'
+        : prod.category || 'Thiết bị',
+    shelfLocation: 'Kệ A-01',
+    quantityPhysical: qty,
+    quantityReserved: 0,
+    quantityAvailable: qty,
+    lowStockThreshold: 3,
+    unitPrice: sku.salePrice || sku.price || 0,
+    hasSerial: prod.isSerialManaged !== undefined ? prod.isSerialManaged : true,
+    serials: [],
+  };
+};
+
 export const inventoryService = {
   getBranchesWithSkuStock: async (skuId) => {
+    if (isMockEnabled()) {
+      return fallbackSkuInventory;
+    }
+
+    // Nếu skuId rỗng hoặc chưa phải là ObjectId hợp lệ của Mongo (24 hex chars)
+    if (!skuId || !/^[0-9a-fA-F]{24}$/.test(String(skuId))) {
+      return fallbackSkuInventory;
+    }
+
     try {
       const response = await apiClient.get(`/inventory/sku/${skuId}`);
-      if (response?.data?.data && Array.isArray(response.data.data) && response.data.data.length > 0) {
-        return response.data.data;
+      // Backend sendSuccess returns { data: { availableBranches: [...] } }
+      // apiClient unwrap returns response.data
+      const rawList =
+        response?.data?.availableBranches ||
+        response?.availableBranches ||
+        (Array.isArray(response?.data) ? response.data : []);
+
+      if (Array.isArray(rawList) && rawList.length > 0) {
+        return rawList.map(normalizeBranchStock).filter(Boolean);
       }
       return fallbackSkuInventory;
-    } catch {
+    } catch (err) {
+      if (isDevOrTest()) {
+        console.error(`[inventoryService.getBranchesWithSkuStock] Lỗi tải tồn kho SKU ${skuId}:`, err);
+      }
       return fallbackSkuInventory;
     }
   },
 
-  getBranchInventory: async (branchId = '65f0a1000000000000000001', { search = '', category = '', status = '' } = {}) => {
-    try {
-      const res = await apiClient.get(`/inventory/branch/${branchId}`);
-      if (res.data?.data?.items?.length) {
-        return res.data.data.items;
+  getBranchInventory: async (
+    branchId = '65f0a1000000000000000001',
+    { search = '', category = '', status = '' } = {}
+  ) => {
+    if (isMockEnabled()) {
+      let items = [...DEMO_BRANCH_INVENTORY];
+      if (search) {
+        const q = search.toLowerCase();
+        items = items.filter(
+          (i) =>
+            i.productName.toLowerCase().includes(q) ||
+            i.sku.toLowerCase().includes(q) ||
+            i.shelfLocation.toLowerCase().includes(q)
+        );
       }
-    } catch {
-      // fallback
+      if (category && category !== 'TẤT CẢ') {
+        items = items.filter((i) => i.category.toLowerCase() === category.toLowerCase());
+      }
+      if (status) {
+        if (status === 'OUT_OF_STOCK') items = items.filter((i) => i.quantityAvailable <= 0);
+        else if (status === 'LOW_STOCK')
+          items = items.filter(
+            (i) => i.quantityAvailable > 0 && i.quantityAvailable <= i.lowStockThreshold
+          );
+        else if (status === 'IN_STOCK')
+          items = items.filter((i) => i.quantityAvailable > i.lowStockThreshold);
+      }
+      return items;
     }
 
-    let items = [...DEMO_BRANCH_INVENTORY];
-    if (search) {
-      const q = search.toLowerCase();
-      items = items.filter(
-        i => i.productName.toLowerCase().includes(q) || i.sku.toLowerCase().includes(q) || i.shelfLocation.toLowerCase().includes(q)
-      );
+    try {
+      const res = await apiClient.get(`/inventory/branch/${branchId}`);
+      const rawInventories = res?.data?.inventories || res?.inventories || [];
+      let items = rawInventories.map(normalizeBranchInventoryItem).filter(Boolean);
+
+      if (items.length === 0) {
+        items = [...DEMO_BRANCH_INVENTORY];
+      }
+
+      if (search) {
+        const q = search.toLowerCase();
+        items = items.filter(
+          (i) =>
+            i.productName.toLowerCase().includes(q) ||
+            i.sku.toLowerCase().includes(q) ||
+            i.shelfLocation.toLowerCase().includes(q)
+        );
+      }
+      if (category && category !== 'TẤT CẢ') {
+        items = items.filter((i) => i.category.toLowerCase() === category.toLowerCase());
+      }
+      if (status) {
+        if (status === 'OUT_OF_STOCK') items = items.filter((i) => i.quantityAvailable <= 0);
+        else if (status === 'LOW_STOCK')
+          items = items.filter(
+            (i) => i.quantityAvailable > 0 && i.quantityAvailable <= i.lowStockThreshold
+          );
+        else if (status === 'IN_STOCK')
+          items = items.filter((i) => i.quantityAvailable > i.lowStockThreshold);
+      }
+      return items;
+    } catch (err) {
+      if (isDevOrTest()) {
+        console.error(`[inventoryService.getBranchInventory] Lỗi tải tồn kho chi nhánh ${branchId}:`, err);
+      }
+      return DEMO_BRANCH_INVENTORY;
     }
-    if (category && category !== 'TẤT CẢ') {
-      items = items.filter(i => i.category.toLowerCase() === category.toLowerCase());
-    }
-    if (status) {
-      if (status === 'OUT_OF_STOCK') items = items.filter(i => i.quantityAvailable <= 0);
-      else if (status === 'LOW_STOCK') items = items.filter(i => i.quantityAvailable > 0 && i.quantityAvailable <= i.lowStockThreshold);
-      else if (status === 'IN_STOCK') items = items.filter(i => i.quantityAvailable > i.lowStockThreshold);
-    }
-    return items;
   },
 
   adjustStock: async (payload) => {
-    try {
-      const res = await apiClient.post('/inventory/adjust', payload);
-      return res.data?.data;
-    } catch {
+    if (isMockEnabled()) {
       return {
         success: true,
         message: 'Điều chỉnh số lượng tồn kho thành công (mock)',
-        adjustedAt: new Date().toISOString()
+        adjustedAt: new Date().toISOString(),
       };
     }
-  }
+
+    try {
+      const res = await apiClient.post('/inventory/adjust', payload);
+      return res?.data || res;
+    } catch (err) {
+      if (isDevOrTest()) {
+        console.error('[inventoryService.adjustStock] Lỗi điều chỉnh tồn kho:', err);
+        throw err;
+      }
+      return {
+        success: false,
+        message: err.message,
+      };
+    }
+  },
 };
 
 export default inventoryService;
+

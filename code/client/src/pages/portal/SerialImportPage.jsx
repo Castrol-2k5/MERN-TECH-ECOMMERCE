@@ -1,9 +1,13 @@
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useSelector } from 'react-redux';
 import { QrCode, CheckCircle2, AlertCircle } from 'lucide-react';
 import SerialBatchImportCard from '../../features/inventory/components/SerialBatchImportCard';
 import SerialParserTextarea from '../../features/inventory/components/SerialParserTextarea';
 import ImportSummaryModal from '../../features/inventory/components/ImportSummaryModal';
 import apiClient from '../../services/api';
+import branchService from '../../features/branches/services/branchService';
+import productService from '../../features/products/services/productService';
+import { isMockEnabled, isDevOrTest } from '../../config/dataMode';
 
 const DEMO_BRANCHES = [
   { _id: '65f0a1000000000000000001', code: 'BR-Q1', name: 'TechOne Q1 • 138 Trần Quang Khải', address: 'Quận 1, TP.HCM' },
@@ -16,21 +20,24 @@ const DEMO_PRODUCTS = [
     _id: '65f0a0000000000000000001',
     name: 'MacBook Air 13 M4 16GB/256GB',
     skus: [
-      { code: 'MBA-M4-16-256-SL', options: { RAM: '16GB', Color: 'Silver' }, price: 26490000 },
-      { code: 'MBA-M4-32-512-MD', options: { RAM: '32GB', Color: 'Midnight' }, price: 33490000 }
+      { _id: 'sku-mba-1', code: 'MBA-M4-16-256-SL', sku: 'MBA-M4-16-256-SL', options: { RAM: '16GB', Color: 'Silver' }, price: 26490000 },
+      { _id: 'sku-mba-2', code: 'MBA-M4-32-512-MD', sku: 'MBA-M4-32-512-MD', options: { RAM: '32GB', Color: 'Midnight' }, price: 33490000 }
     ]
   },
   {
     _id: '65f0a0000000000000000002',
     name: 'iPhone 16 Pro Max 256GB',
     skus: [
-      { code: 'IP16PM-256-DESERT', options: { Color: 'Desert Titanium' }, price: 34990000 },
-      { code: 'IP16PM-512-NATURAL', options: { Color: 'Natural Titanium' }, price: 39990000 }
+      { _id: 'sku-ip16-1', code: 'IP16PM-256-DESERT', sku: 'IP16PM-256-DESERT', options: { Color: 'Desert Titanium' }, price: 34990000 },
+      { _id: 'sku-ip16-2', code: 'IP16PM-512-NATURAL', sku: 'IP16PM-512-NATURAL', options: { Color: 'Natural Titanium' }, price: 39990000 }
     ]
   }
 ];
 
 export const SerialImportPage = () => {
+  const authUser = useSelector((state) => state.auth?.user);
+  const [branches, setBranches] = useState(DEMO_BRANCHES);
+  const [products, setProducts] = useState(DEMO_PRODUCTS);
   const [selectedBranchId, setSelectedBranchId] = useState(DEMO_BRANCHES[0]._id);
   const [selectedSku, setSelectedSku] = useState(DEMO_PRODUCTS[0].skus[0]);
   const [rawText, setRawText] = useState(
@@ -41,7 +48,40 @@ export const SerialImportPage = () => {
   const [isImporting, setIsImporting] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
 
-  const selectedBranch = DEMO_BRANCHES.find((b) => b._id === selectedBranchId) || DEMO_BRANCHES[0];
+  // Load branches & products on mount
+  useEffect(() => {
+    let ignore = false;
+    Promise.all([
+      branchService.getBranches(),
+      productService.getProducts({ limit: 100 })
+    ]).then(([branchList, productRes]) => {
+      if (!ignore) {
+        if (branchList && branchList.length > 0) {
+          setBranches(branchList);
+          const initialBranchId =
+            authUser?.branchId && branchList.some((b) => b._id === authUser.branchId)
+              ? authUser.branchId
+              : branchList[0]._id;
+          setSelectedBranchId(initialBranchId);
+        }
+
+        const prodList = productRes?.products || [];
+        if (prodList.length > 0) {
+          setProducts(prodList);
+          if (prodList[0].skus && prodList[0].skus.length > 0) {
+            setSelectedSku(prodList[0].skus[0]);
+          }
+        }
+      }
+    }).catch(() => {});
+
+    return () => {
+      ignore = true;
+    };
+  }, [authUser?.branchId]);
+
+  const selectedBranch =
+    branches.find((b) => b._id === selectedBranchId) || branches[0] || DEMO_BRANCHES[0];
 
   const handleParsedResult = useCallback((report) => {
     setValidationReport(report);
@@ -50,29 +90,49 @@ export const SerialImportPage = () => {
   const handleConfirmImport = async () => {
     if (!validationReport || validationReport.valid === 0) return;
 
+    // Check if in live mode and user is not admin
+    if (!isMockEnabled() && !authUser) {
+      setToastMsg({
+        type: 'error',
+        message: 'Bạn cần đăng nhập tài khoản có quyền SUPER_ADMIN hoặc BRANCH_MANAGER để nhập serials vào database.'
+      });
+      return;
+    }
+
     setIsImporting(true);
     try {
       const validSerials = validationReport.items
         .filter((i) => i.status === 'VALID')
         .map((i) => i.serialNumber);
 
+      // Find owning product of selectedSku
+      const owningProduct = products.find((p) =>
+        p.skus?.some((s) => (s._id || s.code) === (selectedSku._id || selectedSku.code))
+      );
+
       const payload = {
         branchId: selectedBranchId,
-        productSkuId: selectedSku.code,
+        productId: owningProduct?._id || products[0]?._id,
+        productSkuId: selectedSku?._id || selectedSku?.productSkuId,
         serials: validSerials
       };
 
-      await apiClient.post('/serials/import', payload).catch(() => {});
+      if (!isMockEnabled()) {
+        await apiClient.post('/serials/import', payload);
+      }
 
       setShowSummaryModal(false);
       setToastMsg({
         type: 'success',
-        message: `Đã nhập thành công ${validSerials.length} mã Serial cho SKU ${selectedSku.code} vào chi nhánh ${selectedBranch.name}!`
+        message: `Đã nhập thành công ${validSerials.length} mã Serial cho SKU ${selectedSku.code || selectedSku.sku} vào chi nhánh ${selectedBranch.name || selectedBranch.branchName}!`
       });
       setRawText('');
       setTimeout(() => setToastMsg(null), 4000);
-    } catch {
-      setToastMsg({ type: 'error', message: 'Lỗi khi nhập danh sách Serial' });
+    } catch (err) {
+      setToastMsg({
+        type: 'error',
+        message: `Lỗi khi nhập danh sách Serial: ${err.response?.data?.message || err.message}`
+      });
     } finally {
       setIsImporting(false);
     }
@@ -130,8 +190,8 @@ export const SerialImportPage = () => {
 
       {/* Step 1: Branch & SKU Setup Card */}
       <SerialBatchImportCard
-        branches={DEMO_BRANCHES}
-        products={DEMO_PRODUCTS}
+        branches={branches}
+        products={products}
         selectedBranchId={selectedBranchId}
         selectedSku={selectedSku}
         onSelectBranch={setSelectedBranchId}
@@ -151,8 +211,8 @@ export const SerialImportPage = () => {
       <ImportSummaryModal
         isOpen={showSummaryModal}
         onClose={() => setShowSummaryModal(false)}
-        skuCode={selectedSku?.code}
-        branchName={selectedBranch.name}
+        skuCode={selectedSku?.code || selectedSku?.sku}
+        branchName={selectedBranch.name || selectedBranch.branchName}
         validationReport={validationReport}
         onConfirmImport={handleConfirmImport}
         isImporting={isImporting}
