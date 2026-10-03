@@ -126,7 +126,7 @@ export const posService = {
         if (isDevOrTest()) {
           console.error(`[posService.scanBarcode] Không tìm thấy serial/barcode "${clean}":`, err);
         }
-        throw new Error(err.response?.data?.message || `Không tìm thấy sản phẩm hay serial khớp với mã [${clean}]`);
+        throw new Error(err.response?.data?.message || `Không tìm thấy sản phẩm hay serial khớp với mã [${clean}]`, { cause: err });
       }
     }
 
@@ -183,7 +183,7 @@ export const posService = {
         const res = await apiClient.get('/products', { params });
         const rawProducts = res?.data?.products || (Array.isArray(res?.data) ? res.data : []);
 
-        if (Array.isArray(rawProducts) && rawProducts.length > 0) {
+        if (Array.isArray(rawProducts)) {
           return rawProducts.map((p) => {
             const skus = Array.isArray(p.skus) ? p.skus : [];
             const primarySku = skus[0] || {};
@@ -204,10 +204,12 @@ export const posService = {
             };
           });
         }
+        return [];
       } catch (err) {
         if (isDevOrTest()) {
           console.error('[posService.searchProducts] Lỗi tải sản phẩm POS từ API:', err);
         }
+        return [];
       }
     }
 
@@ -235,7 +237,7 @@ export const posService = {
         if (isDevOrTest()) {
           console.error('[posService.checkoutPos] Lỗi thanh toán POS:', err);
         }
-        throw new Error(err.response?.data?.message || err.message || 'Thanh toán POS thất bại!');
+        throw new Error(err.response?.data?.message || err.message || 'Thanh toán POS thất bại!', { cause: err });
       }
     }
 

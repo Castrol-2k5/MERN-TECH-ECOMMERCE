@@ -268,22 +268,24 @@ export const inventoryService = {
         response?.availableBranches ||
         (Array.isArray(response?.data) ? response.data : []);
 
-      if (Array.isArray(rawList) && rawList.length > 0) {
+      if (Array.isArray(rawList)) {
         return rawList.map(normalizeBranchStock).filter(Boolean);
       }
-      return fallbackSkuInventory;
+      return [];
     } catch (err) {
       if (isDevOrTest()) {
         console.error(`[inventoryService.getBranchesWithSkuStock] Lỗi tải tồn kho SKU ${skuId}:`, err);
       }
-      return fallbackSkuInventory;
+      return [];
     }
   },
 
   getBranchInventory: async (
-    branchId = '65f0a1000000000000000001',
+    branchId,
     { search = '', category = '', status = '' } = {}
   ) => {
+    if (!branchId) return [];
+
     if (isMockEnabled()) {
       let items = [...DEMO_BRANCH_INVENTORY];
       if (search) {
@@ -314,10 +316,6 @@ export const inventoryService = {
       const res = await apiClient.get(`/inventory/branch/${branchId}`);
       const rawInventories = res?.data?.inventories || res?.inventories || [];
       let items = rawInventories.map(normalizeBranchInventoryItem).filter(Boolean);
-
-      if (items.length === 0) {
-        items = [...DEMO_BRANCH_INVENTORY];
-      }
 
       if (search) {
         const q = search.toLowerCase();

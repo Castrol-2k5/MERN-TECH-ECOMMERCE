@@ -11,7 +11,6 @@ import { X, Sparkles } from 'lucide-react';
 
 export const CategoryPage = () => {
   const { slug = 'laptop' } = useParams();
-  const { products, isLoading, error, refetch } = useProducts({ category: slug });
   const isDev = isDevOrTest();
 
   const [selectedFilters, setSelectedFilters] = useState({});
@@ -19,43 +18,37 @@ export const CategoryPage = () => {
   const [viewMode, setViewMode] = useState('grid');
   const [currentPage, setCurrentPage] = useState(1);
 
-  const filteredProducts = useMemo(() => {
-    let result = [...products];
-
+  const queryParams = useMemo(() => {
+    const params = {
+      category: slug,
+      page: currentPage,
+      limit: 12,
+      sortBy: currentSort,
+    };
     if (selectedFilters.brand?.length > 0) {
-      result = result.filter((p) => selectedFilters.brand.includes(p.brand));
+      params.brand = selectedFilters.brand[0];
     }
+    Object.entries(selectedFilters).forEach(([key, vals]) => {
+      if (key !== 'brand' && Array.isArray(vals) && vals.length > 0) {
+        params[key] = vals[0];
+      }
+    });
+    return params;
+  }, [slug, currentPage, currentSort, selectedFilters]);
 
-    if (selectedFilters.cpu?.length > 0) {
-      result = result.filter((p) =>
-        selectedFilters.cpu.some((c) =>
-          p.attributes?.cpu?.toLowerCase().includes(c.toLowerCase().replace(' series', ''))
-        )
-      );
-    }
+  const { products, meta, isLoading, error, refetch } = useProducts(queryParams);
 
-    if (selectedFilters.ram?.length > 0) {
-      result = result.filter((p) =>
-        selectedFilters.ram.some((r) => p.attributes?.ram?.includes(r))
-      );
-    }
-
-    if (currentSort === 'price_asc') {
-      result.sort((a, b) => a.price - b.price);
-    } else if (currentSort === 'price_desc') {
-      result.sort((a, b) => b.price - a.price);
-    } else if (currentSort === 'newest') {
-      result.sort((a, b) => (b.discountPercentage || 0) - (a.discountPercentage || 0));
-    }
-
-    return result;
-  }, [products, selectedFilters, currentSort]);
+  const handleFilterChange = (newFilters) => {
+    setSelectedFilters(newFilters);
+    setCurrentPage(1);
+  };
 
   const handleRemoveFilter = (groupKey, value) => {
     setSelectedFilters((prev) => ({
       ...prev,
       [groupKey]: prev[groupKey].filter((v) => v !== value),
     }));
+    setCurrentPage(1);
   };
 
   const activeFilterList = useMemo(() => {
@@ -99,8 +92,11 @@ export const CategoryPage = () => {
       <div className="flex flex-col lg:flex-row gap-8 items-start">
         <DynamicFilterSidebar
           selectedFilters={selectedFilters}
-          onFilterChange={setSelectedFilters}
-          onResetFilters={() => setSelectedFilters({})}
+          onFilterChange={handleFilterChange}
+          onResetFilters={() => {
+            setSelectedFilters({});
+            setCurrentPage(1);
+          }}
         />
 
         <div className="flex-1 w-full">
@@ -122,7 +118,10 @@ export const CategoryPage = () => {
                 </span>
               ))}
               <button
-                onClick={() => setSelectedFilters({})}
+                onClick={() => {
+                  setSelectedFilters({});
+                  setCurrentPage(1);
+                }}
                 className="text-xs text-blue-600 hover:underline font-semibold ml-2 cursor-pointer"
               >
                 Xóa tất cả
@@ -132,10 +131,13 @@ export const CategoryPage = () => {
 
           <SortBar
             currentSort={currentSort}
-            onSortChange={setCurrentSort}
+            onSortChange={(newSort) => {
+              setCurrentSort(newSort);
+              setCurrentPage(1);
+            }}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
-            totalResults={filteredProducts.length}
+            totalResults={meta?.total ?? products.length}
           />
 
           {error ? (
@@ -149,7 +151,7 @@ export const CategoryPage = () => {
                   : 'Đã có lỗi xảy ra trong quá trình tải dữ liệu. Vui lòng thử lại sau.'}
               </p>
               <button
-                onClick={() => refetch()}
+                onClick={() => refetch(queryParams)}
                 className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-xl shadow-xs cursor-pointer transition-colors"
               >
                 Thử tải lại
@@ -159,16 +161,19 @@ export const CategoryPage = () => {
             <div className="py-20 flex items-center justify-center">
               <Spinner size="lg" />
             </div>
-          ) : filteredProducts.length === 0 ? (
+          ) : products.length === 0 ? (
             <div className="py-20 text-center bg-white rounded-3xl border border-slate-200 p-8">
               <p className="text-base font-bold text-slate-700">Không tìm thấy sản phẩm phù hợp</p>
               <p className="text-xs text-slate-400 mt-1">
-                {isDev && products.length === 0
+                {isDev
                   ? 'Chưa có sản phẩm nào thuộc danh mục này trong Database. Chạy `npm run seed` ở backend để tạo dữ liệu.'
                   : 'Hãy thử nới lỏng các tiêu chí bộ lọc để xem thêm kết quả.'}
               </p>
               <button
-                onClick={() => setSelectedFilters({})}
+                onClick={() => {
+                  setSelectedFilters({});
+                  setCurrentPage(1);
+                }}
                 className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold"
               >
                 Đặt lại bộ lọc
@@ -182,7 +187,7 @@ export const CategoryPage = () => {
                   : 'grid-cols-1'
               }`}
             >
-              {filteredProducts.map((product) => (
+              {products.map((product) => (
                 <ProductCard key={product._id || product.id} product={product} />
               ))}
             </div>
@@ -190,7 +195,7 @@ export const CategoryPage = () => {
 
           <Pagination
             currentPage={currentPage}
-            totalPages={12}
+            totalPages={meta?.totalPages || 1}
             onPageChange={setCurrentPage}
           />
         </div>

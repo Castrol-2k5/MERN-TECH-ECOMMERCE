@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   BarChart3, 
   Calendar, 
@@ -10,6 +10,7 @@ import RevenueChart from '../../features/analytics/components/RevenueChart';
 import BranchSalesBreakdown from '../../features/analytics/components/BranchSalesBreakdown';
 import ChannelBreakdownPie from '../../features/analytics/components/ChannelBreakdownPie';
 import TopProductsTable from '../../features/analytics/components/TopProductsTable';
+import { branchService } from '../../features/branches/services/branchService.js';
 
 const BRANCH_PERFORMANCE = [
   { rank: '01', branch: 'TechOne Q1 • Nguyễn Thị Minh Khai', revenue: '4,28 tỷ', orders: '1.042', aov: '4,11 triệu', returnRate: '1,8%', growth: '+22,4%' },
@@ -21,6 +22,19 @@ const BRANCH_PERFORMANCE = [
 export const AdminAnalyticsPage = () => {
   const [selectedBranch, setSelectedBranch] = useState('ALL');
   const [dateRange, setDateRange] = useState('01/09/2026 — 30/09/2026');
+  const [branches, setBranches] = useState([]);
+
+  useEffect(() => {
+    let ignore = false;
+    branchService.getBranches().then((list) => {
+      if (!ignore && list) {
+        setBranches(list);
+      }
+    }).catch(() => {});
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   return (
     <div className="space-y-5 select-none font-sans text-slate-100">
@@ -31,9 +45,14 @@ export const AdminAnalyticsPage = () => {
             <BarChart3 className="w-4 h-4" />
             <span>Phân Tích Kinh Doanh • Business Intelligence</span>
           </div>
-          <h1 className="text-xl font-black text-slate-100 tracking-tight">
-            Báo Cáo Doanh Thu Đa Kênh &amp; Hiệu Quả Chuỗi
-          </h1>
+          <div className="flex flex-wrap items-center gap-2.5 mt-0.5">
+            <h1 className="text-xl font-black text-slate-100 tracking-tight">
+              Báo Cáo Doanh Thu Đa Kênh &amp; Hiệu Quả Chuỗi
+            </h1>
+            <span className="px-2.5 py-0.5 bg-amber-500/15 text-amber-300 border border-amber-500/30 rounded-full text-[11px] font-bold">
+              Dữ liệu thử nghiệm / Demo Preview
+            </span>
+          </div>
           <p className="text-xs text-slate-400 mt-0.5">
             Dữ liệu cập nhật thời gian thực • Đối soát doanh thu Web POS quầy và Storefront B2C trực tuyến
           </p>
@@ -42,11 +61,12 @@ export const AdminAnalyticsPage = () => {
         {/* Export action */}
         <button
           type="button"
-          onClick={() => alert('Đang xuất báo cáo tài chính doanh thu đa kênh (Excel/PDF)...')}
-          className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg shadow-blue-600/20 cursor-pointer w-fit"
+          disabled
+          className="px-3.5 py-2 bg-slate-800 text-slate-400 border border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-not-allowed opacity-75 w-fit"
+          title="Tính năng xuất báo cáo doanh thu tài chính đang được hoàn thiện"
         >
           <Download className="w-3.5 h-3.5" />
-          <span>Xuất Báo Cáo Doanh Thu</span>
+          <span>Xuất Báo Cáo (Sắp ra mắt)</span>
         </button>
       </div>
 
@@ -69,10 +89,12 @@ export const AdminAnalyticsPage = () => {
             onChange={(e) => setSelectedBranch(e.target.value)}
             className="bg-transparent text-slate-200 text-xs focus:outline-none cursor-pointer"
           >
-            <option value="ALL" className="bg-slate-900">Chi nhánh: Toàn chuỗi (48 điểm)</option>
-            <option value="Q1" className="bg-slate-900">Chi nhánh: Q1 • 138 Trần Quang Khải</option>
-            <option value="TD" className="bg-slate-900">Chi nhánh: Thủ Đức • 214 Võ Văn Ngân</option>
-            <option value="Q5" className="bg-slate-900">Chi nhánh: Q5 • 382 Trần Hưng Đạo</option>
+            <option value="ALL" className="bg-slate-900">Chi nhánh: Toàn chuỗi ({branches.length > 0 ? `${branches.length} điểm` : 'Tất cả'})</option>
+            {branches.map((b) => (
+              <option key={b._id} value={b._id} className="bg-slate-900">
+                {b.branchName || b.name}
+              </option>
+            ))}
           </select>
         </div>
 

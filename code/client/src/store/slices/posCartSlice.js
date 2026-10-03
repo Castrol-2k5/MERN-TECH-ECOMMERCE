@@ -1,27 +1,14 @@
 import { createSlice } from '@reduxjs/toolkit';
 
 const initialState = {
-  items: [
-    {
-      productId: '65f0a0000000000000000001',
-      productSkuId: '65f0b0000000000000000001',
-      name: 'iPhone 16 Pro Max 256GB - Sa Mạc Tự Nhiên',
-      sku: 'IP16PM-256-DESERT',
-      price: 34990000,
-      quantity: 1,
-      hasSerial: true,
-      serialsAssigned: ['SN-IP16-VN-9081'],
-      image: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=300&auto=format&fit=crop&q=80',
-      availableSerials: ['SN-IP16-VN-9081', 'SN-IP16-VN-9082', 'SN-IP16-VN-9083']
-    }
-  ],
+  items: [],
   customerInfo: {
-    fullName: 'Trần Minh Khang',
-    phone: '0912345678',
-    address: 'Quận 1, TP.HCM'
+    fullName: '',
+    phone: '',
+    address: ''
   },
-  discount: 500000,
-  customerPaid: 35000000,
+  discount: 0,
+  customerPaid: 0,
   paymentMethod: 'CASH', // CASH | VNPAY
   note: ''
 };

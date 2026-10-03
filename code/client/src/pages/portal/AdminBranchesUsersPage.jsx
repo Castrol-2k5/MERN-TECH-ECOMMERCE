@@ -86,7 +86,7 @@ const INITIAL_USERS = [
 
 export const AdminBranchesUsersPage = () => {
   const [activeTab, setActiveTab] = useState('BRANCHES'); // 'BRANCHES' | 'USERS'
-  const [branches, setBranches] = useState(INITIAL_BRANCHES);
+  const [branches, setBranches] = useState(isMockEnabled() ? INITIAL_BRANCHES : []);
   const [users, setUsers] = useState(INITIAL_USERS);
   const [editingBranch, setEditingBranch] = useState(null);
   const [showBranchModal, setShowBranchModal] = useState(false);
@@ -95,15 +95,16 @@ export const AdminBranchesUsersPage = () => {
   useEffect(() => {
     let ignore = false;
     if (isMockEnabled()) {
-      setBranches(INITIAL_BRANCHES);
       return;
     }
 
     branchService.getBranches().then((list) => {
-      if (!ignore && list && list.length > 0) {
-        setBranches(list);
+      if (!ignore) {
+        setBranches(list || []);
       }
-    }).catch(() => {});
+    }).catch(() => {
+      if (!ignore) setBranches([]);
+    });
 
     return () => {
       ignore = true;

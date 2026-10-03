@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useSelector } from 'react-redux';
 import { X, SlidersHorizontal, AlertCircle, Plus, Minus, Check } from 'lucide-react';
 
 export const StockAdjustModal = ({ isOpen, onClose, item, onSubmit }) => {
+  const authUser = useSelector((state) => state.auth?.user);
   const [adjustmentType, setAdjustmentType] = useState('INCREASE'); // 'INCREASE' | 'DECREASE'
   const [delta, setDelta] = useState(1);
   const [reason, setReason] = useState('Kiểm kê định kỳ phát hiện thừa/thiếu');
@@ -29,7 +31,7 @@ export const StockAdjustModal = ({ isOpen, onClose, item, onSubmit }) => {
     setIsSubmitting(true);
     try {
       await onSubmit({
-        branchId: '65f0a1000000000000000001',
+        branchId: item.branchId || authUser?.branchId,
         productId: item.productId,
         productSkuId: item.productSkuId,
         quantityDelta,

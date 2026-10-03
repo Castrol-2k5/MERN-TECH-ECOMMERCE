@@ -1,5 +1,5 @@
 import HeroBannerCarousel from '../../features/products/components/HeroBannerCarousel.jsx';
-import FlashSaleSection from '../../features/products/components/FlashSaleSection.jsx';
+// import FlashSaleSection from '../../features/products/components/FlashSaleSection.jsx';
 import CategoryHighlights from '../../features/products/components/CategoryHighlights.jsx';
 import ClickAndCollectBanner from '../../features/products/components/ClickAndCollectBanner.jsx';
 import ProductCard from '../../features/products/components/ProductCard.jsx';
@@ -25,7 +25,8 @@ export const HomePage = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-12 py-4">
       <HeroBannerCarousel />
-      <FlashSaleSection products={products} />
+      {/* Tạm ẩn Flash Sale chờ bổ sung API khuyến mãi giờ vàng ở phân hệ tiếp theo */}
+      {/* <FlashSaleSection products={products} /> */}
       <CategoryHighlights />
 
       <section className="my-14">

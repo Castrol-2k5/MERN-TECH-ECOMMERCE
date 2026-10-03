@@ -9,39 +9,27 @@ export const BranchAllocationModal = ({
   onConfirmAllocation,
   isAllocating = false
 }) => {
+  const displayBranches = branches && branches.length > 0
+    ? branches.map((b, idx) => ({
+        _id: b._id,
+        name: b.name || b.branchName || 'Chi nhánh TechOne',
+        distanceKm: b.distanceKm || (idx === 0 ? 1.2 : 3.5),
+        stockAvailable: b.stockAvailable ?? 10,
+        isRecommended: idx === 0
+      }))
+    : [];
+
   const [selectedBranchId, setSelectedBranchId] = useState(
-    branches[0]?._id || '65f0a1000000000000000001'
+    displayBranches[0]?._id || ''
   );
 
   if (!isOpen || !order) return null;
 
-  const branchesWithDistance = [
-    {
-      _id: '65f0a1000000000000000001',
-      name: 'TechOne Q1 • 138 Trần Quang Khải',
-      distanceKm: 1.2,
-      stockAvailable: 14,
-      isRecommended: true
-    },
-    {
-      _id: '65f0a1000000000000000003',
-      name: 'TechOne Q5 • 382 Trần Hưng Đạo',
-      distanceKm: 3.8,
-      stockAvailable: 9,
-      isRecommended: false
-    },
-    {
-      _id: '65f0a1000000000000000002',
-      name: 'TechOne Thủ Đức • 214 Võ Văn Ngân',
-      distanceKm: 12.5,
-      stockAvailable: 5,
-      isRecommended: false
-    }
-  ];
-
   const handleConfirm = () => {
-    const branch = branchesWithDistance.find((b) => b._id === selectedBranchId);
-    onConfirmAllocation(order.orderCode, branch);
+    const branch = displayBranches.find((b) => b._id === selectedBranchId) || displayBranches[0];
+    if (branch) {
+      onConfirmAllocation(order.orderCode, branch);
+    }
   };
 
   return (
@@ -86,7 +74,7 @@ export const BranchAllocationModal = ({
               Lựa chọn chi nhánh xuất kho tối ưu:
             </label>
             <div className="space-y-2">
-              {branchesWithDistance.map((branch) => {
+              {displayBranches.map((branch) => {
                 const isSelected = branch._id === selectedBranchId;
                 return (
                   <div

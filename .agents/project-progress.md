@@ -3,7 +3,7 @@
 * **Dự án:** Hệ thống Thương mại điện tử Đa kênh MERN Stack cho chuỗi bán lẻ thiết bị công nghệ (Storefront B2C, Web POS, Branch Admin, HQ Super Admin).
 * **Kiến trúc:** Modular Monolith trên Node.js/Express (v20+ LTS), Mongoose ODM (v8+), MongoDB (v7.0+).
 * **Tiêu chuẩn chất lượng:** Tuân thủ Clean Architecture, 0 lỗi ESLint, 0 bí mật lộ lọt, độ phủ kiểm thử tự động ≥ 70% (Đáp ứng Mức 5 Rubric Đồ án).
-* **Thời điểm cập nhật:** 29/09/2026.
+* **Thời điểm cập nhật:** 03/10/2026 (Hoàn tất Gói 1: Vá bảo mật và tinh chỉnh Core APIs Server).
 
 ---
 
@@ -12,15 +12,19 @@
 | Phân hệ / Hạng mục | Trạng thái | Độ phủ Test / Kiểm thử | Tiêu chuẩn Rubric đạt được |
 | :--- | :---: | :---: | :---: |
 | **1. Database Schemas & Indexing (9 Models)** | Hoàn thành | 100% Pass (9/9 Models) | **TC2.2, TC2.4** |
-| **2. Auth & RBAC 3 Tầng (JWT, Session, Scoping)** | Hoàn thành | 93.16% Line Coverage (17 ACs) | **TC2.2, TC2.4, TC2.5** |
-| **3. Branch Module & GeoSpatial GPS ($near)** | Hoàn thành | 90.14% Line Coverage (11 Cases) | **TC2.2, TC2.4, TC2.5** |
-| **4. Category Module (Hierarchy & Dynamic Specs)** | Hoàn thành | 91.76% Line Coverage (11 Cases) | **TC2.2, TC2.4, TC2.5** |
-| **5. Product Module (Dynamic Filter & Hybrid Schema)** | Hoàn thành | 87.82% Line Coverage (19 Cases) | **TC2.2, TC2.4, TC2.5** |
-| **6. Inventory Module (Atomic OCC & Multi-Branch)** | Hoàn thành | 91.22% Line Coverage (11 Cases) | **TC2.2, TC2.4, TC2.5** |
-| **7. Serial/IMEI & e-Warranty Module (State Pattern)** | Hoàn thành | 89.47% Line Coverage (13 Cases) | **TC2.2, TC2.4, TC2.5** |
-| **8. Order & Web POS Checkout (Zero Overselling)** | Hoàn thành | 89.50% Line Coverage (20 Cases) | **TC2.1, TC2.2, TC2.5** |
-| **9. Pipeline CI/CD GitHub Actions** | Hoàn thành | 100% Green Build Pipeline | **TC2.4, TC2.5, TC2.6** |
-| **Tổng thể Hệ thống (Toàn bộ Backend)** | **Hoàn thành Xuất sắc** | **88.97% Line Coverage (142/142 Tests)** | **Mức 5 Xuất sắc** |
+| **2. Auth & RBAC 3 Tầng (JWT, Session, Scoping)** | Hoàn thành | 100% Pass (18 ACs - Đã vá H1) | **TC2.2, TC2.4, TC2.5** |
+| **3. Branch Module & GeoSpatial GPS ($near)** | Hoàn thành | 100% Pass (11 Cases) | **TC2.2, TC2.4, TC2.5** |
+| **4. Category Module (Hierarchy & Dynamic Specs)** | Hoàn thành | 100% Pass (11 Cases) | **TC2.2, TC2.4, TC2.5** |
+| **5. Product Module (Dynamic Filter & Hybrid Schema)** | Hoàn thành | 100% Pass (19 Cases) | **TC2.2, TC2.4, TC2.5** |
+| **6. Inventory Module (Atomic OCC & Multi-Branch)** | Hoàn thành | 100% Pass (11 Cases) | **TC2.2, TC2.4, TC2.5** |
+| **7. Serial/IMEI & Query Filter (State Pattern)** | Hoàn thành | 100% Pass (16 Cases - Sửa A4) | **TC2.2, TC2.4, TC2.5** |
+| **8. Warranty Ticket Module (RMA Processing)** | Hoàn thành | 100% Pass (6 Cases - Sửa A5) | **TC2.2, TC2.4, TC2.5** |
+| **9. Order & Web POS Checkout (Zero Overselling)** | Hoàn thành | 100% Pass (22 Cases - Sửa A1, A2, E2) | **TC2.1, TC2.2, TC2.5** |
+| **10. Chuẩn Hóa Adapter & Redux Store Client (Gói 2)** | Hoàn thành | 100% Build Pass (0 ESLint errors) | **TC2.1, TC2.2, TC2.5** |
+| **11. Dọn Dẹp Mock Data & Đưa UI về Core Chuẩn (Gói 3)** | Hoàn thành | 100% Build Pass (0 ESLint errors) | **TC2.1, TC2.2, TC2.5** |
+| **12. Pipeline CI/CD GitHub Actions** | Hoàn thành | 100% Green Build Pipeline | **TC2.4, TC2.5, TC2.6** |
+| **Tổng thể Hệ thống (Backend & Client Core Sync)** | **Hoàn thành Xuất sắc** | **100% Pass Rate (156/156 Tests - 13 Suites)** | **Mức 5 Xuất sắc** |
+
 
 ---
 
@@ -50,6 +54,7 @@
   - *Tầng 2 (Role Authorization):* Middleware `authorize(...roles)` bảo vệ các endpoint quản trị.
   - *Tầng 3 (Data Scoping):* Middleware `scopeBranch` ép buộc phạm vi dữ liệu chi nhánh (`req.scopedBranchId = req.user.branchId`) cho nhân viên POS và Quản lý cửa hàng, ngăn chặn truy vấn chéo chi nhánh. `SUPER_ADMIN` được cấp quyền xem xuyên chuỗi.
 * **Bảo vệ Brute-Force:** Tích hợp `authRateLimiter` tối đa 5 lần thử/15 phút.
+* **Vá lỗ hổng bảo mật H1 (Forgot Password):** Endpoint `POST /auth/forgot-password` tuyệt đối không trả về `resetToken` trong JSON response, chỉ trả thông báo chung, ngăn chặn nguy cơ tấn công chiếm quyền tài khoản.
 
 ---
 
@@ -97,8 +102,9 @@
 
 ---
 
-### 2.7. Phân Hệ Quản Lý Vòng Đời Serial/IMEI & e-Warranty (`/api/v1/serials`)
+### 2.7. Phân Hệ Quản Lý Vòng Đời Serial/IMEI (`/api/v1/serials`)
 * **Kiểm Soát Vòng Đời Thiết Bị Độc Bản (State Pattern):** Quản lý trạng thái vòng đời từng mã máy (`IN_STOCK` ➔ `RESERVED` ➔ `SOLD` ➔ `WARRANTY` ➔ `TRANSIT`).
+* **Truy Vấn Danh Sách Serial (`GET /serials` - Sửa A4):** Hỗ trợ lọc theo `branchId`, `productSkuId`, `productId`, `status` kèm phân trang. Tự động áp dụng `scopeBranch` giúp quầy POS và điều phối kho lấy danh sách máy `IN_STOCK` chính xác.
 * **Atomic Batch Import:** Nhập danh sách Serial/IMEI mới vào kho: tự động tạo hàng loạt bản ghi Serial ở trạng thái `IN_STOCK`, đồng thời kích hoạt toán tử Atomic `$inc` tăng số lượng tồn kho tương ứng trong `branch_inventories`. Chặn trùng lặp mã bằng Unique Index.
 * **Quét Mã Vạch/QR POS Siêu Tốc ($T_{response} < 100ms$):**
   - Kiểm tra 3 lớp: Mã có tồn tại không ➔ Có ở trạng thái `IN_STOCK` không ➔ Thiết bị có thuộc đúng chi nhánh của nhân sự POS không (chặn thao tác chéo chi nhánh qua HTTP 403 `CROSS_BRANCH_ACCESS_DENIED`).
@@ -107,20 +113,71 @@
   - Truy vấn mã Serial bằng `.lean()` ($T_{query} < 300ms$, độ chính xác 100%).
   - Trả về tên sản phẩm, SKU, ngày kích hoạt bán, hạn bảo hành và cờ `isExpired` tự động so khớp ngày hiện tại.
 
-### 2.8. Phân Hệ Quản Lý Đơn Hàng & Web POS Checkout (`/api/v1/orders`)
+---
+
+### 2.8. Phân Hệ Tiếp Nhận & Quản Lý Bảo Hành (`/api/v1/warranty` - Sửa A5)
+* **Tiếp Nhận Bảo Hành (`POST /warranty`):** Tiếp nhận thiết bị gặp sự cố. Bắt buộc kiểm tra Serial tồn tại và đã bán (`SOLD`). Tự động sinh mã phiếu duy nhất định dạng `RMA-YYYYMMDD-XXXX`, lưu vết khách hàng (hỗ trợ cả khách vãng lai và tài khoản hệ thống), chuyển trạng thái Serial sang `WARRANTY`.
+* **Tra Cứu Danh Sách Bảo Hành (`GET /warranty`):** Lọc theo chi nhánh tiếp nhận, trạng thái xử lý (`RECEIVED`, `PROCESSING`, `COMPLETED`, `RETURNED`), mã phiếu hoặc số Serial, tự động giới hạn phạm vi qua `scopeBranch`.
+
+---
+
+### 2.9. Phân Hệ Quản Lý Đơn Hàng & Web POS Checkout (`/api/v1/orders`)
 * **Chống Race Condition & Zero Overselling (TC2.1 & TC2.2):** Thực thi trừ kho trực tiếp bằng toán tử Atomic `BranchInventory.updateOne({ branchId, productSkuId, quantity: { $gte: qty } }, { $inc: { quantity: -qty } })` ở cấp độ Document-level Lock của MongoDB Engine. Đảm bảo năng suất $\ge 100\text{ TPS}$ và tuyệt đối không bao giờ xảy ra tình trạng bán âm kho.
-* **Quy Trình POS Checkout Khép Kín:**
+* **Quy Trình POS Checkout Khép Kín (Sửa A1, E2):**
+  - Server tự động tính toán tổng tiền, không đòi hỏi client gửi các trường phụ thừa thãi.
+  - Hỗ trợ khách hàng vãng lai không bắt buộc cung cấp số điện thoại.
+  - Nghiệp vụ E2: Bắt buộc gán đủ Serial nếu SKU có `isSerialManaged === true`, nếu thiếu lập tức báo lỗi `HTTP 400 SERIAL_COUNT_MISMATCH`.
   - Nhân sự POS quét mã Serial/IMEI, hệ thống tự động kiểm tra trạng thái `IN_STOCK` và đối soát chi nhánh (`CROSS_BRANCH_ACCESS_DENIED`).
   - Trừ kho Atomic, chuyển trạng thái Serial sang `SOLD`, lưu vết `soldAt` và kích hoạt bảo hành điện tử 12 tháng (`warrantyEndDate`).
   - Tạo Order `POS_STORE` ở trạng thái `COMPLETED` và `PAID`, sẵn sàng in hóa đơn K80 tại quầy.
-* **Quy Trình Đặt Hàng B2C Trực Tuyến (Atomic Virtual Holding):**
-  - Khách hàng (đăng nhập hoặc vãng lai) gửi giỏ hàng và chọn chi nhánh nhận/xuất kho.
+* **Quy Trình Đặt Hàng B2C Trực Tuyến (Sửa A2):**
+  - Khách hàng gửi giỏ hàng và chọn chi nhánh nhận/xuất kho. Hỗ trợ phương thức thanh toán `CASH` (COD nhận hàng trả tiền mặt) bên cạnh `VNPAY` và `STRIPE`.
   - Hệ thống giữ hàng tạm thời bằng cách trừ kho Atomic trước. Nếu hết hàng, trả về `HTTP 409 Conflict (PRODUCT_OUT_OF_STOCK)`.
-  - Khởi tạo đơn `B2C_ONLINE` ở trạng thái `PENDING` và `paymentStatus: PENDING` sẵn sàng chuyển sang cổng thanh toán.
+  - Khởi tạo đơn `B2C_ONLINE` ở trạng thái `PENDING` và `paymentStatus: PENDING` sẵn sàng chuyển sang cổng thanh toán hoặc giao COD.
 * **Quản Lý & Truy Vấn Đơn Hàng Chuẩn Phân Quyền:**
   - `GET /orders/my-orders`: Khách hàng xem lịch sử đơn hàng cá nhân (phân trang).
   - `GET /orders/branch`: Quản lý/Thu ngân xem danh sách đơn hàng thuộc chi nhánh mình (`scopeBranch`). `SUPER_ADMIN` xem xuyên chuỗi.
   - `GET /orders/:orderCode`: Xem chi tiết đơn hàng kèm danh sách Serial và bảo hành theo mã đơn.
+
+---
+
+### 2.10. Chuẩn Hóa Tầng Adapter, Redux Store & Khắc Phục Lệch Payload Client (Gói 2)
+Tuân thủ nguyên tắc kiến trúc "Server là Single Source of Truth (SSOT)" và bố trí Adapter trực tiếp trong thư mục `services` của từng Feature tương ứng (`features/<feature>/services/<feature>Adapter.js`):
+* **Tách & Chuẩn hóa Product Adapter (`client/src/features/products/services/productAdapter.js`):**
+  - Tách hàm `normalizeProduct` khỏi `productService.js` giúp cấu trúc file rõ ràng, mạch lạc.
+  - Xử lý chuyển đổi `skus[].optionValues` dạng mảng `[{ optionName, value }]` thành key-value dictionary `options: { [optionName]: value }`, giúp trang `ProductDetailPage` so khớp biến thể chính xác 100%.
+  - Chuẩn hóa hàm `createCartItem` đóng gói đầy đủ `{ productId, productSkuId, sku, price, image, quantity, options }` tránh tình trạng Redux cart thiếu trường SKU.
+* **Xây dựng Order Adapter (`client/src/features/orders/services/orderAdapter.js`):**
+  - `toPosCheckoutPayload(cartState, branchId)`: Lọc bỏ 100% các trường UI thừa (`subtotal, tax, discount, customerPaid, change, totalAmount, finalAmount...`) do Server đã có engine tính toán giá; loại bỏ `phone: ''` rỗng của khách vãng lai để không làm hỏng Zod Regex.
+  - `toB2cCheckoutPayload(cartState, checkoutForm)`: Loại bỏ `unitPrice` ở từng item và loại bỏ trường thừa ở root, chuyển đổi đúng cấu trúc `{ branchId, items: [{ productId, productSkuId, quantity }], shippingAddress, paymentMethod }`.
+* **Khôi phục Phiên Làm Việc Sau F5 (Silent Refresh / Auth Bootstrap):**
+  - Bổ sung async thunk `bootstrapAuth` trong `authSlice.js` âm thầm gọi `POST /api/v1/auth/refresh-token` và `GET /api/v1/auth/me`.
+  - Quản lý cờ `isInitialized: false` trong Redux Store, tích hợp vào `App.jsx` và chặn điều hướng vội vã tại `RoleProtectedRoute.jsx`, triệt tiêu lỗi bị đá về `/login` khi F5.
+* **Cải Tiến Bóc Tách Lỗi Axios (`client/src/services/axiosClient.js`):**
+  - Chuẩn hóa đối tượng `ApiError` chứa `errorCode, errors, status, message`, đồng thời giữ nguyên `response` để tương thích ngược.
+
+---
+
+### 2.11. Dọn Dẹp Dữ Liệu Mock & Đưa Giao Diện Về Core Chuẩn (Gói 3)
+* **Triệt tiêu Fallback Mock & Hardcode Branch ID (Sửa F1 - F7):**
+  - `posCartSlice.js`: Đưa `items: []`, xóa thông tin khách mẫu "Trần Minh Khang", khởi tạo giỏ hàng trống sạch.
+  - `PosPage.jsx` & `posService.js`: Xóa bỏ việc nạp `DEMO_POS_PRODUCTS` khi API rỗng hoặc lỗi; hiển thị trạng thái Empty State trung thực.
+  - `inventoryService.js`: Xóa bỏ fallback ngầm `DEMO_BRANCH_INVENTORY` và `fallbackSkuInventory`; xóa hardcode `branchId = '65f0a1000000000000000001'`.
+  - Thay thế toàn bộ hardcode `branchId` tại `BranchAllocationModal`, `StockAdjustModal`, `RmaTicketForm`, `SerialImportPage`, `AdminBranchesUsersPage` bằng danh sách chi nhánh thực tế hoặc `authUser.branchId`.
+  - `PortalLayout.jsx`: Xóa bỏ badge cứng `48 CN` tại mục Quản trị Chi Nhánh & RBAC.
+  - `CartPage.jsx` & `CheckoutSuccessPage.jsx`: Xóa tên khách mặc định "Hoàng Khách Hàng", sử dụng thông tin tài khoản đăng nhập hoặc form nhập thật.
+* **Ẩn/Disable các Tính năng Ngoài Phạm vi Core (Sửa B2, C4, C9):**
+  - `HomePage.jsx`: Tạm ẩn component `<FlashSaleSection />` do chưa có API Flash Sale / khuyến mãi theo giờ.
+  - `productAdapter.js`: Xóa bỏ các trường bịa đặt `rating: 5.0`, `reviewsCount: 128` và danh sách chi nhánh tồn kho ảo.
+  - `AdminAnalyticsPage.jsx`: Gắn nhãn *"Dữ liệu thử nghiệm / Demo Preview"*, vô hiệu hóa nút xuất báo cáo (xóa bỏ `alert` giả lập).
+* **Chuyển Bộ lọc & Phân trang Sản phẩm sang Server-Side (Sửa B12 - B15):**
+  - `CategoryPage.jsx`: Kết nối trực tiếp bộ lọc động (`brand`, `cpu`, `ram`...) và sắp xếp (`sortBy`), phân trang (`page`) với API Backend `GET /api/v1/products`.
+  - Nhận `meta.totalPages` và `meta.total` do MongoDB tính toán để render phân trang chính xác, loại bỏ hoàn toàn bộ lọc cục bộ phía client.
+* **Đồng bộ Trang Tra cứu Bảo hành e-Warranty (Sửa B6):**
+  - `WarrantyCheckPage.jsx`: Khởi tạo `warrantyData = null` (không nạp dữ liệu mẫu trước), không điền sẵn serial mẫu `C02ZQ0ABQ6L7`.
+  - `warrantyService.js` & `WarrantyResultCard.jsx`: Xóa bỏ thông tin khách hàng giả lập nhằm bảo vệ quyền riêng tư; chỉ hiển thị thông tin thiết bị và thời hạn bảo hành thực tế từ Server.
+* **Khóa Nút Gạt DataModeToggle ở Production (Sửa H4, F8):**
+  - `dataMode.js`: Ép `isDevOrTest()` và `isMockEnabled()` luôn trả về `false` khi `import.meta.env.PROD === true` hoặc `VITE_SHOW_DEV_TOOLS=false`, khóa nút gạt và bảo đảm toàn bộ hệ thống chạy dữ liệu thực 100% từ MongoDB.
 
 ---
 
@@ -135,11 +192,12 @@
 Hệ thống sử dụng **Jest**, **Supertest** kết hợp **`mongodb-memory-server`** chạy độc lập siêu tốc không phụ thuộc database ngoài:
 
 ```text
-Test Suites: 12 passed, 12 total
-Tests:       142 passed, 142 total (100% Pass Rate)
+Test Suites: 13 passed, 13 total
+Tests:       156 passed, 156 total (100% Pass Rate)
 Snapshots:   0 total
-Time:        ~61s
+Time:        ~66s
 ```
+
 
 #### Bảng Thống Kê Độ Phủ Mã Nguồn (`npm run test:coverage`):
 ```text

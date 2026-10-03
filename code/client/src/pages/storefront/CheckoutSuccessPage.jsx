@@ -19,12 +19,12 @@ export const CheckoutSuccessPage = () => {
   // Get order data from router state or fallback to query params
   const orderState = location.state?.order || null;
   const orderCode =
-    orderState?.orderCode || searchParams.get('orderCode') || 'ORD-20261001-0002';
-  const totalAmount = orderState?.totalAmount || 990000;
-  const customerInfo = orderState?.customerInfo || {
-    fullName: 'Hoàng Khách Hàng',
-    phone: '0909000005',
-    address: '45 Võ Văn Ngân, Phường Linh Chiểu, TP. Thủ Đức, TP.HCM'
+    orderState?.orderCode || searchParams.get('orderCode') || '';
+  const totalAmount = orderState?.finalAmount || orderState?.totalAmount || 0;
+  const customerInfo = orderState?.shippingAddress || orderState?.customerInfo || {
+    fullName: '',
+    phone: '',
+    address: ''
   };
   const isClickAndCollect = !orderState?.shippingAddress || orderState?.shippingAddress?.includes('Click & Collect');
 
