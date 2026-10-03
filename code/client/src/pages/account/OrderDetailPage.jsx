@@ -12,7 +12,7 @@ import {
   ExternalLink,
   AlertCircle
 } from 'lucide-react';
-import axiosClient from '../../services/axiosClient.js';
+import { orderService } from '../../features/orders/services/orderService.js';
 
 export const OrderDetailPage = () => {
   const { id } = useParams();
@@ -25,9 +25,9 @@ export const OrderDetailPage = () => {
     const fetchOrderDetail = async () => {
       try {
         setError('');
-        const res = await axiosClient.get(`/orders/my-orders/${id}`);
+        const detail = await orderService.getMyOrderDetail(id);
         if (!ignore) {
-          setOrder(res.data?.order || null);
+          setOrder(detail);
         }
       } catch (err) {
         if (!ignore) {

@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Truck, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
 import B2COrderDispatchTable from '../../features/orders/components/B2COrderDispatchTable';
 import BranchAllocationModal from '../../features/orders/components/BranchAllocationModal';
 import OrderSerialAssignDrawer from '../../features/orders/components/OrderSerialAssignDrawer';
+import { orderService } from '../../features/orders/services/orderService.js';
+import { isMockEnabled } from '../../config/dataMode.js';
 
 const DEMO_B2C_ORDERS = [
   {
@@ -73,6 +75,43 @@ export const OrderDispatchPage = () => {
   const [serialAssignOrder, setSerialAssignOrder] = useState(null);
   const [toastMsg, setToastMsg] = useState(null);
 
+  const fetchLiveOrders = useCallback(async () => {
+    if (isMockEnabled()) {
+      setOrders(DEMO_B2C_ORDERS);
+      return;
+    }
+    try {
+      const liveList = await orderService.getBranchOrders();
+      if (liveList && liveList.length > 0) {
+        const mapped = liveList.map((o) => ({
+          orderCode: o.orderCode || o._id,
+          customerName: o.shippingAddress?.fullName || o.customerInfo?.fullName || 'Khách Hàng',
+          phone: o.shippingAddress?.phone || o.customerInfo?.phone || '',
+          shippingAddress: o.shippingAddress?.address || o.customerInfo?.address || 'Tại chi nhánh',
+          slaRemaining: '01:30:00',
+          fulfillmentType: o.orderType === 'POS_STORE' ? 'Tại quầy' : 'Giao tiêu chuẩn',
+          totalAmount: o.totalAmount || 0,
+          status: o.orderStatus || 'PENDING',
+          assignedBranchName: o.branchId?.name || o.branchId?.branchName || 'TechOne Q1 Flagship',
+          productName: o.items?.[0]?.productName || 'Thiết bị công nghệ',
+          sku: o.items?.[0]?.sku || '',
+          quantity: o.items?.[0]?.quantity || 1,
+          serials: o.items?.[0]?.serialsAssigned || []
+        }));
+        setOrders(mapped);
+      } else {
+        setOrders(DEMO_B2C_ORDERS);
+      }
+    } catch {
+      // In case user doesn't have BRANCH_MANAGER role or live list is empty, keep demo list
+      setOrders(DEMO_B2C_ORDERS);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLiveOrders();
+  }, [fetchLiveOrders]);
+
   const handleConfirmAllocation = (orderCode, branch) => {
     setOrders((prev) =>
       prev.map((o) =>
@@ -125,7 +164,8 @@ export const OrderDispatchPage = () => {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => {
+            onClick={async () => {
+              await fetchLiveOrders();
               setToastMsg({ type: 'success', message: 'Dữ liệu đơn hàng B2C đã được đồng bộ mới nhất!' });
               setTimeout(() => setToastMsg(null), 3000);
             }}

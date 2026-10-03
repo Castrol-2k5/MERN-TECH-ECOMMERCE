@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { 
   addItem, 
@@ -29,6 +29,7 @@ import InvoiceK80Modal from '../../features/pos/components/InvoiceK80Modal';
 
 export const PosPage = () => {
   const dispatch = useDispatch();
+  const authUser = useSelector((state) => state.auth?.user);
   const cart = useSelector(selectPosCart);
   const totals = useSelector(selectPosCartTotals);
   const missingSerialCount = useSelector(selectMissingSerialsCount);
@@ -41,6 +42,18 @@ export const PosPage = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [scanNotification, setScanNotification] = useState(null);
+
+  useEffect(() => {
+    let ignore = false;
+    posService.searchProducts().then((data) => {
+      if (!ignore && data && data.length > 0) {
+        setProducts(data);
+      }
+    }).catch(() => {});
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   // Modals state
   const [activeSerialModalItem, setActiveSerialModalItem] = useState(null);

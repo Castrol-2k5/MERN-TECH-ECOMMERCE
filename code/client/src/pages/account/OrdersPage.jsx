@@ -14,7 +14,7 @@ import {
   ExternalLink,
   ShieldCheck
 } from 'lucide-react';
-import axiosClient from '../../services/axiosClient.js';
+import { orderService } from '../../features/orders/services/orderService.js';
 
 export const OrdersPage = () => {
   const [orders, setOrders] = useState([]);
@@ -27,9 +27,9 @@ export const OrdersPage = () => {
     const fetchOrders = async () => {
       try {
         setError('');
-        const res = await axiosClient.get('/orders/my-orders?limit=50');
+        const list = await orderService.getMyOrders();
         if (!ignore) {
-          setOrders(res.data?.orders || []);
+          setOrders(list || []);
         }
       } catch (err) {
         if (!ignore) {

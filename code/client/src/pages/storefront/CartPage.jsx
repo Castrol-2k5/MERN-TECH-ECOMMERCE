@@ -22,6 +22,9 @@ import {
 } from '../../store/slices/cartSlice.js';
 import axiosClient from '../../services/axiosClient.js';
 
+import { branchService } from '../../features/branches/services/branchService.js';
+import { orderService } from '../../features/orders/services/orderService.js';
+
 export const CartPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -44,16 +47,15 @@ export const CartPage = () => {
     let ignore = false;
     const fetchBranches = async () => {
       try {
-        const res = await axiosClient.get('/branches');
+        const list = await branchService.getBranches();
         if (!ignore) {
-          const list = res.data?.branches || [];
-          setBranches(list);
-          if (list.length > 0) {
+          setBranches(list || []);
+          if (list && list.length > 0) {
             setSelectedBranchId(list[0]._id);
           }
         }
-      } catch {
-        // Fallback
+      } catch (err) {
+        console.warn('Failed to load branches for cart:', err);
       }
     };
 
@@ -90,19 +92,23 @@ export const CartPage = () => {
         items: items.map((it) => ({
           productId: it.productId,
           productSkuId: it.productSkuId,
-          quantity: it.quantity
+          quantity: it.quantity,
+          unitPrice: it.price
         })),
         customerInfo: {
           fullName: customerInfo.fullName.trim(),
           phone: customerInfo.phone.trim(),
           address: customerInfo.address.trim()
         },
-        shippingAddress: customerInfo.address.trim(),
+        shippingAddress: {
+          fullName: customerInfo.fullName.trim(),
+          phone: customerInfo.phone.trim(),
+          address: customerInfo.address.trim()
+        },
         paymentMethod
       };
 
-      const res = await axiosClient.post('/orders/b2c/checkout', payload);
-      const createdOrder = res.data?.order;
+      const createdOrder = await orderService.createB2cOrder(payload);
 
       dispatch(clearCart());
       setIsCheckoutModalOpen(false);

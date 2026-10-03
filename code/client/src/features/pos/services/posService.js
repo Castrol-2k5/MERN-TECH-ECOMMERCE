@@ -1,4 +1,5 @@
 import apiClient from '../../../services/api';
+import { isMockEnabled, isDevOrTest } from '../../../config/dataMode.js';
 
 // Demo product catalog cho Web POS khi dev offline hoặc barcode test
 export const DEMO_POS_PRODUCTS = [
@@ -97,76 +98,127 @@ export const DEMO_POS_PRODUCTS = [
 export const posService = {
   // Quét barcode (có thể là SKU Barcode hoặc Serial cụ thể)
   scanBarcode: async (barcode) => {
-    try {
-      const res = await apiClient.get(`/serials/scan/${encodeURIComponent(barcode)}`);
-      return res.data?.data;
-    } catch {
-      // Fallback tìm trong demo catalog
-      const clean = String(barcode).trim().toLowerCase();
-      // 1. Tìm theo serial chính xác
-      for (const p of DEMO_POS_PRODUCTS) {
-        if (p.availableSerials?.some(s => s.toLowerCase() === clean)) {
+    const clean = String(barcode).trim();
+
+    if (!isMockEnabled()) {
+      try {
+        const res = await apiClient.get(`/serials/scan/${encodeURIComponent(clean)}`);
+        const data = res?.data || res;
+
+        if (data && data.serialNumber) {
+          const sku = data.sku || {};
+          const prod = data.product || {};
           return {
             type: 'SERIAL',
-            serialNumber: barcode,
+            serialNumber: data.serialNumber,
             product: {
-              _id: p._id,
-              name: p.name,
-              sku: p.sku,
-              productSkuId: p.skuId,
-              price: p.price,
+              _id: prod._id,
+              name: prod.name,
+              sku: sku.sku || 'SKU-GEN',
+              productSkuId: sku._id,
+              price: sku.salePrice || sku.price || 0,
               hasSerial: true,
-              image: p.image
-            }
+              image: prod.images?.[0] || '',
+            },
           };
         }
+      } catch (err) {
+        if (isDevOrTest()) {
+          console.error(`[posService.scanBarcode] Không tìm thấy serial/barcode "${clean}":`, err);
+        }
+        throw new Error(err.response?.data?.message || `Không tìm thấy sản phẩm hay serial khớp với mã [${clean}]`);
       }
-      // 2. Tìm theo SKU hoặc Barcode
-      const found = DEMO_POS_PRODUCTS.find(
-        p => p.barcode.toLowerCase() === clean || p.sku.toLowerCase() === clean
-      );
-      if (found) {
+    }
+
+    // Fallback tìm trong demo catalog
+    const lowerClean = clean.toLowerCase();
+    // 1. Tìm theo serial chính xác
+    for (const p of DEMO_POS_PRODUCTS) {
+      if (p.availableSerials?.some((s) => s.toLowerCase() === lowerClean)) {
         return {
-          type: 'SKU',
-          barcode: found.barcode,
+          type: 'SERIAL',
+          serialNumber: clean,
           product: {
-            _id: found._id,
-            name: found.name,
-            sku: found.sku,
-            productSkuId: found.skuId,
-            price: found.price,
-            hasSerial: found.hasSerial,
-            image: found.image,
-            availableSerials: found.availableSerials
-          }
+            _id: p._id,
+            name: p.name,
+            sku: p.sku,
+            productSkuId: p.skuId,
+            price: p.price,
+            hasSerial: true,
+            image: p.image,
+          },
         };
       }
-      throw new Error(`Không tìm thấy sản phẩm hay serial khớp với mã [${barcode}]`);
     }
+    // 2. Tìm theo SKU hoặc Barcode
+    const found = DEMO_POS_PRODUCTS.find(
+      (p) => p.barcode.toLowerCase() === lowerClean || p.sku.toLowerCase() === lowerClean
+    );
+    if (found) {
+      return {
+        type: 'SKU',
+        barcode: found.barcode,
+        product: {
+          _id: found._id,
+          name: found.name,
+          sku: found.sku,
+          productSkuId: found.skuId,
+          price: found.price,
+          hasSerial: found.hasSerial,
+          image: found.image,
+          availableSerials: found.availableSerials,
+        },
+      };
+    }
+    throw new Error(`Không tìm thấy sản phẩm hay serial khớp với mã [${clean}]`);
   },
 
   // Tìm kiếm sản phẩm POS theo từ khóa / danh mục
   searchProducts: async ({ keyword = '', category = '' } = {}) => {
-    try {
-      const params = new URLSearchParams();
-      if (keyword) params.append('search', keyword);
-      if (category && category !== 'TẤT CẢ') params.append('category', category);
-      const res = await apiClient.get(`/products?${params.toString()}`);
-      if (res.data?.data?.products?.length) {
-        return res.data.data.products;
+    if (!isMockEnabled()) {
+      try {
+        const params = {};
+        if (keyword) params.search = keyword;
+        if (category && category !== 'TẤT CẢ') params.category = category;
+        const res = await apiClient.get('/products', { params });
+        const rawProducts = res?.data?.products || (Array.isArray(res?.data) ? res.data : []);
+
+        if (Array.isArray(rawProducts) && rawProducts.length > 0) {
+          return rawProducts.map((p) => {
+            const skus = Array.isArray(p.skus) ? p.skus : [];
+            const primarySku = skus[0] || {};
+            return {
+              _id: p._id,
+              skuId: primarySku._id || p._id,
+              sku: primarySku.sku || primarySku.code || 'SKU-GEN',
+              barcode: primarySku.sku || primarySku.code || '8938500000000',
+              name: p.name,
+              price: primarySku.salePrice || primarySku.price || p.price || 0,
+              costPrice: Math.round((primarySku.price || 0) * 0.85),
+              stock: 10,
+              hasSerial: p.isSerialManaged !== undefined ? p.isSerialManaged : true,
+              category: typeof p.categoryId === 'object' ? p.categoryId?.name : p.category || 'Thiết bị',
+              brand: p.brand || '',
+              image: p.images?.[0] || '',
+              availableSerials: [],
+            };
+          });
+        }
+      } catch (err) {
+        if (isDevOrTest()) {
+          console.error('[posService.searchProducts] Lỗi tải sản phẩm POS từ API:', err);
+        }
       }
-    } catch {
-      // fallback
     }
 
     let results = [...DEMO_POS_PRODUCTS];
     if (category && category !== 'TẤT CẢ') {
-      results = results.filter(p => p.category.toLowerCase() === category.toLowerCase());
+      results = results.filter((p) => p.category.toLowerCase() === category.toLowerCase());
     }
     if (keyword) {
       const q = keyword.toLowerCase();
       results = results.filter(
-        p => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || p.barcode.includes(q)
+        (p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || p.barcode.includes(q)
       );
     }
     return results;
@@ -174,25 +226,35 @@ export const posService = {
 
   // Thanh toán POS checkout
   checkoutPos: async (payload) => {
-    try {
-      const res = await apiClient.post('/orders/pos/checkout', payload);
-      return res.data?.data;
-    } catch {
-      // Giả lập checkout thành công nếu backend chưa chạy hoặc token mock
-      const orderCode = `POS-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
-      return {
-        _id: 'pos_' + Date.now(),
-        orderCode,
-        branchId: payload.branchId || 'BR-HCM-Q1',
-        items: payload.items,
-        totalAmount: payload.totalAmount || 0,
-        finalAmount: payload.finalAmount || 0,
-        paymentMethod: payload.paymentMethod,
-        customerInfo: payload.customerInfo,
-        createdAt: new Date().toISOString()
-      };
+    if (!isMockEnabled()) {
+      try {
+        const res = await apiClient.post('/orders/pos/checkout', payload);
+        const order = res?.data?.order || res?.data || res;
+        return order;
+      } catch (err) {
+        if (isDevOrTest()) {
+          console.error('[posService.checkoutPos] Lỗi thanh toán POS:', err);
+        }
+        throw new Error(err.response?.data?.message || err.message || 'Thanh toán POS thất bại!');
+      }
     }
-  }
+
+    // Giả lập checkout thành công nếu đang ở chế độ mock
+    const orderCode = `POS-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${Math.floor(
+      1000 + Math.random() * 9000
+    )}`;
+    return {
+      _id: 'pos_' + Date.now(),
+      orderCode,
+      branchId: payload.branchId || 'BR-HCM-Q1',
+      items: payload.items,
+      totalAmount: payload.totalAmount || 0,
+      finalAmount: payload.finalAmount || 0,
+      paymentMethod: payload.paymentMethod,
+      customerInfo: payload.customerInfo,
+      createdAt: new Date().toISOString(),
+    };
+  },
 };
 
 export default posService;
