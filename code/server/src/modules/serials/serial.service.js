@@ -190,4 +190,41 @@ export class SerialService {
       isExpired
     };
   }
+
+  /**
+   * Query Serial list by filters (branchId, productSkuId, productId, status)
+   * Supports branch isolation and pagination
+   */
+  static async getSerials(query = {}, _currentUser) {
+    const filter = {};
+    if (query.branchId) filter.branchId = query.branchId;
+    if (query.productId) filter.productId = query.productId;
+    if (query.productSkuId) filter.productSkuId = query.productSkuId;
+    if (query.status) filter.status = query.status;
+
+    const page = Math.max(1, parseInt(query.page, 10) || 1);
+    const limit = Math.max(1, Math.min(200, parseInt(query.limit, 10) || 50));
+    const skip = (page - 1) * limit;
+
+    const [total, serials] = await Promise.all([
+      Serial.countDocuments(filter),
+      Serial.find(filter)
+        .populate('productId', 'name slug images brand')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean()
+    ]);
+
+    return {
+      serials,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
+  }
 }
+

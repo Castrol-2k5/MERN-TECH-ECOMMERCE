@@ -86,6 +86,26 @@ describe('Order DTO Unit Tests (Zod)', () => {
 
       expect(() => posCheckoutSchema.parse(payload)).toThrow();
     });
+
+    test('Happy Path: should validate walk-in customer with empty or missing phone', () => {
+      const payload = {
+        items: [
+          {
+            productId: validObjectId,
+            productSkuId: validObjectId,
+            quantity: 1
+          }
+        ],
+        customerInfo: {
+          fullName: 'Khách Vãng Lai',
+          phone: ''
+        }
+      };
+
+      const result = posCheckoutSchema.parse(payload);
+      expect(result.customerInfo.fullName).toBe('Khách Vãng Lai');
+      expect(result.customerInfo.phone).toBe('');
+    });
   });
 
   describe('b2cCheckoutSchema', () => {
@@ -111,6 +131,29 @@ describe('Order DTO Unit Tests (Zod)', () => {
       expect(result.branchId).toBe(validObjectId);
       expect(result.paymentMethod).toBe('VNPAY');
     });
+
+    test('Happy Path: should validate B2C checkout with CASH (COD)', () => {
+      const payload = {
+        branchId: validObjectId,
+        items: [
+          {
+            productId: validObjectId,
+            productSkuId: validObjectId,
+            quantity: 1
+          }
+        ],
+        shippingAddress: {
+          fullName: 'Tran Thi B',
+          phone: '0987654321',
+          address: '123 Nguyen Hue, Q1, TP.HCM'
+        },
+        paymentMethod: PAYMENT_METHODS.CASH
+      };
+
+      const result = b2cCheckoutSchema.parse(payload);
+      expect(result.paymentMethod).toBe('CASH');
+    });
+
 
     test('Negative Path: should reject when branchId is missing or invalid', () => {
       const payload = {

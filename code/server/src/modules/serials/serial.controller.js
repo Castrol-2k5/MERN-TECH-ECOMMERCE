@@ -34,4 +34,16 @@ export class SerialController {
       data: result
     });
   });
+
+  static getSerials = catchAsync(async (req, res) => {
+    const result = await SerialService.getSerials(req.query, req.user);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Lấy danh sách mã Serial/IMEI thành công',
+      data: result.serials,
+      meta: { pagination: result.pagination }
+    });
+  });
 }
+

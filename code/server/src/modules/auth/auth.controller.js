@@ -118,14 +118,12 @@ export class AuthController {
   });
 
   static forgotPassword = catchAsync(async (req, res) => {
-    const result = await AuthService.forgotPassword(req.body);
+    await AuthService.forgotPassword(req.body);
 
     return sendSuccess(res, {
       statusCode: 200,
-      message: result.message,
-      data: {
-        resetToken: result.resetToken
-      }
+      message: 'Nếu thông tin chính xác, liên kết đặt lại mật khẩu đã được gửi.',
+      data: {}
     });
   });
 

@@ -294,6 +294,28 @@ describe('Order & POS Checkout Module Integration Tests', () => {
       expect(res.body.errorCode).toBe('INVALID_SERIAL_STATUS');
     });
 
+    test('Negative Path - Thiếu Serial (E2): Sản phẩm quản lý Serial nhưng không gán đủ Serial -> HTTP 400 SERIAL_COUNT_MISMATCH', async () => {
+      const payload = {
+        items: [
+          {
+            productId: productIpad._id.toString(),
+            productSkuId: skuIpad._id.toString(),
+            quantity: 1,
+            serialsAssigned: []
+          }
+        ],
+        paymentMethod: PAYMENT_METHODS.CASH
+      };
+
+      const res = await request(app)
+        .post('/api/v1/orders/pos/checkout')
+        .set('Authorization', `Bearer ${staffAToken}`)
+        .send(payload);
+
+      expect(res.status).toBe(400);
+      expect(res.body.errorCode).toBe('SERIAL_COUNT_MISMATCH');
+    });
+
     test('Security / RBAC: Khách hàng CUSTOMER không thể gọi endpoint quầy POS', async () => {
       const res = await request(app)
         .post('/api/v1/orders/pos/checkout')
@@ -380,6 +402,35 @@ describe('Order & POS Checkout Module Integration Tests', () => {
       // Tồn kho giữ nguyên 3
       const inv = await BranchInventory.findOne({ branchId: branchA._id, productSkuId: skuIpad._id });
       expect(inv.quantity).toBe(3);
+    });
+
+    test('Happy Path: Khách hàng đặt mua B2C với phương thức CASH (COD) -> HTTP 201, paymentMethod: CASH', async () => {
+      const payload = {
+        branchId: branchA._id.toString(),
+        items: [
+          {
+            productId: productIpad._id.toString(),
+            productSkuId: skuIpad._id.toString(),
+            quantity: 1
+          }
+        ],
+        shippingAddress: {
+          fullName: 'Khách COD',
+          phone: '0977111222',
+          address: '100 Lê Duẩn, Q1'
+        },
+        paymentMethod: PAYMENT_METHODS.CASH
+      };
+
+      const res = await request(app)
+        .post('/api/v1/orders/b2c/checkout')
+        .set('Authorization', `Bearer ${customerToken}`)
+        .send(payload);
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.order.paymentMethod).toBe(PAYMENT_METHODS.CASH);
+      expect(res.body.data.order.paymentStatus).toBe(PAYMENT_STATUS.PENDING);
     });
   });
 

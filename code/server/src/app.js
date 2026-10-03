@@ -16,6 +16,7 @@ import productRoutes from './modules/products/product.routes.js';
 import inventoryRoutes from './modules/inventory/inventory.routes.js';
 import serialRoutes from './modules/serials/serial.routes.js';
 import orderRoutes from './modules/orders/order.routes.js';
+import warrantyRoutes from './modules/warranty/warranty.routes.js';
 
 const app = express();
 
@@ -60,6 +61,7 @@ app.use(`${env.API_PREFIX}/products`, productRoutes);
 app.use(`${env.API_PREFIX}/inventory`, inventoryRoutes);
 app.use(`${env.API_PREFIX}/serials`, serialRoutes);
 app.use(`${env.API_PREFIX}/orders`, orderRoutes);
+app.use(`${env.API_PREFIX}/warranty`, warrantyRoutes);
 
 // Internal routes for integration testing RBAC and data scoping
 app.get(`${env.API_PREFIX}/test/admin-only`, protect, authorize('SUPER_ADMIN'), (req, res) => {

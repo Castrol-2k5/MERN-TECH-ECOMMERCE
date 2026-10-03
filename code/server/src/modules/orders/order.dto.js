@@ -60,11 +60,15 @@ export const posCheckoutSchema = z
       .default(PAYMENT_METHODS.CASH),
     customerInfo: z
       .object({
-        fullName: z.string({ required_error: 'Họ tên khách hàng là bắt buộc' }).trim().min(1, 'Họ tên không được để trống'),
+        fullName: z.string().trim().optional().default(''),
         phone: z
-          .string({ required_error: 'Số điện thoại khách hàng là bắt buộc' })
+          .string()
           .trim()
-          .regex(VIETNAMESE_PHONE_REGEX, 'Số điện thoại không đúng định dạng di động Việt Nam'),
+          .refine((val) => !val || VIETNAMESE_PHONE_REGEX.test(val), {
+            message: 'Số điện thoại không đúng định dạng di động Việt Nam'
+          })
+          .optional()
+          .default(''),
         address: z.string().trim().optional().default('')
       })
       .optional()
@@ -107,8 +111,9 @@ export const b2cCheckoutSchema = z
         address: z.string({ required_error: 'Địa chỉ giao hàng là bắt buộc' }).trim().min(1, 'Địa chỉ giao hàng không được để trống')
       })
       .strict(),
-    paymentMethod: z.enum([PAYMENT_METHODS.VNPAY, PAYMENT_METHODS.STRIPE], {
-      errorMap: () => ({ message: 'Phương thức thanh toán B2C phải là VNPAY hoặc STRIPE' })
+    paymentMethod: z.enum([PAYMENT_METHODS.CASH, PAYMENT_METHODS.VNPAY, PAYMENT_METHODS.STRIPE], {
+      errorMap: () => ({ message: 'Phương thức thanh toán B2C phải là CASH, VNPAY hoặc STRIPE' })
     })
   })
   .strict();
+

@@ -31,7 +31,19 @@ const warrantyTicketSchema = new Schema(
     customerId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
-      required: [true, 'Khách hàng (customerId) là bắt buộc']
+      default: null
+    },
+    customerInfo: {
+      fullName: {
+        type: String,
+        trim: true,
+        default: ''
+      },
+      phone: {
+        type: String,
+        trim: true,
+        default: ''
+      }
     },
     branchId: {
       type: Schema.Types.ObjectId,

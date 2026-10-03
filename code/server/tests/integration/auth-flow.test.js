@@ -494,4 +494,25 @@ describe('Auth & RBAC Flow Integration Tests (16 AC Matrix)', () => {
       expect(res.body.scopedBranchId).toBe(branchBId.toString());
     });
   });
+
+  // ===========================================================================
+  // NHÓM 5: QUÊN MẬT KHẨU & BẢO MẬT H1 (POST /api/v1/auth/forgot-password)
+  // ===========================================================================
+  describe('Nhóm 5: Quên mật khẩu & Bảo mật H1 (POST /api/v1/auth/forgot-password)', () => {
+    test('Happy Path & Security H1: Yêu cầu khôi phục mật khẩu -> HTTP 200, TUYỆT ĐỐI KHÔNG trả resetToken trong response', async () => {
+      // Đăng ký tài khoản
+      await request(app).post('/api/v1/auth/register').send(validCustomer);
+
+      // Yêu cầu quên mật khẩu
+      const res = await request(app)
+        .post('/api/v1/auth/forgot-password')
+        .send({ identifier: validCustomer.email });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.message).toBe('Nếu thông tin chính xác, liên kết đặt lại mật khẩu đã được gửi.');
+      expect(res.body.data.resetToken).toBeUndefined();
+    });
+  });
 });
+

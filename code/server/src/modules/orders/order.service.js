@@ -69,6 +69,18 @@ export class OrderService {
 
       const cleanSerials = (item.serialsAssigned || []).map((s) => s.trim().toUpperCase());
 
+      // Nghiệp vụ E2: Bắt buộc gán đủ Serial nếu sản phẩm có quản lý Serial/IMEI
+      const isSerialManaged = sku.isSerialManaged ?? product.isSerialManaged ?? true;
+      if (isSerialManaged) {
+        if (!cleanSerials || cleanSerials.length !== item.quantity) {
+          throw new AppError(
+            `Sản phẩm '${product.name}' (${sku.sku}) yêu cầu quản lý Serial/IMEI. Số lượng Serial gán (${cleanSerials.length}) không khớp với số lượng mua (${item.quantity}).`,
+            400,
+            'SERIAL_COUNT_MISMATCH'
+          );
+        }
+      }
+
       if (cleanSerials.length > 0) {
         // Kiểm tra trùng lặp nội bộ trong danh sách serial
         if (new Set(cleanSerials).size !== cleanSerials.length) {

@@ -43,3 +43,28 @@ export const verifySerialSchema = z
       .min(1, 'Mã Serial/IMEI không được để trống')
   })
   .strict();
+
+export const getSerialsQuerySchema = z.object({
+  branchId: z
+    .string()
+    .trim()
+    .regex(/^[0-9a-fA-F]{24}$/, 'Mã chi nhánh (branchId) không hợp lệ')
+    .optional(),
+  productId: z
+    .string()
+    .trim()
+    .regex(/^[0-9a-fA-F]{24}$/, 'Mã sản phẩm (productId) không hợp lệ')
+    .optional(),
+  productSkuId: z
+    .string()
+    .trim()
+    .regex(/^[0-9a-fA-F]{24}$/, 'Mã biến thể SKU (productSkuId) không hợp lệ')
+    .optional(),
+  status: z
+    .enum(['IN_STOCK', 'RESERVED', 'SOLD', 'WARRANTY', 'TRANSIT'], {
+      errorMap: () => ({ message: 'Trạng thái Serial không hợp lệ' })
+    })
+    .optional(),
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(200).optional().default(50)
+});

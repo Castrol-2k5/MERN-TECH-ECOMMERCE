@@ -407,4 +407,68 @@ describe('Serial/IMEI Module Integration Tests', () => {
       expect(res.body.errorCode).toBe('SERIAL_NOT_FOUND');
     });
   });
+
+  describe('GET /api/v1/serials (List & Filter with Scope)', () => {
+    beforeEach(async () => {
+      await Serial.create([
+        {
+          serialNumber: 'SN-TEST-BRANCH-A-1',
+          productId: productMacbook._id,
+          productSkuId: skuMacbook._id,
+          branchId: branchA._id,
+          status: SERIAL_STATUS.IN_STOCK
+        },
+        {
+          serialNumber: 'SN-TEST-BRANCH-A-2',
+          productId: productMacbook._id,
+          productSkuId: skuMacbook._id,
+          branchId: branchA._id,
+          status: SERIAL_STATUS.SOLD
+        },
+        {
+          serialNumber: 'SN-TEST-BRANCH-B-1',
+          productId: productMacbook._id,
+          productSkuId: skuMacbook._id,
+          branchId: branchB._id,
+          status: SERIAL_STATUS.IN_STOCK
+        }
+      ]);
+    });
+
+    test('Happy Path: Super Admin có thể lọc serial theo branchId, productSkuId, status', async () => {
+      const res = await request(app)
+        .get(`/api/v1/serials?branchId=${branchA._id}&status=IN_STOCK&productSkuId=${skuMacbook._id}`)
+        .set('Authorization', `Bearer ${superAdminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(res.body.data.length).toBe(1);
+      expect(res.body.data[0].serialNumber).toBe('SN-TEST-BRANCH-A-1');
+      expect(res.body.meta.pagination.total).toBe(1);
+    });
+
+    test('Data Scoping: Staff tại Chi nhánh A tự động bị scope về Chi nhánh A', async () => {
+      // Dù cố tình truyền query ?branchId=branchB, middleware scopeBranch vẫn ghi đè thành branchA
+      const res = await request(app)
+        .get(`/api/v1/serials?branchId=${branchB._id}`)
+        .set('Authorization', `Bearer ${staffAToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      const serialNumbers = res.body.data.map((s) => s.serialNumber);
+      expect(serialNumbers).toContain('SN-TEST-BRANCH-A-1');
+      expect(serialNumbers).not.toContain('SN-TEST-BRANCH-B-1');
+    });
+
+    test('Security / RBAC: Customer không được phép truy cập danh sách Serial', async () => {
+      const res = await request(app)
+        .get('/api/v1/serials')
+        .set('Authorization', `Bearer ${customerToken}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.errorCode).toBe('FORBIDDEN');
+    });
+  });
 });
+
