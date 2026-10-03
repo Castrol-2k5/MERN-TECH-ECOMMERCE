@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { Truck, RotateCcw, ShieldCheck, Gift, Star, CheckCircle2 } from 'lucide-react';
@@ -9,6 +9,7 @@ import SpecsTable from '../../features/products/components/SpecsTable.jsx';
 import MultiBranchStockBox from '../../features/inventory/components/MultiBranchStockBox.jsx';
 import ProductCard from '../../features/products/components/ProductCard.jsx';
 import productService, { fallbackProducts } from '../../features/products/services/productService.js';
+import { createCartItem } from '../../features/products/services/productAdapter.js';
 import { addToCart } from '../../store/slices/cartSlice.js';
 import Spinner from '../../components/common/Spinner.jsx';
 
@@ -18,11 +19,29 @@ export const ProductDetailPage = () => {
   const dispatch = useDispatch();
   const { product, isLoading } = useProductDetail(slug);
 
-  const [selectedOptions, setSelectedOptions] = useState({});
+  const [userSelectedOptions, setUserSelectedOptions] = useState({});
   const [activeTab, setActiveTab] = useState('specs');
   const [selectedBranch, setSelectedBranch] = useState(null);
   const [showOrderToast, setShowOrderToast] = useState(false);
   const [relatedProducts, setRelatedProducts] = useState([]);
+
+  const defaultOptions = useMemo(() => {
+    if (product?.skus?.[0]?.options) {
+      return product.skus[0].options;
+    }
+    if (product?.options?.length > 0) {
+      const init = {};
+      product.options.forEach((opt) => {
+        if (opt.name && opt.values?.[0]) init[opt.name] = opt.values[0];
+      });
+      return init;
+    }
+    return {};
+  }, [product]);
+
+  const selectedOptions = useMemo(() => {
+    return { ...defaultOptions, ...userSelectedOptions };
+  }, [defaultOptions, userSelectedOptions]);
 
   const activeSku =
     product?.skus?.find((s) => {
@@ -31,7 +50,7 @@ export const ProductDetailPage = () => {
     }) || product?.skus?.[0];
 
   const handleSelectOption = (optionName, value) => {
-    setSelectedOptions((prev) => ({
+    setUserSelectedOptions((prev) => ({
       ...prev,
       [optionName]: value,
     }));
@@ -46,55 +65,28 @@ export const ProductDetailPage = () => {
 
   const handleBuyNow = () => {
     if (!product) return;
-    dispatch(
-      addToCart({
-        productId: product._id || product.id,
-        productSkuId: activeSku?._id || product.skus?.[0]?._id || `sku-${product._id || product.id}`,
-        name: product.name,
-        price: activeSku?.salePrice || activeSku?.price || product.price,
-        image: product.images?.[0] || '',
-        quantity: 1,
-      })
-    );
+    const item = createCartItem({
+      product,
+      activeSku,
+      quantity: 1,
+    });
+    dispatch(addToCart(item));
     navigate('/cart');
   };
 
   const handleReserveClickCollect = () => {
     if (!product) return;
-    dispatch(
-      addToCart({
-        productId: product._id || product.id,
-        productSkuId: product.skus?.[0]?._id || `sku-${product._id || product.id}`,
-        name: product.name,
-        price: product.price,
-        image: product.images?.[0] || '',
-        quantity: 1,
-        fulfillmentType: 'CLICK_AND_COLLECT',
-        pickupBranch: selectedBranch?.branchName || 'TechOne Q1 Flagship',
-      })
-    );
+    const item = createCartItem({
+      product,
+      activeSku,
+      quantity: 1,
+      fulfillmentType: 'CLICK_AND_COLLECT',
+      pickupBranch: selectedBranch?.branchName || 'TechOne Q1 Flagship',
+    });
+    dispatch(addToCart(item));
     setShowOrderToast(true);
     setTimeout(() => setShowOrderToast(false), 4000);
   };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <Spinner size="lg" />
-      </div>
-    );
-  }
-
-  if (!product) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 py-20 text-center">
-        <h2 className="text-xl font-bold">Không tìm thấy sản phẩm</h2>
-        <Link to="/category/laptop" className="text-blue-600 font-bold mt-2 inline-block">
-          Quay lại danh mục
-        </Link>
-      </div>
-    );
-  }
 
   useEffect(() => {
     if (!product) return;
@@ -123,7 +115,26 @@ export const ProductDetailPage = () => {
     return () => {
       isMounted = false;
     };
-  }, [product?._id, product?.id, product?.category]);
+  }, [product]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!product) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-20 text-center">
+        <h2 className="text-xl font-bold">Không tìm thấy sản phẩm</h2>
+        <Link to="/category/laptop" className="text-blue-600 font-bold mt-2 inline-block">
+          Quay lại danh mục
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-12 py-6">
