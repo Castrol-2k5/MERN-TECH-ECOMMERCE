@@ -133,7 +133,8 @@ export class ProductService {
             total: 0,
             page: pageNum,
             totalPages: 0,
-            limit: limitNum
+            limit: limitNum,
+            availableBrands: []
           };
         }
         filterConditions.categoryId = foundCategory._id;
@@ -198,19 +199,45 @@ export class ProductService {
       sortOptions = { 'skus.salePrice': -1 };
     } else if (sortBy === 'oldest') {
       sortOptions = { createdAt: 1 };
+    } else if (sortBy === 'popular') {
+      // Sắp xếp theo số lượng đã bán (hoặc fallback về { createdAt: -1 } nếu chưa có trường thống kê lượt mua)
+      sortOptions = { createdAt: -1 };
     }
 
     // 7. Thực thi truy vấn với .lean() tối ưu độ trễ T_avg < 200ms
     const skip = (pageNum - 1) * limitNum;
 
-    const [total, products] = await Promise.all([
+    // Lấy danh sách thương hiệu thực tế đang có sản phẩm active (theo danh mục nếu có lọc theo danh mục)
+    const brandMatch = { isActive: true };
+    if (filterConditions.categoryId) {
+      brandMatch.categoryId = new mongoose.Types.ObjectId(filterConditions.categoryId);
+    }
+
+    const [total, products, brandFacets] = await Promise.all([
       Product.countDocuments(filterConditions),
       Product.find(filterConditions)
         .sort(sortOptions)
         .skip(skip)
         .limit(limitNum)
-        .populate('categoryId', 'name slug')
-        .lean()
+        .populate('categoryId', 'name slug attributeKeys')
+        .lean(),
+      Product.aggregate([
+        { $match: brandMatch },
+        {
+          $group: {
+            _id: '$brand',
+            count: { $sum: 1 }
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            brand: '$_id',
+            count: 1
+          }
+        },
+        { $sort: { count: -1 } }
+      ])
     ]);
 
     const totalPages = Math.ceil(total / limitNum) || (total === 0 ? 0 : 1);
@@ -220,7 +247,8 @@ export class ProductService {
       total,
       page: pageNum,
       totalPages,
-      limit: limitNum
+      limit: limitNum,
+      availableBrands: brandFacets || []
     };
   }
 

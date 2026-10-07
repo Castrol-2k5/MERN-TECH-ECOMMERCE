@@ -375,6 +375,23 @@ describe('Product Module Integration Tests', () => {
       // Highest salePrice is MSI 45M
       expect(resDesc.body.data.products[0].slug).toBe('laptop-msi-raider-ge78');
     });
+
+    test('Happy Path - Sorting & Facets: should accept sortBy=popular and return availableBrands facets', async () => {
+      const resPopular = await request(app).get('/api/v1/products?category=laptop-may-tinh&sortBy=popular');
+      expect(resPopular.status).toBe(200);
+      expect(resPopular.body.data.products.length).toBe(2);
+
+      // Check availableBrands in meta and data
+      expect(resPopular.body.meta.availableBrands).toBeDefined();
+      expect(Array.isArray(resPopular.body.meta.availableBrands)).toBe(true);
+      const brands = resPopular.body.meta.availableBrands;
+      expect(brands).toEqual(
+        expect.arrayContaining([
+          { brand: 'Asus', count: 1 },
+          { brand: 'MSI', count: 1 }
+        ])
+      );
+    });
   });
 
   describe('GET /api/v1/products/:slug (Product Detail)', () => {

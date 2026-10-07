@@ -10,6 +10,7 @@ export const SortBar = ({
   const sortOptions = [
     { key: 'popular', label: 'Bán chạy' },
     { key: 'newest', label: 'Mới nhất' },
+    { key: 'oldest', label: 'Cũ nhất' },
     { key: 'price_asc', label: 'Giá thấp → cao' },
     { key: 'price_desc', label: 'Giá cao → thấp' },
   ];

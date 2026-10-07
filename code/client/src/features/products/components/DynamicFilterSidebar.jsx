@@ -4,13 +4,9 @@ export const DynamicFilterSidebar = ({
   selectedFilters = {},
   onFilterChange,
   onResetFilters,
+  availableBrands = [],
 }) => {
-  const filterGroups = [
-    {
-      key: 'brand',
-      label: 'Hãng sản xuất',
-      options: ['Apple', 'ASUS', 'Lenovo', 'Dell', 'Acer', 'HP'],
-    },
+  const otherFilterGroups = [
     {
       key: 'priceRange',
       label: 'Khoảng giá',
@@ -85,8 +81,44 @@ export const DynamicFilterSidebar = ({
       </div>
 
       <div className="space-y-5 divide-y divide-slate-100">
-        {filterGroups.map((group, idx) => (
-          <div key={group.key} className={idx > 0 ? 'pt-4' : ''}>
+        {/* Dynamic Brand Facets Section */}
+        <div>
+          <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider mb-2.5">
+            Hãng sản xuất
+          </h4>
+          <div className="space-y-1.5 max-h-48 overflow-y-auto scrollbar-thin">
+            {availableBrands.length === 0 ? (
+              <p className="text-xs text-slate-400 py-1 italic">Đang tải thương hiệu...</p>
+            ) : (
+              availableBrands.map((item) => {
+                const brandName = typeof item === 'string' ? item : item.brand;
+                const count = typeof item === 'object' && item.count !== undefined ? item.count : null;
+                const isChecked = (selectedFilters.brand || []).includes(brandName);
+
+                return (
+                  <label
+                    key={brandName}
+                    className="flex items-center gap-2.5 text-xs text-slate-600 hover:text-slate-900 cursor-pointer py-0.5 select-none"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => handleCheckboxToggle('brand', brandName)}
+                      className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <span className={isChecked ? 'font-bold text-blue-600' : ''}>
+                      {brandName} {count !== null ? `(${count})` : ''}
+                    </span>
+                  </label>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Other Filter Groups */}
+        {otherFilterGroups.map((group) => (
+          <div key={group.key} className="pt-4">
             <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider mb-2.5">
               {group.label}
             </h4>
