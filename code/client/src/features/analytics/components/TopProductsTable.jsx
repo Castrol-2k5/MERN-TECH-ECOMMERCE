@@ -8,7 +8,8 @@ const TOP_PRODUCTS = [
   { rank: 5, name: 'Chuột Logitech MX Master 4', sku: 'LOG-MXM4-GR', quantity: '412 chiếc', revenue: '1,19 tỷ', color: 'text-cyan-400' }
 ];
 
-export const TopProductsTable = () => {
+export const TopProductsTable = ({ data }) => {
+  const topProducts = data && data.length > 0 ? data : TOP_PRODUCTS;
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl text-slate-100">
       <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -22,7 +23,7 @@ export const TopProductsTable = () => {
       </div>
 
       <div className="divide-y divide-slate-800/60">
-        {TOP_PRODUCTS.map((prod) => (
+        {topProducts.map((prod) => (
           <div key={prod.rank} className="py-2.5 flex items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <span className={`w-5 text-center font-black font-mono text-sm ${prod.color}`}>

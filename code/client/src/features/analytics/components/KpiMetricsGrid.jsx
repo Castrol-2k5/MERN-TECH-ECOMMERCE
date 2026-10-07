@@ -1,10 +1,10 @@
 import { Wallet, ShoppingBag, Receipt, TrendingUp } from 'lucide-react';
 
-export const KpiMetricsGrid = () => {
+export const KpiMetricsGrid = ({ data }) => {
   const kpis = [
     {
       title: 'Doanh thu thuần',
-      value: '18,42 tỷ',
+      value: data?.totalRevenue || '18,42 tỷ',
       change: '↑ 18,6% so với kỳ trước',
       changeType: 'positive',
       icon: Wallet,
@@ -13,7 +13,7 @@ export const KpiMetricsGrid = () => {
     },
     {
       title: 'Đơn hàng thành công',
-      value: '4.862',
+      value: data?.totalOrders || '4.862',
       change: '↑ 12,4% • 187 đơn/ngày',
       changeType: 'positive',
       icon: ShoppingBag,
@@ -22,7 +22,7 @@ export const KpiMetricsGrid = () => {
     },
     {
       title: 'Giá trị đơn TB (AOV)',
-      value: '3,79 triệu',
+      value: data?.avgOrderValue || '3,79 triệu',
       change: '↑ 5,5% giá trị trung bình',
       changeType: 'positive',
       icon: Receipt,
@@ -31,7 +31,7 @@ export const KpiMetricsGrid = () => {
     },
     {
       title: 'Tốc độ tăng trưởng',
-      value: '+18,6%',
+      value: data?.growth || '+18,6%',
       change: 'Vượt mục tiêu quý 6,6 điểm',
       changeType: 'positive',
       icon: TrendingUp,

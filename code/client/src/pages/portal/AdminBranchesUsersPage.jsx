@@ -1,153 +1,142 @@
-import { useState, useEffect } from 'react';
-import { Store, ShieldCheck, Users } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Store, ShieldCheck, Users, UserPlus } from 'lucide-react';
 import BranchListCardGrid from '../../features/branches/components/BranchListCardGrid';
 import BranchFormModal from '../../features/branches/components/BranchFormModal';
 import UserRbacTable from '../../features/users/components/UserRbacTable';
+import UserFormModal from '../../features/users/components/UserFormModal';
 import { branchService } from '../../features/branches/services/branchService.js';
+import { userService, fallbackUsers } from '../../features/users/services/userService.js';
 import { isMockEnabled } from '../../config/dataMode.js';
-
-const INITIAL_BRANCHES = [
-  {
-    _id: '65f0a1000000000000000001',
-    code: 'BR-Q1-TQK',
-    name: 'TechOne Q1 • 138 Trần Quang Khải',
-    address: '138 Trần Quang Khải, P. Tân Định, Quận 1, TP.HCM',
-    phone: '028 3822 6868',
-    managerName: 'Phạm Quốc Huy',
-    stockCount: 3864,
-    revenueText: '4,28 tỷ',
-    location: { type: 'Point', coordinates: [106.6912, 10.7915] },
-    isActive: true
-  },
-  {
-    _id: '65f0a1000000000000000002',
-    code: 'BR-TD-VVN',
-    name: 'TechOne Thủ Đức • 214 Võ Văn Ngân',
-    address: '214 Võ Văn Ngân, P. Linh Chiểu, TP. Thủ Đức, TP.HCM',
-    phone: '028 3722 6868',
-    managerName: 'Lê Thanh Tùng',
-    stockCount: 2950,
-    revenueText: '3,62 tỷ',
-    location: { type: 'Point', coordinates: [106.7725, 10.8504] },
-    isActive: true
-  },
-  {
-    _id: '65f0a1000000000000000003',
-    code: 'BR-Q5-THD',
-    name: 'TechOne Q5 • 382 Trần Hưng Đạo',
-    address: '382 Trần Hưng Đạo, Phường 11, Quận 5, TP.HCM',
-    phone: '028 3855 6868',
-    managerName: 'Hoàng Minh Đức',
-    stockCount: 2180,
-    revenueText: '2,94 tỷ',
-    location: { type: 'Point', coordinates: [106.6668, 10.7532] },
-    isActive: true
-  }
-];
-
-const INITIAL_USERS = [
-  {
-    _id: 'user-001',
-    fullName: 'Nguyễn Minh Anh',
-    email: 'admin@techone.vn',
-    phone: '090 999 8888',
-    role: 'SUPER_ADMIN',
-    branchId: '',
-    isActive: true
-  },
-  {
-    _id: 'user-002',
-    fullName: 'Phạm Quốc Huy',
-    email: 'huy.pham@techone.vn',
-    phone: '091 234 5678',
-    role: 'BRANCH_MANAGER',
-    branchId: '65f0a1000000000000000001',
-    isActive: true
-  },
-  {
-    _id: 'user-003',
-    fullName: 'Nguyễn Văn Thu Ngân',
-    email: 'thungan.q1@techone.vn',
-    phone: '098 765 4321',
-    role: 'STAFF',
-    branchId: '65f0a1000000000000000001',
-    isActive: true
-  },
-  {
-    _id: 'user-004',
-    fullName: 'Trần Kỹ Thuật',
-    email: 'kythuat.q1@techone.vn',
-    phone: '097 112 3344',
-    role: 'STAFF',
-    branchId: '65f0a1000000000000000001',
-    isActive: true
-  }
-];
 
 export const AdminBranchesUsersPage = () => {
   const [activeTab, setActiveTab] = useState('BRANCHES'); // 'BRANCHES' | 'USERS'
-  const [branches, setBranches] = useState(isMockEnabled() ? INITIAL_BRANCHES : []);
-  const [users, setUsers] = useState(INITIAL_USERS);
+  const [branches, setBranches] = useState([]);
+  const [users, setUsers] = useState(isMockEnabled() ? fallbackUsers : []);
   const [editingBranch, setEditingBranch] = useState(null);
   const [showBranchModal, setShowBranchModal] = useState(false);
+  const [showUserModal, setShowUserModal] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
+
+  const fetchBranches = useCallback(async () => {
+    try {
+      const list = await branchService.getBranches();
+      setBranches(list || []);
+    } catch {
+      setBranches([]);
+    }
+  }, []);
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      const list = await userService.getUsers();
+      setUsers(list || []);
+    } catch {
+      if (isMockEnabled()) {
+        setUsers(fallbackUsers);
+      } else {
+        setUsers([]);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     let ignore = false;
-    if (isMockEnabled()) {
-      return;
-    }
-
-    branchService.getBranches().then((list) => {
+    const init = async () => {
+      await fetchBranches();
       if (!ignore) {
-        setBranches(list || []);
+        await fetchUsers();
       }
-    }).catch(() => {
-      if (!ignore) setBranches([]);
-    });
-
+    };
+    init();
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [fetchBranches, fetchUsers]);
 
-  const handleSaveBranch = (saved) => {
-    if (editingBranch) {
-      setBranches((prev) => prev.map((b) => (b._id === saved._id ? saved : b)));
-      setToastMsg({ type: 'success', message: `Đã cập nhật chi nhánh ${saved.name}!` });
-    } else {
-      setBranches((prev) => [saved, ...prev]);
-      setToastMsg({ type: 'success', message: `Đã tạo mới chi nhánh ${saved.name}!` });
+  const handleSaveBranch = async (formData) => {
+    try {
+      if (editingBranch) {
+        const saved = await branchService.updateBranch(editingBranch._id, formData);
+        setBranches((prev) => prev.map((b) => (b._id === saved._id ? saved : b)));
+        setToastMsg({ type: 'success', message: `Đã cập nhật chi nhánh ${saved.name}!` });
+      } else {
+        const saved = await branchService.createBranch(formData);
+        setBranches((prev) => [saved, ...prev]);
+        setToastMsg({ type: 'success', message: `Đã tạo mới chi nhánh ${saved.name}!` });
+      }
+      setEditingBranch(null);
+      setShowBranchModal(false);
+      await fetchBranches();
+    } catch (err) {
+      setToastMsg({
+        type: 'error',
+        message: err.response?.data?.message || err.message || 'Lỗi khi lưu chi nhánh'
+      });
     }
-    setEditingBranch(null);
-    setTimeout(() => setToastMsg(null), 3000);
+    setTimeout(() => setToastMsg(null), 3500);
   };
 
-  const handleUpdateUserRole = (userId, role) => {
-    setUsers((prev) =>
-      prev.map((u) => (u._id === userId ? { ...u, role } : u))
-    );
-    setToastMsg({ type: 'success', message: `Đã cập nhật quyền ${role} cho nhân sự!` });
-    setTimeout(() => setToastMsg(null), 3000);
+  const handleCreateUser = async (userPayload) => {
+    try {
+      const created = await userService.createUser(userPayload);
+      setUsers((prev) => [created, ...prev]);
+      setToastMsg({ type: 'success', message: `Đã khởi tạo tài khoản ${created.fullName} thành công!` });
+      await fetchUsers();
+    } catch (err) {
+      throw err;
+    }
+    setTimeout(() => setToastMsg(null), 3500);
   };
 
-  const handleUpdateUserBranch = (userId, branchId) => {
-    setUsers((prev) =>
-      prev.map((u) => (u._id === userId ? { ...u, branchId } : u))
-    );
-    setToastMsg({ type: 'success', message: 'Đã phân bổ lại chi nhánh công tác!' });
-    setTimeout(() => setToastMsg(null), 3000);
+  const handleUpdateUserRole = async (userId, role) => {
+    try {
+      const updated = await userService.updateUser(userId, { role });
+      setUsers((prev) =>
+        prev.map((u) => (u._id === userId ? { ...u, role: updated.role || role } : u))
+      );
+      setToastMsg({ type: 'success', message: `Đã cập nhật quyền ${role} cho nhân sự!` });
+    } catch (err) {
+      setToastMsg({
+        type: 'error',
+        message: err.response?.data?.message || err.message || 'Lỗi khi cập nhật vai trò'
+      });
+    }
+    setTimeout(() => setToastMsg(null), 3500);
   };
 
-  const handleToggleUserActive = (userId, isActive) => {
-    setUsers((prev) =>
-      prev.map((u) => (u._id === userId ? { ...u, isActive } : u))
-    );
-    setToastMsg({
-      type: 'success',
-      message: `Đã ${isActive ? 'kích hoạt' : 'tạm khóa'} tài khoản nhân sự!`
-    });
-    setTimeout(() => setToastMsg(null), 3000);
+  const handleUpdateUserBranch = async (userId, branchId) => {
+    try {
+      const updated = await userService.updateUser(userId, { branchId });
+      setUsers((prev) =>
+        prev.map((u) => (u._id === userId ? { ...u, branchId: updated.branchId || branchId } : u))
+      );
+      setToastMsg({ type: 'success', message: 'Đã phân bổ lại chi nhánh công tác!' });
+    } catch (err) {
+      setToastMsg({
+        type: 'error',
+        message: err.response?.data?.message || err.message || 'Lỗi khi phân bổ chi nhánh'
+      });
+    }
+    setTimeout(() => setToastMsg(null), 3500);
+  };
+
+  const handleToggleUserActive = async (userId, isActive) => {
+    try {
+      await userService.toggleUserStatus(userId, isActive);
+      setUsers((prev) =>
+        prev.map((u) => (u._id === userId ? { ...u, isActive } : u))
+      );
+      setToastMsg({
+        type: 'success',
+        message: `Đã ${isActive ? 'kích hoạt' : 'tạm khóa'} tài khoản nhân sự!`
+      });
+    } catch (err) {
+      setToastMsg({
+        type: 'error',
+        message: err.response?.data?.message || err.message || 'Lỗi khi cập nhật trạng thái'
+      });
+    }
+    setTimeout(() => setToastMsg(null), 3500);
   };
 
   return (
@@ -167,39 +156,58 @@ export const AdminBranchesUsersPage = () => {
           </p>
         </div>
 
-        {/* Tab switchers */}
-        <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
-          <button
-            type="button"
-            onClick={() => setActiveTab('BRANCHES')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              activeTab === 'BRANCHES'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Store className="w-3.5 h-3.5" />
-            <span>Mạng Lưới Chi Nhánh ({branches.length})</span>
-          </button>
+        {/* Tab switchers & Action */}
+        <div className="flex items-center gap-2">
+          {activeTab === 'USERS' && (
+            <button
+              type="button"
+              onClick={() => setShowUserModal(true)}
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-blue-600/20 cursor-pointer"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>Thêm Nhân Sự</span>
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('USERS')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              activeTab === 'USERS'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>Nhân Sự &amp; Phân Quyền ({users.length})</span>
-          </button>
+          <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+            <button
+              type="button"
+              onClick={() => setActiveTab('BRANCHES')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'BRANCHES'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Store className="w-3.5 h-3.5" />
+              <span>Mạng Lưới Chi Nhánh ({branches.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('USERS')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'USERS'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Nhân Sự &amp; Phân Quyền ({users.length})</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Toast */}
       {toastMsg && (
-        <div className="p-3 bg-emerald-950/80 border border-emerald-500/50 rounded-xl text-xs font-semibold text-emerald-300 flex items-center justify-between animate-in fade-in">
+        <div
+          className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-between animate-in fade-in ${
+            toastMsg.type === 'success'
+              ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-300'
+              : 'bg-rose-950/80 border-rose-500/50 text-rose-300'
+          }`}
+        >
           <span>{toastMsg.message}</span>
           <button onClick={() => setToastMsg(null)} className="opacity-70 hover:opacity-100">✕</button>
         </div>
@@ -237,6 +245,14 @@ export const AdminBranchesUsersPage = () => {
         onClose={() => setShowBranchModal(false)}
         branch={editingBranch}
         onSaveBranch={handleSaveBranch}
+      />
+
+      {/* User Form Modal */}
+      <UserFormModal
+        isOpen={showUserModal}
+        onClose={() => setShowUserModal(false)}
+        branches={branches}
+        onCreateUser={handleCreateUser}
       />
     </div>
   );

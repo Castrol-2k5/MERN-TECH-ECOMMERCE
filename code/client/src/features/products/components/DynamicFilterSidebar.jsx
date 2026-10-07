@@ -88,7 +88,7 @@ export const DynamicFilterSidebar = ({
           </h4>
           <div className="space-y-1.5 max-h-48 overflow-y-auto scrollbar-thin">
             {availableBrands.length === 0 ? (
-              <p className="text-xs text-slate-400 py-1 italic">Đang tải thương hiệu...</p>
+              <p className="text-xs text-slate-400 py-1 italic">Không có thương hiệu phù hợp</p>
             ) : (
               availableBrands.map((item) => {
                 const brandName = typeof item === 'string' ? item : item.brand;

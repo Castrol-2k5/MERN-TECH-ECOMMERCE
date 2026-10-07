@@ -2,10 +2,25 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export const Pagination = ({
   currentPage = 1,
-  totalPages = 12,
+  totalPages = 1,
   onPageChange,
 }) => {
-  const pages = [1, 2, 3, 4, '...', totalPages];
+  if (totalPages <= 1) return null;
+
+  const getPages = () => {
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    if (currentPage <= 3) {
+      return [1, 2, 3, 4, '...', totalPages];
+    }
+    if (currentPage >= totalPages - 2) {
+      return [1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    }
+    return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
+  };
+
+  const pages = getPages();
 
   return (
     <div className="flex items-center justify-center gap-1.5 mt-10">
@@ -28,7 +43,7 @@ export const Pagination = ({
         const isActive = p === currentPage;
         return (
           <button
-            key={p}
+            key={`page-${p}-${idx}`}
             onClick={() => onPageChange(p)}
             className={`w-9 h-9 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               isActive

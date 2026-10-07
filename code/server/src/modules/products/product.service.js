@@ -117,28 +117,40 @@ export class ProductService {
     const limitNum = Math.max(1, Number(limit));
     const filterConditions = { isActive: true };
 
-    // 1. Lọc theo Category (hỗ trợ cả slug lẫn ObjectId)
+    // 1. Lọc theo Category (hỗ trợ cả slug lẫn ObjectId, bao gồm toàn bộ danh mục con trong cây phân cấp)
     if (category) {
-      if (mongoose.Types.ObjectId.isValid(category)) {
-        filterConditions.categoryId = category;
-      } else {
-        const foundCategory = await Category.findOne({
-          slug: category.toLowerCase().trim(),
-          isActive: true
-        }).lean();
+      const targetCategory = mongoose.Types.ObjectId.isValid(category)
+        ? await Category.findOne({ _id: category, isActive: true }).lean()
+        : await Category.findOne({
+            slug: category.toLowerCase().trim(),
+            isActive: true
+          }).lean();
 
-        if (!foundCategory) {
-          return {
-            products: [],
-            total: 0,
-            page: pageNum,
-            totalPages: 0,
-            limit: limitNum,
-            availableBrands: []
-          };
-        }
-        filterConditions.categoryId = foundCategory._id;
+      if (!targetCategory) {
+        return {
+          products: [],
+          total: 0,
+          page: pageNum,
+          totalPages: 0,
+          limit: limitNum,
+          availableBrands: []
+        };
       }
+
+      // Đệ quy lấy danh mục con
+      const getDescendantCategoryIds = async (parentId) => {
+        const children = await Category.find({ parentId, isActive: true }).select('_id').lean();
+        if (!children || children.length === 0) return [];
+        const childIds = children.map((c) => c._id);
+        const grandChildIds = await Promise.all(childIds.map((id) => getDescendantCategoryIds(id)));
+        return [...childIds, ...grandChildIds.flat()];
+      };
+
+      const descendantIds = await getDescendantCategoryIds(targetCategory._id);
+      const matchedCategoryIds = [targetCategory._id, ...descendantIds];
+      filterConditions.categoryId = matchedCategoryIds.length > 1
+        ? { $in: matchedCategoryIds }
+        : targetCategory._id;
     }
 
     // 2. Lọc theo Brand (case-insensitive)
@@ -210,7 +222,13 @@ export class ProductService {
     // Lấy danh sách thương hiệu thực tế đang có sản phẩm active (theo danh mục nếu có lọc theo danh mục)
     const brandMatch = { isActive: true };
     if (filterConditions.categoryId) {
-      brandMatch.categoryId = new mongoose.Types.ObjectId(filterConditions.categoryId);
+      if (filterConditions.categoryId.$in) {
+        brandMatch.categoryId = {
+          $in: filterConditions.categoryId.$in.map((id) => new mongoose.Types.ObjectId(id))
+        };
+      } else {
+        brandMatch.categoryId = new mongoose.Types.ObjectId(filterConditions.categoryId);
+      }
     }
 
     const [total, products, brandFacets] = await Promise.all([
@@ -219,7 +237,7 @@ export class ProductService {
         .sort(sortOptions)
         .skip(skip)
         .limit(limitNum)
-        .populate('categoryId', 'name slug attributeKeys')
+        .populate('categoryId', 'name slug parentId attributeKeys')
         .lean(),
       Product.aggregate([
         { $match: brandMatch },

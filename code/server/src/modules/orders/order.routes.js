@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { OrderController } from './order.controller.js';
-import { posCheckoutSchema, b2cCheckoutSchema } from './order.dto.js';
+import { posCheckoutSchema, b2cCheckoutSchema, allocateOrderSchema, dispatchOrderSchema } from './order.dto.js';
 import { validateDto } from '../../middlewares/validate.middleware.js';
 import { protect, optionalProtect } from '../../middlewares/auth.middleware.js';
 import { authorize, scopeBranch } from '../../middlewares/rbac.middleware.js';
@@ -48,7 +48,25 @@ router.get(
   OrderController.getBranchOrders
 );
 
-// 5. Xem chi tiết đơn hàng theo orderCode
+// 5. Điều phối đơn hàng sang chi nhánh (SUPER_ADMIN, BRANCH_MANAGER)
+router.patch(
+  '/:id/allocate',
+  protect,
+  authorize(USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER),
+  validateDto(allocateOrderSchema),
+  OrderController.allocateOrder
+);
+
+// 6. Đóng gói & Gán serials cho đơn hàng B2C dispatch (SUPER_ADMIN, BRANCH_MANAGER, STAFF)
+router.patch(
+  '/:id/dispatch',
+  protect,
+  authorize(USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER, USER_ROLES.STAFF),
+  validateDto(dispatchOrderSchema),
+  OrderController.dispatchOrder
+);
+
+// 7. Xem chi tiết đơn hàng theo orderCode
 router.get(
   '/:orderCode',
   protect,

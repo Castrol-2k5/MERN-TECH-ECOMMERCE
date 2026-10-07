@@ -79,6 +79,33 @@ export const branchService = {
       return fallbackBranches.find((b) => b._id === id);
     }
   },
+
+  createBranch: async (payload) => {
+    if (isMockEnabled()) {
+      const newB = { _id: 'branch-' + Date.now(), ...payload };
+      return normalizeBranch(newB);
+    }
+    const response = await axiosClient.post('/branches', payload);
+    const rawBranch = response?.data?.branch || response?.data;
+    return normalizeBranch(rawBranch);
+  },
+
+  updateBranch: async (id, payload) => {
+    if (isMockEnabled()) {
+      return normalizeBranch({ _id: id, ...payload });
+    }
+    const response = await axiosClient.put(`/branches/${id}`, payload);
+    const rawBranch = response?.data?.branch || response?.data;
+    return normalizeBranch(rawBranch);
+  },
+
+  deleteBranch: async (id) => {
+    if (isMockEnabled()) {
+      return { success: true };
+    }
+    const response = await axiosClient.delete(`/branches/${id}`);
+    return response?.data || { success: true };
+  },
 };
 
 export default branchService;

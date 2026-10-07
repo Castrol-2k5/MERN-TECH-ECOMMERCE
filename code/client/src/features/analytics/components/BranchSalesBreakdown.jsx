@@ -7,16 +7,17 @@ const BRANCH_SALES = [
   { name: 'TechOne Q3 • CMT8', revenue: '2,36 tỷ', percentage: 55, color: 'bg-emerald-500' }
 ];
 
-export const BranchSalesBreakdown = () => {
+export const BranchSalesBreakdown = ({ data }) => {
+  const branchSales = data && data.length > 0 ? data : BRANCH_SALES;
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl text-slate-100">
       <div className="border-b border-slate-800 pb-3">
         <h3 className="font-bold text-sm text-slate-100">So sánh doanh thu chi nhánh</h3>
-        <p className="text-xs text-slate-400 mt-0.5">Xếp hạng tỷ trọng đóng góp của 4 điểm bán chủ lực</p>
+        <p className="text-xs text-slate-400 mt-0.5">Xếp hạng tỷ trọng đóng góp của các điểm bán</p>
       </div>
 
       <div className="space-y-4 pt-1">
-        {BRANCH_SALES.map((b) => (
+        {branchSales.map((b) => (
           <div key={b.name} className="space-y-1.5">
             <div className="flex items-center justify-between text-xs">
               <span className="font-medium text-slate-300 flex items-center gap-1.5">

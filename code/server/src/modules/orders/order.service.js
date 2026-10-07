@@ -436,4 +436,75 @@ export class OrderService {
 
     return order;
   }
+
+  /**
+   * Điều phối / Phân bổ đơn hàng B2C sang chi nhánh xử lý
+   * Quyền: SUPER_ADMIN, BRANCH_MANAGER
+   */
+  static async allocateOrder(orderId, branchId, currentUser) {
+    const order = await Order.findById(orderId);
+    if (!order) {
+      throw new AppError('Không tìm thấy đơn hàng cần điều phối.', 404, 'ORDER_NOT_FOUND');
+    }
+
+    const branch = await Branch.findById(branchId).lean();
+    if (!branch || !branch.isActive) {
+      throw new AppError('Chi nhánh điều phối không tồn tại hoặc đã tạm dừng hoạt động.', 404, 'BRANCH_NOT_FOUND');
+    }
+
+    order.branchId = branchId;
+    order.orderStatus = ORDER_STATUS.PROCESSING;
+    await order.save();
+
+    return order;
+  }
+
+  /**
+   * Đóng gói & Gán serials cho đơn B2C dispatch
+   * Kích hoạt bảo hành điện tử (e-warranty) cho serials gán vào đơn
+   * Quyền: SUPER_ADMIN, BRANCH_MANAGER, STAFF
+   */
+  static async dispatchOrder(orderId, payload, currentUser) {
+    const { serials, orderStatus } = payload;
+    const order = await Order.findById(orderId);
+    if (!order) {
+      throw new AppError('Không tìm thấy đơn hàng cần đóng gói.', 404, 'ORDER_NOT_FOUND');
+    }
+
+    if (currentUser.role !== USER_ROLES.SUPER_ADMIN) {
+      const orderBranchId = order.branchId?.toString();
+      if (orderBranchId && orderBranchId !== currentUser.branchId?.toString()) {
+        throw new AppError('Bạn không có quyền đóng gói đơn hàng thuộc chi nhánh khác.', 403, 'CROSS_BRANCH_ACCESS_DENIED');
+      }
+    }
+
+    if (Array.isArray(serials) && serials.length > 0) {
+      // Gán serials vào item đầu tiên hoặc các items
+      if (order.items && order.items.length > 0) {
+        order.items[0].serialsAssigned = serials;
+      }
+
+      // Cập nhật trạng thái Serial sang SOLD và kích hoạt bảo hành
+      const now = new Date();
+      const warrantyEndDate = new Date(now);
+      warrantyEndDate.setFullYear(warrantyEndDate.getFullYear() + 1);
+
+      await Serial.updateMany(
+        { serialNumber: { $in: serials } },
+        {
+          $set: {
+            status: SERIAL_STATUS.SOLD,
+            soldAt: now,
+            warrantyEndDate,
+            orderId: order._id
+          }
+        }
+      );
+    }
+
+    order.orderStatus = orderStatus || ORDER_STATUS.READY_FOR_SHIPPING;
+    await order.save();
+
+    return order;
+  }
 }

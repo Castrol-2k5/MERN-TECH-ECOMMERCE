@@ -347,6 +347,14 @@ export const productService = {
     return response?.data?.product || response?.data || payload;
   },
 
+  createProduct: async (payload) => {
+    if (isMockEnabled()) {
+      return { _id: 'prod-' + Date.now(), ...payload };
+    }
+    const response = await axiosClient.post('/products', payload);
+    return response?.data?.product || response?.data || payload;
+  },
+
   updateProduct: async (id, payload) => {
     if (isMockEnabled()) {
       return { _id: id, ...payload };
@@ -372,11 +380,14 @@ export const productService = {
   },
 
   getCompareProducts: async () => {
+    if (isMockEnabled()) {
+      return fallbackProducts.slice(0, 2);
+    }
     try {
       const res = await productService.getProducts({ limit: 4 });
-      return res.products?.slice(0, 2) || fallbackProducts.slice(0, 2);
+      return res.products?.slice(0, 2) || [];
     } catch {
-      return fallbackProducts.slice(0, 2);
+      return [];
     }
   },
 

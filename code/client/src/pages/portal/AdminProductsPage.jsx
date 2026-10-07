@@ -5,15 +5,14 @@ import {
   ExternalLink, 
   CheckCircle2, 
   AlertCircle,
-  Database,
-  Beaker,
-  RefreshCw
+  FolderTree
 } from 'lucide-react';
 import productService, { fallbackProducts } from '../../features/products/services/productService';
 import ProductManagementTable from '../../features/products/components/ProductManagementTable';
 import DynamicAttributesForm from '../../features/products/components/DynamicAttributesForm';
 import SkuVariantBuilder from '../../features/products/components/SkuVariantBuilder';
-import { isMockEnabled, isDevOrTest } from '../../config/dataMode';
+import CategoryManagementTab from '../../features/categories/components/CategoryManagementTab';
+import { isMockEnabled } from '../../config/dataMode';
 
 export const AdminProductsPage = () => {
   const auth = useSelector((state) => state.auth);
@@ -21,7 +20,6 @@ export const AdminProductsPage = () => {
   const [selectedProduct, setSelectedProduct] = useState(fallbackProducts[0]);
   const [activeTab, setActiveTab] = useState('ATTRIBUTES'); // 'INFO' | 'ATTRIBUTES' | 'SKUS' | 'SEO'
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
 
   // Editable state of currently selected product
@@ -67,20 +65,21 @@ export const AdminProductsPage = () => {
   };
 
   useEffect(() => {
-    if (isMockEnabled()) {
-      setProducts(fallbackProducts);
-      if (fallbackProducts.length > 0) {
-        handleSelectProduct(fallbackProducts[0]);
-      }
-      return;
-    }
-
     let isMounted = true;
-    setIsLoading(true);
 
-    productService
-      .getProducts({ limit: 100 })
-      .then((res) => {
+    const loadData = async () => {
+      if (isMockEnabled()) {
+        if (isMounted) {
+          setProducts(fallbackProducts);
+          if (fallbackProducts.length > 0) {
+            handleSelectProduct(fallbackProducts[0]);
+          }
+        }
+        return;
+      }
+
+      try {
+        const res = await productService.getProducts({ limit: 100 });
         if (isMounted) {
           const list = res.products || [];
           setProducts(list);
@@ -88,18 +87,17 @@ export const AdminProductsPage = () => {
             handleSelectProduct(list[0]);
           }
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         if (isMounted) {
           setToastMsg({
             type: 'error',
             message: `Lỗi kết nối Live Database: ${err.message || 'Không thể tải danh sách sản phẩm'}`,
           });
         }
-      })
-      .finally(() => {
-        if (isMounted) setIsLoading(false);
-      });
+      }
+    };
+
+    loadData();
 
     return () => {
       isMounted = false;
@@ -138,14 +136,28 @@ export const AdminProductsPage = () => {
 
     setIsSaving(true);
     try {
-      await productService.updateProduct(selectedProduct._id, formData);
-      setProducts((prev) =>
-        prev.map((p) => (p._id === selectedProduct._id ? { ...p, ...formData } : p))
-      );
-      setToastMsg({
-        type: 'success',
-        message: 'Đã lưu thay đổi thông tin sản phẩm và schema thuộc tính thành công!',
-      });
+      const isNew = String(selectedProduct._id).startsWith('prod-') && isNaN(Number(selectedProduct._id));
+      let savedProduct;
+      if (isNew) {
+        savedProduct = await productService.createProduct(formData);
+        setProducts((prev) =>
+          prev.map((p) => (p._id === selectedProduct._id ? savedProduct : p))
+        );
+        setSelectedProduct(savedProduct);
+        setToastMsg({
+          type: 'success',
+          message: 'Đã tạo sản phẩm mới và lưu vào cơ sở dữ liệu thành công!',
+        });
+      } else {
+        savedProduct = await productService.updateProduct(selectedProduct._id, formData);
+        setProducts((prev) =>
+          prev.map((p) => (p._id === selectedProduct._id ? { ...p, ...formData } : p))
+        );
+        setToastMsg({
+          type: 'success',
+          message: 'Đã lưu thay đổi thông tin sản phẩm và schema thuộc tính thành công!',
+        });
+      }
       setTimeout(() => setToastMsg(null), 3500);
     } catch (err) {
       setToastMsg({
@@ -298,6 +310,18 @@ export const AdminProductsPage = () => {
             >
               SEO &amp; URL
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('CATEGORIES')}
+              className={`px-3.5 py-2 rounded-t-lg transition-all border-b-2 cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'CATEGORIES'
+                  ? 'border-blue-500 text-blue-400 font-bold bg-slate-850/50'
+                  : 'border-transparent text-slate-400 hover:text-white'
+              }`}
+            >
+              <FolderTree className="w-3.5 h-3.5 text-blue-400" />
+              <span>Quản lý Danh mục</span>
+            </button>
           </div>
 
           {/* Tab Content */}
@@ -413,6 +437,10 @@ export const AdminProductsPage = () => {
                   ></textarea>
                 </div>
               </div>
+            )}
+
+            {activeTab === 'CATEGORIES' && (
+              <CategoryManagementTab />
             )}
           </div>
         </div>
