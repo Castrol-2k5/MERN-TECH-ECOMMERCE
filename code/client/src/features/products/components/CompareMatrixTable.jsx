@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { X, Plus, ShoppingCart } from 'lucide-react';
@@ -6,6 +7,43 @@ import {
   toggleHighlightDifferences,
 } from '../../../store/slices/compareSlice.js';
 import { addToCart } from '../../../store/slices/cartSlice.js';
+
+const ATTRIBUTE_LABELS = {
+  cpu: 'Vi xử lý (CPU)',
+  ram: 'Bộ nhớ RAM',
+  storage: 'Ổ cứng lưu trữ',
+  screen_size: 'Màn hình hiển thị',
+  screen: 'Màn hình hiển thị',
+  display: 'Màn hình hiển thị',
+  vga: 'Card đồ họa (VGA)',
+  gpu: 'Card đồ họa (VGA)',
+  connectivity: 'Cổng kết nối',
+  ports: 'Cổng kết nối',
+  battery: 'Dung lượng pin',
+  weight: 'Trọng lượng',
+  os: 'Hệ điều hành',
+  warranty: 'Thời gian bảo hành',
+  chip: 'Vi xử lý (SoC)',
+  camera: 'Camera chính',
+  front_camera: 'Camera trước',
+  rear_camera: 'Camera sau',
+  resolution: 'Độ phân giải',
+  refresh_rate: 'Tần số quét',
+  connection: 'Chuẩn kết nối',
+  power: 'Công suất sạc',
+};
+
+const getAttributeLabel = (key) => {
+  const normalizedKey = String(key || '').trim().toLowerCase();
+  if (ATTRIBUTE_LABELS[normalizedKey]) {
+    return ATTRIBUTE_LABELS[normalizedKey];
+  }
+  return key
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/_/g, ' ')
+    .trim()
+    .replace(/^\w/, (c) => c.toUpperCase());
+};
 
 export const CompareMatrixTable = ({ onAddProductClick }) => {
   const dispatch = useDispatch();
@@ -18,18 +56,62 @@ export const CompareMatrixTable = ({ onAddProductClick }) => {
     }).format(val || 0);
   };
 
-  const attributesList = [
-    { key: 'cpu', label: 'Vi xử lý (CPU)' },
-    { key: 'ram', label: 'Bộ nhớ RAM' },
-    { key: 'storage', label: 'Ổ cứng lưu trữ' },
-    { key: 'screen_size', label: 'Màn hình hiển thị' },
-    { key: 'vga', label: 'Card đồ họa (VGA)' },
-    { key: 'connectivity', label: 'Cổng kết nối' },
-    { key: 'battery', label: 'Dung lượng pin' },
-    { key: 'weight', label: 'Trọng lượng' },
-    { key: 'os', label: 'Hệ điều hành' },
-    { key: 'warranty', label: 'Thời gian bảo hành' },
-  ];
+  // Trích xuất danh sách thuộc tính động từ Sản phẩm 1 (Anchor Product) & Category attributeKeys
+  const attributesList = useMemo(() => {
+    if (!products || products.length === 0) return [];
+
+    const keysSet = new Set();
+    const orderedKeys = [];
+
+    // 1. Thêm từ attributeKeys của danh mục (nếu có)
+    const categoryKeys =
+      products[0]?.categoryId?.attributeKeys ||
+      products[0]?.category?.attributeKeys ||
+      [];
+
+    if (Array.isArray(categoryKeys)) {
+      categoryKeys.forEach((k) => {
+        const keyLower = String(k).trim().toLowerCase();
+        if (keyLower && !keysSet.has(keyLower)) {
+          keysSet.add(keyLower);
+          orderedKeys.push(keyLower);
+        }
+      });
+    }
+
+    // 2. Thêm các thuộc tính thực tế có trong sản phẩm 1
+    const collectFromProduct = (prod) => {
+      if (!prod) return;
+      if (Array.isArray(prod.rawAttributes)) {
+        prod.rawAttributes.forEach((attr) => {
+          if (attr && attr.key) {
+            const keyLower = String(attr.key).trim().toLowerCase();
+            if (keyLower && !keysSet.has(keyLower)) {
+              keysSet.add(keyLower);
+              orderedKeys.push(keyLower);
+            }
+          }
+        });
+      }
+      if (prod.attributes && typeof prod.attributes === 'object') {
+        Object.keys(prod.attributes).forEach((key) => {
+          const keyLower = String(key).trim().toLowerCase();
+          if (keyLower && !keysSet.has(keyLower)) {
+            keysSet.add(keyLower);
+            orderedKeys.push(keyLower);
+          }
+        });
+      }
+    };
+
+    // Thu thập thuộc tính từ sản phẩm neo đầu tiên và các sản phẩm tiếp theo
+    products.forEach(collectFromProduct);
+
+    return orderedKeys.map((key) => ({
+      key,
+      label: getAttributeLabel(key),
+    }));
+  }, [products]);
 
   const handleAddToCart = (product) => {
     dispatch(
@@ -46,9 +128,15 @@ export const CompareMatrixTable = ({ onAddProductClick }) => {
 
   const checkRowHasDifferences = (key) => {
     if (products.length <= 1) return false;
-    const firstVal = products[0]?.attributes?.[key];
-    return products.some((p) => (p.attributes?.[key] || '') !== (firstVal || ''));
+    const firstVal = (products[0]?.attributes?.[key] || '').toString().trim();
+    return products.some(
+      (p) => (p.attributes?.[key] || '').toString().trim() !== firstVal
+    );
   };
+
+  if (!products || products.length === 0) {
+    return null;
+  }
 
   return (
     <div className="space-y-6">
@@ -129,7 +217,7 @@ export const CompareMatrixTable = ({ onAddProductClick }) => {
                     <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
                       <Plus className="w-5 h-5" />
                     </div>
-                    <span className="text-xs font-bold">Thêm sản phẩm</span>
+                    <span className="text-xs font-bold">+ Thêm sản phẩm so sánh</span>
                   </button>
                 </th>
               )}
@@ -137,48 +225,56 @@ export const CompareMatrixTable = ({ onAddProductClick }) => {
           </thead>
 
           <tbody className="divide-y divide-slate-100">
-            {attributesList.map((attr) => {
-              const hasDiff = checkRowHasDifferences(attr.key);
-              const rowHighlight = highlightDifferences && hasDiff;
+            {attributesList.length === 0 ? (
+              <tr>
+                <td colSpan={products.length + (products.length < 4 ? 2 : 1)} className="p-6 text-center text-slate-400 italic">
+                  Chưa có thông số kỹ thuật chi tiết để so sánh cho sản phẩm này.
+                </td>
+              </tr>
+            ) : (
+              attributesList.map((attr) => {
+                const hasDiff = checkRowHasDifferences(attr.key);
+                const rowHighlight = highlightDifferences && hasDiff;
 
-              return (
-                <tr
-                  key={attr.key}
-                  className={`divide-x divide-slate-100 transition-colors ${
-                    rowHighlight ? 'bg-amber-50/50' : 'hover:bg-slate-50/50'
-                  }`}
-                >
-                  <td className="p-4 font-bold text-slate-700 bg-slate-50/30">
-                    <div className="flex items-center justify-between">
-                      <span>{attr.label}</span>
-                      {rowHighlight && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-200 text-amber-900">
-                          Khác biệt
-                        </span>
-                      )}
-                    </div>
-                  </td>
+                return (
+                  <tr
+                    key={attr.key}
+                    className={`divide-x divide-slate-100 transition-colors ${
+                      rowHighlight ? 'bg-amber-50/50' : 'hover:bg-slate-50/50'
+                    }`}
+                  >
+                    <td className="p-4 font-bold text-slate-700 bg-slate-50/30">
+                      <div className="flex items-center justify-between">
+                        <span>{attr.label}</span>
+                        {rowHighlight && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-200 text-amber-900">
+                            Khác biệt
+                          </span>
+                        )}
+                      </div>
+                    </td>
 
-                  {products.map((product) => {
-                    const value = product.attributes?.[attr.key] || '—';
-                    return (
-                      <td
-                        key={product._id || product.id}
-                        className={`p-4 font-medium leading-relaxed ${
-                          rowHighlight
-                            ? 'text-slate-900 font-bold bg-amber-50/70 border-l-2 border-amber-400'
-                            : 'text-slate-700'
-                        }`}
-                      >
-                        {value}
-                      </td>
-                    );
-                  })}
+                    {products.map((product) => {
+                      const value = product.attributes?.[attr.key] || '—';
+                      return (
+                        <td
+                          key={product._id || product.id}
+                          className={`p-4 font-medium leading-relaxed ${
+                            rowHighlight
+                              ? 'text-slate-900 font-bold bg-amber-50/70 border-l-2 border-amber-400'
+                              : 'text-slate-700'
+                          }`}
+                        >
+                          {value}
+                        </td>
+                      );
+                    })}
 
-                  {products.length < 4 && <td className="p-4 bg-slate-50/20" />}
-                </tr>
-              );
-            })}
+                    {products.length < 4 && <td className="p-4 bg-slate-50/20 text-center text-slate-300">—</td>}
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>

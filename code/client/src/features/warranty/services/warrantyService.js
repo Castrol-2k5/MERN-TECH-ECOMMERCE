@@ -146,7 +146,7 @@ export const warrantyService = {
 
     try {
       const res = await axiosClient.post('/warranty', payload);
-      return res?.data || res;
+      return res?.data?.ticket || res?.data || res;
     } catch {
       // In case warranty endpoint is not exposed yet, create RMA ticket receipt for staff
       const datePart = new Date().toISOString().slice(2, 10).replace(/-/g, '');
@@ -157,6 +157,48 @@ export const warrantyService = {
         createdAt: new Date().toISOString(),
         status: 'RECEIVED'
       };
+    }
+  },
+
+  getWarrantyTickets: async (params = {}) => {
+    if (isMockEnabled()) {
+      return [
+        {
+          _id: 'ticket-mock-01',
+          ticketCode: 'BH-Q1-261005-081',
+          serialNumber: 'SN-IP16-VN-9075',
+          productName: 'iPhone 16 Pro Max 256GB - Sa Mạc Tự Nhiên',
+          customerName: 'Trần Minh Khang',
+          customerPhone: '0912345678',
+          issueDescription: 'Màn hình chớp nháy khi mở camera góc siêu rộng',
+          accessories: 'Máy trần, kèm hộp zin',
+          status: 'RECEIVED',
+          createdAt: new Date().toISOString()
+        },
+        {
+          _id: 'ticket-mock-02',
+          ticketCode: 'BH-Q1-261004-032',
+          serialNumber: 'C02ZQ0ABQ6L7',
+          productName: 'MacBook Air 13 M4 16GB/256GB Silver',
+          customerName: 'Lê Hoàng Yến',
+          customerPhone: '0987654321',
+          issueDescription: 'Bàn phím kẹt phím Spacebar sau 2 tuần sử dụng',
+          accessories: 'Máy + Sạc cáp 30W',
+          status: 'IN_REPAIR',
+          createdAt: new Date(Date.now() - 86400000).toISOString()
+        }
+      ];
+    }
+
+    try {
+      const query = new URLSearchParams(params).toString();
+      const res = await axiosClient.get(`/warranty${query ? `?${query}` : ''}`);
+      return res?.data?.tickets || res?.data || [];
+    } catch (err) {
+      if (isDevOrTest()) {
+        console.warn('[warrantyService.getWarrantyTickets] Failed fetching tickets:', err?.message);
+      }
+      return [];
     }
   }
 };

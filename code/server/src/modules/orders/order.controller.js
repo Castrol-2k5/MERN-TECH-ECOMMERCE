@@ -76,4 +76,27 @@ export class OrderController {
       data: { order }
     });
   });
+
+  static allocateOrder = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const { branchId } = req.body;
+    const order = await OrderService.allocateOrder(id, branchId, req.user);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Điều phối đơn hàng sang chi nhánh thành công',
+      data: { order }
+    });
+  });
+
+  static dispatchOrder = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const order = await OrderService.dispatchOrder(id, req.body, req.user);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Đóng gói và bàn giao đơn hàng thành công',
+      data: { order }
+    });
+  });
 }

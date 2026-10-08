@@ -5,7 +5,8 @@ const CHANNEL_DATA = [
   { name: 'Web POS Quầy', value: 38, revenue: '7,00 tỷ', color: '#06B6D4' }
 ];
 
-export const ChannelBreakdownPie = () => {
+export const ChannelBreakdownPie = ({ data }) => {
+  const channelData = data && data.length > 0 ? data : CHANNEL_DATA;
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl text-slate-100">
       <div className="border-b border-slate-800 pb-3">
@@ -19,13 +20,13 @@ export const ChannelBreakdownPie = () => {
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
-                data={CHANNEL_DATA}
+                data={channelData}
                 innerRadius={32}
                 outerRadius={52}
                 paddingAngle={4}
                 dataKey="value"
               >
-                {CHANNEL_DATA.map((entry, index) => (
+                {channelData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} stroke="#0f172a" strokeWidth={2} />
                 ))}
               </Pie>
@@ -35,7 +36,7 @@ export const ChannelBreakdownPie = () => {
 
         {/* Legend */}
         <div className="flex-1 space-y-2.5 text-xs">
-          {CHANNEL_DATA.map((ch) => (
+          {channelData.map((ch) => (
             <div key={ch.name} className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ch.color }}></span>

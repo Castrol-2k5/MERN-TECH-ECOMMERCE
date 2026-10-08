@@ -1,13 +1,43 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Hash, Search, Calendar, ShieldCheck, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
+import inventoryService from '../services/inventoryService.js';
+import { isMockEnabled } from '../../../config/dataMode.js';
 
-export const SerialListDrawer = ({ isOpen, onClose, item }) => {
+export const SerialListDrawer = ({ isOpen, onClose, item, branchId }) => {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
+  const [liveSerials, setLiveSerials] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !item) return;
+
+    if (isMockEnabled()) {
+      setLiveSerials(item.serials || []);
+      return;
+    }
+
+    const fetchSerials = async () => {
+      setIsLoading(true);
+      try {
+        const data = await inventoryService.getSerials({
+          productSkuId: item.productSkuId || item._id,
+          branchId: branchId || item.branchId,
+        });
+        setLiveSerials(data.length > 0 ? data : (item.serials || []));
+      } catch {
+        setLiveSerials(item.serials || []);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSerials();
+  }, [isOpen, item, branchId]);
 
   if (!isOpen || !item) return null;
 
-  const serials = item.serials || [];
+  const serials = liveSerials;
 
   const filteredSerials = serials.filter((s) => {
     const matchSearch = s.serialNumber.toLowerCase().includes(search.toLowerCase());

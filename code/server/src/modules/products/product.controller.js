@@ -19,12 +19,16 @@ export class ProductController {
     return sendSuccess(res, {
       statusCode: 200,
       message: 'Lấy danh sách sản phẩm thành công',
-      data: { products: result.products },
+      data: {
+        products: result.products,
+        availableBrands: result.availableBrands
+      },
       meta: {
         page: result.page,
         limit: result.limit,
         total: result.total,
-        totalPages: result.totalPages
+        totalPages: result.totalPages,
+        availableBrands: result.availableBrands
       }
     });
   });

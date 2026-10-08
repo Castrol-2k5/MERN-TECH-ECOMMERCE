@@ -117,3 +117,27 @@ export const b2cCheckoutSchema = z
   })
   .strict();
 
+export const allocateOrderSchema = z
+  .object({
+    branchId: z
+      .string({ required_error: 'Mã chi nhánh phân bổ (branchId) là bắt buộc' })
+      .trim()
+      .regex(OBJECT_ID_REGEX, 'Mã chi nhánh (branchId) không hợp lệ')
+  })
+  .strict();
+
+export const dispatchOrderSchema = z
+  .object({
+    serials: z
+      .array(
+        z.string().trim().min(1, 'Mã Serial không được để trống')
+      )
+      .optional()
+      .default([]),
+    orderStatus: z
+      .enum(['READY_FOR_SHIPPING', 'SHIPPING', 'COMPLETED'])
+      .optional()
+      .default('READY_FOR_SHIPPING')
+  })
+  .strict();
+
