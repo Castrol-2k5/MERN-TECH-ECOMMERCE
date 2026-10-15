@@ -24,8 +24,7 @@ export const BranchFormModal = ({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSaveBranch({
-      _id: branch?._id || 'branch-' + Date.now(),
+    const payload = {
       name,
       code,
       address,
@@ -36,7 +35,11 @@ export const BranchFormModal = ({
         coordinates: [parseFloat(longitude) || 106.6912, parseFloat(latitude) || 10.7915]
       },
       isActive
-    });
+    };
+    if (branch?._id) {
+      payload._id = branch._id;
+    }
+    onSaveBranch(payload);
     onClose();
   };
 

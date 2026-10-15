@@ -3,7 +3,7 @@
 * **Dự án:** Hệ thống Thương mại điện tử Đa kênh MERN Stack cho chuỗi bán lẻ thiết bị công nghệ (Storefront B2C, Web POS, Branch Admin, HQ Super Admin).
 * **Kiến trúc:** Modular Monolith trên Node.js/Express (v20+ LTS), Mongoose ODM (v8+), MongoDB (v7.0+).
 * **Tiêu chuẩn chất lượng:** Tuân thủ Clean Architecture, 0 lỗi ESLint, 0 bí mật lộ lọt, độ phủ kiểm thử tự động ≥ 70% (Đáp ứng Mức 5 Rubric Đồ án).
-* **Thời điểm cập nhật:** 03/10/2026 (Hoàn tất Gói 1: Vá bảo mật và tinh chỉnh Core APIs Server).
+* **Thời điểm cập nhật:** 07/10/2026 (Hoàn tất Gói 5: Kiểm toán toàn diện 50 Use Cases cho 4 tác nhân, Module Quản Trị Nhân Sự Users RBAC, Điều Phối B2C Dispatch & Kích Hoạt Bảo Hành, Analytics BI Đa Kênh, Quản Lý Danh Mục & Phiếu RMA).
 
 ---
 
@@ -13,17 +13,21 @@
 | :--- | :---: | :---: | :---: |
 | **1. Database Schemas & Indexing (9 Models)** | Hoàn thành | 100% Pass (9/9 Models) | **TC2.2, TC2.4** |
 | **2. Auth & RBAC 3 Tầng (JWT, Session, Scoping)** | Hoàn thành | 100% Pass (18 ACs - Đã vá H1) | **TC2.2, TC2.4, TC2.5** |
-| **3. Branch Module & GeoSpatial GPS ($near)** | Hoàn thành | 100% Pass (11 Cases) | **TC2.2, TC2.4, TC2.5** |
-| **4. Category Module (Hierarchy & Dynamic Specs)** | Hoàn thành | 100% Pass (11 Cases) | **TC2.2, TC2.4, TC2.5** |
-| **5. Product Module (Dynamic Filter & Hybrid Schema)** | Hoàn thành | 100% Pass (19 Cases) | **TC2.2, TC2.4, TC2.5** |
-| **6. Inventory Module (Atomic OCC & Multi-Branch)** | Hoàn thành | 100% Pass (11 Cases) | **TC2.2, TC2.4, TC2.5** |
-| **7. Serial/IMEI & Query Filter (State Pattern)** | Hoàn thành | 100% Pass (16 Cases - Sửa A4) | **TC2.2, TC2.4, TC2.5** |
-| **8. Warranty Ticket Module (RMA Processing)** | Hoàn thành | 100% Pass (6 Cases - Sửa A5) | **TC2.2, TC2.4, TC2.5** |
-| **9. Order & Web POS Checkout (Zero Overselling)** | Hoàn thành | 100% Pass (22 Cases - Sửa A1, A2, E2) | **TC2.1, TC2.2, TC2.5** |
-| **10. Chuẩn Hóa Adapter & Redux Store Client (Gói 2)** | Hoàn thành | 100% Build Pass (0 ESLint errors) | **TC2.1, TC2.2, TC2.5** |
-| **11. Dọn Dẹp Mock Data & Đưa UI về Core Chuẩn (Gói 3)** | Hoàn thành | 100% Build Pass (0 ESLint errors) | **TC2.1, TC2.2, TC2.5** |
-| **12. Pipeline CI/CD GitHub Actions** | Hoàn thành | 100% Green Build Pipeline | **TC2.4, TC2.5, TC2.6** |
-| **Tổng thể Hệ thống (Backend & Client Core Sync)** | **Hoàn thành Xuất sắc** | **100% Pass Rate (156/156 Tests - 13 Suites)** | **Mức 5 Xuất sắc** |
+| **3. Users & Nhân Sự RBAC Scoping Module** | Hoàn thành | 100% Pass (6 Cases) | **TC2.2, TC2.4, TC2.5** |
+| **4. Branch Module & GeoSpatial GPS ($near)** | Hoàn thành | 100% Pass (11 Cases) | **TC2.2, TC2.4, TC2.5** |
+| **5. Category Module (Hierarchy & Dynamic Specs)** | Hoàn thành | 100% Pass (11 Cases - Đã hỗ trợ Đệ quy Phân cấp Cha-Con) | **TC2.2, TC2.4, TC2.5** |
+| **6. Product Module (Dynamic Filter, Sort & Brand Facets)** | Hoàn thành | 100% Pass (20 Cases - Đã sửa Cascading Aggregation Facets & Sort Enum) | **TC2.2, TC2.4, TC2.5** |
+| **7. Inventory Module (Atomic OCC & Multi-Branch)** | Hoàn thành | 100% Pass (11 Cases) | **TC2.2, TC2.4, TC2.5** |
+| **8. Serial/IMEI & Query Filter (State Pattern)** | Hoàn thành | 100% Pass (16 Cases - Sửa A4) | **TC2.2, TC2.4, TC2.5** |
+| **9. Warranty Ticket Module (RMA Processing)** | Hoàn thành | 100% Pass (6 Cases - Sửa A5) | **TC2.2, TC2.4, TC2.5** |
+| **10. Order & Web POS Checkout (Zero Overselling)** | Hoàn thành | 100% Pass (22 Cases - Sửa A1, A2, E2) | **TC2.1, TC2.2, TC2.5** |
+| **11. B2C Order Dispatch & E-Warranty Activation** | Hoàn thành | 100% Pass (2 Cases) | **TC2.1, TC2.2, TC2.5** |
+| **12. Analytics & Business Intelligence BI** | Hoàn thành | 100% Pass (1 Case tổng hợp) | **TC2.2, TC2.4, TC2.5** |
+| **13. Chuẩn Hóa Adapter & Redux Store Client (Gói 2)** | Hoàn thành | 100% Build Pass (0 ESLint errors) | **TC2.1, TC2.2, TC2.5** |
+| **14. Dọn Dẹp Mock Data & Đưa UI về Core Chuẩn (Gói 3)** | Hoàn thành | 100% Build Pass (0 ESLint errors) | **TC2.1, TC2.2, TC2.5** |
+| **15. Nâng Cấp So Sánh P-04 Scoped Root Category & Live DB Sync** | Hoàn thành | 100% Build Pass (0 ESLint errors) | **TC2.1, TC2.2, TC2.5** |
+| **16. Pipeline CI/CD GitHub Actions** | Hoàn thành | 100% Green Build Pipeline | **TC2.4, TC2.5, TC2.6** |
+| **Tổng thể Hệ thống (Backend & Client Core Sync)** | **Hoàn thành Xuất sắc** | **100% Pass Rate (166/166 Tests - 16 Suites)** | **Mức 5 Xuất sắc** |
 
 
 ---
@@ -79,12 +83,15 @@
 
 ---
 
-### 2.5. Phân Hệ Quản Lý Sản Phẩm (`/api/v1/products`) - Hybrid Dynamic Schema
+### 2.5. Phân Hệ Quản Lý Sản Phẩm (`/api/v1/products`) - Hybrid Dynamic Schema & Dynamic Facets
 * **Mô hình Hybrid Schema:** Kết hợp thông tin sản phẩm chuẩn, mảng thuộc tính động `attributes` (`{ key, value }`), `options` và mảng biến thể `skus` nhúng (triệt tiêu phép `$lookup`).
 * **Đảm bảo tính toàn vẹn thuộc tính (Integrity Rule):** So khớp `attributes.key` gửi lên với `Category.attributeKeys`. Báo lỗi `HTTP 400 Bad Request` với mã `INVALID_ATTRIBUTE_KEY` nếu xuất hiện thông số sai lệch.
-* **Dynamic Filter Engine:** Tự động trích xuất các tham số query động (VD: `?ram=16GB&cpu=Intel i7`) và thực thi lọc tối ưu bằng toán tử `$all` kết hợp `$elemMatch` trên **Multikey Compound Index** `{ "attributes.key": 1, "attributes.value": 1 }`, cam kết $T_{avg} < 200ms$ cùng `.lean()`.
+* **Dynamic Filter Engine & Brand Facets Aggregation:**
+  - Tự động trích xuất các tham số query động (VD: `?ram=16GB&cpu=Intel i7`) và thực thi lọc tối ưu bằng toán tử `$all` kết hợp `$elemMatch` trên **Multikey Compound Index** `{ "attributes.key": 1, "attributes.value": 1 }`, cam kết $T_{avg} < 200ms$ cùng `.lean()`.
+  - Tích hợp **MongoDB Aggregation Pipeline** chạy song song trong `ProductService.getAllProducts` để tính toán chính xác danh sách thương hiệu thực tế đang có sản phẩm `isActive: true` (`availableBrands`) kèm số đếm sản phẩm (`{ brand, count }`), loại bỏ hoàn toàn dead-end filters phía Storefront.
+  - Hỗ trợ đầy đủ bộ Enum sắp xếp chuẩn: `['price_asc', 'price_desc', 'newest', 'oldest', 'popular']`, trong đó `'popular'` sắp xếp theo độ phổ biến/lượt bán (fallback `{ createdAt: -1 }`), triệt tiêu hoàn toàn lỗi HTTP 400 `VALIDATION_ERROR` trên trang danh mục.
 * **Đầy đủ CRUD & RBAC:**
-  - `GET /products`: Tìm kiếm từ khóa, lọc theo danh mục, thương hiệu, khoảng giá SKU (`skus.salePrice`) và bộ lọc thuộc tính động.
+  - `GET /products`: Tìm kiếm từ khóa, lọc theo danh mục, thương hiệu, khoảng giá SKU (`skus.salePrice`), bộ lọc thuộc tính động và trả về `availableBrands`.
   - `GET /products/:slug`: Xem chi tiết sản phẩm và populate danh mục kèm `attributeKeys`.
   - `POST /products`: Tạo mới sản phẩm (Quyền `SUPER_ADMIN`, validate `salePrice <= price`).
   - `PUT /products/:id`: Cập nhật sản phẩm & thông số kỹ thuật (Quyền `SUPER_ADMIN`).

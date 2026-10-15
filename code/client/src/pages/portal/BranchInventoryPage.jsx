@@ -61,22 +61,25 @@ export const BranchInventoryPage = () => {
   useEffect(() => {
     if (!selectedBranchId) return;
     let active = true;
-    setLoading(true);
-    inventoryService
-      .getBranchInventory(selectedBranchId, {
-        search,
-        category,
-        status,
-      })
-      .then((data) => {
+
+    const loadInventory = async () => {
+      try {
+        const data = await inventoryService.getBranchInventory(selectedBranchId, {
+          search,
+          category,
+          status,
+        });
         if (active) {
           setItems(data);
-          setLoading(false);
         }
-      })
-      .catch(() => {
+      } catch {
+        // ignore
+      } finally {
         if (active) setLoading(false);
-      });
+      }
+    };
+
+    loadInventory();
 
     return () => {
       active = false;

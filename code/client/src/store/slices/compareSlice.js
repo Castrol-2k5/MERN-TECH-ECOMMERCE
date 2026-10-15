@@ -11,11 +11,12 @@ export const compareSlice = createSlice({
   reducers: {
     addToCompare: (state, action) => {
       const product = action.payload;
+      if (!product) return;
       if (state.products.length >= 4) return;
-      const exists = state.products.some((p) => p._id === product._id || p.id === product.id);
-      if (!exists) {
-        state.products.push(product);
-      }
+      const exists = state.products.some((p) => (p._id || p.id) === (product._id || product.id));
+      if (exists) return;
+
+      state.products.push(product);
     },
     removeFromCompare: (state, action) => {
       const id = action.payload;

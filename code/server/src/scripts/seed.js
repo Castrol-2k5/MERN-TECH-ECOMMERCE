@@ -529,6 +529,97 @@ async function seed() {
     orderStatus: ORDER_STATUS.PROCESSING
   });
 
+  // Seed thêm các đơn hàng đa dạng ngày và kênh cho Analytics BI & Dispatch Testing
+  const sampleOrders = [
+    {
+      orderCode: 'ORD-20261002-0003',
+      orderType: ORDER_TYPES.B2C_ONLINE,
+      branchId: branchQ1._id,
+      customerId: customerUser._id,
+      customerInfo: {
+        fullName: 'Nguyễn Hoàng Nam',
+        phone: '0901234567',
+        address: '124 Nguyễn Huệ, P. Bến Nghé, Quận 1, TP.HCM'
+      },
+      items: [
+        {
+          productId: productIphone._id,
+          productSkuId: ip15Sku256Id,
+          productName: productIphone.name,
+          sku: 'IP15PM-256-NAT',
+          quantity: 1,
+          unitPrice: 29490000,
+          subtotal: 29490000,
+          serialsAssigned: []
+        }
+      ],
+      totalAmount: 29490000,
+      paymentMethod: PAYMENT_METHODS.VNPAY,
+      paymentStatus: PAYMENT_STATUS.PAID,
+      orderStatus: ORDER_STATUS.PENDING,
+      createdAt: new Date(Date.now() - 86400000 * 2)
+    },
+    {
+      orderCode: 'ORD-20261003-0004',
+      orderType: ORDER_TYPES.POS_STORE,
+      branchId: branchTDuc._id,
+      staffId: staffQ1User._id,
+      customerId: null,
+      customerInfo: {
+        fullName: 'Trần Thị Mai',
+        phone: '0988776655',
+        address: 'TP. Thủ Đức, TP.HCM'
+      },
+      items: [
+        {
+          productId: productRog._id,
+          productSkuId: rogSku32Id,
+          productName: productRog.name,
+          sku: 'ROG-G16-32GB-GRY',
+          quantity: 1,
+          unitPrice: 42990000,
+          subtotal: 42990000,
+          serialsAssigned: []
+        }
+      ],
+      totalAmount: 42990000,
+      paymentMethod: PAYMENT_METHODS.CASH,
+      paymentStatus: PAYMENT_STATUS.PAID,
+      orderStatus: ORDER_STATUS.COMPLETED,
+      createdAt: new Date(Date.now() - 86400000)
+    },
+    {
+      orderCode: 'ORD-20261004-0005',
+      orderType: ORDER_TYPES.B2C_ONLINE,
+      branchId: branchTDuc._id,
+      customerId: customerUser._id,
+      customerInfo: {
+        fullName: 'Phạm Thu Hà',
+        phone: '0903552211',
+        address: '128 CMT8, Quận 3, TP.HCM'
+      },
+      items: [
+        {
+          productId: productLogitech._id,
+          productSkuId: logiSkuHeroId,
+          productName: productLogitech.name,
+          sku: 'LOGI-G502-HERO',
+          quantity: 2,
+          unitPrice: 990000,
+          subtotal: 1980000,
+          serialsAssigned: []
+        }
+      ],
+      totalAmount: 1980000,
+      paymentMethod: PAYMENT_METHODS.STRIPE,
+      paymentStatus: PAYMENT_STATUS.PAID,
+      orderStatus: ORDER_STATUS.COMPLETED,
+      createdAt: new Date()
+    }
+  ];
+
+  await Order.insertMany(sampleOrders);
+
   // Phiếu bảo hành RMA mẫu (sử dụng WARRANTY_STATUS.PROCESSING phù hợp với schema)
   await WarrantyTicket.create({
     ticketCode: 'RMA-20261001-001',

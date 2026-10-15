@@ -370,6 +370,27 @@ export const inventoryService = {
       };
     }
   },
+
+  getSerials: async (params = {}) => {
+    if (isMockEnabled()) {
+      return [];
+    }
+    try {
+      const query = new URLSearchParams();
+      if (params.productSkuId) query.append('productSkuId', params.productSkuId);
+      if (params.branchId) query.append('branchId', params.branchId);
+      if (params.status) query.append('status', params.status);
+      if (params.search) query.append('search', params.search);
+
+      const res = await apiClient.get(`/serials?${query.toString()}`);
+      return res?.data?.serials || res?.serials || [];
+    } catch (err) {
+      if (isDevOrTest()) {
+        console.error('[inventoryService.getSerials] Lỗi tải serials:', err);
+      }
+      return [];
+    }
+  },
 };
 
 export default inventoryService;

@@ -100,6 +100,30 @@ export const categoryService = {
       return null;
     }
   },
+
+  createCategory: async (payload) => {
+    if (isMockEnabled()) {
+      return { _id: 'cat-' + Date.now(), ...payload };
+    }
+    const response = await axiosClient.post('/categories', payload);
+    return normalizeCategory(response?.data?.category || response?.data);
+  },
+
+  updateCategory: async (id, payload) => {
+    if (isMockEnabled()) {
+      return { _id: id, ...payload };
+    }
+    const response = await axiosClient.put(`/categories/${id}`, payload);
+    return normalizeCategory(response?.data?.category || response?.data);
+  },
+
+  deleteCategory: async (id) => {
+    if (isMockEnabled()) {
+      return { success: true };
+    }
+    const response = await axiosClient.delete(`/categories/${id}`);
+    return response?.data || { success: true };
+  },
 };
 
 export default categoryService;

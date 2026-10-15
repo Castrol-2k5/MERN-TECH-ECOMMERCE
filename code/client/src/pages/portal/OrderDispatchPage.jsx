@@ -84,6 +84,7 @@ export const OrderDispatchPage = () => {
       const liveList = await orderService.getBranchOrders();
       if (liveList && liveList.length > 0) {
         const mapped = liveList.map((o) => ({
+          _id: o._id,
           orderCode: o.orderCode || o._id,
           customerName: o.shippingAddress?.fullName || o.customerInfo?.fullName || 'Khách Hàng',
           phone: o.shippingAddress?.phone || o.customerInfo?.phone || '',
@@ -109,39 +110,72 @@ export const OrderDispatchPage = () => {
   }, []);
 
   useEffect(() => {
-    fetchLiveOrders();
+    let isMounted = true;
+    const init = async () => {
+      if (isMounted) {
+        await fetchLiveOrders();
+      }
+    };
+    init();
+    return () => {
+      isMounted = false;
+    };
   }, [fetchLiveOrders]);
 
-  const handleConfirmAllocation = (orderCode, branch) => {
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.orderCode === orderCode
-          ? { ...o, status: 'PROCESSING', assignedBranchName: branch.name }
-          : o
-      )
-    );
-    setAllocationOrder(null);
-    setToastMsg({
-      type: 'success',
-      message: `Đã điều phối đơn hàng ${orderCode} sang ${branch.name} thành công!`
-    });
-    setTimeout(() => setToastMsg(null), 3500);
+  const handleConfirmAllocation = async (orderCode, branch) => {
+    try {
+      const target = orders.find((o) => o.orderCode === orderCode);
+      if (target?._id && !isMockEnabled()) {
+        await orderService.allocateOrder(target._id, branch._id || branch.id);
+      }
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.orderCode === orderCode
+            ? { ...o, status: 'PROCESSING', assignedBranchName: branch.name }
+            : o
+        )
+      );
+      setAllocationOrder(null);
+      setToastMsg({
+        type: 'success',
+        message: `Đã điều phối đơn hàng ${orderCode} sang ${branch.name} thành công!`
+      });
+    } catch (err) {
+      setToastMsg({
+        type: 'error',
+        message: 'Lỗi điều phối: ' + (err.response?.data?.message || err.message)
+      });
+    } finally {
+      setTimeout(() => setToastMsg(null), 3500);
+    }
   };
 
-  const handleCompletePacking = (orderCode, serials) => {
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.orderCode === orderCode
-          ? { ...o, status: 'READY_FOR_SHIPPING', serials }
-          : o
-      )
-    );
-    setSerialAssignOrder(null);
-    setToastMsg({
-      type: 'success',
-      message: `Đã gán ${serials.length} Serial và hoàn tất đóng gói đơn ${orderCode}! Sẵn sàng giao shipper.`
-    });
-    setTimeout(() => setToastMsg(null), 3500);
+  const handleCompletePacking = async (orderCode, serials) => {
+    try {
+      const target = orders.find((o) => o.orderCode === orderCode);
+      if (target?._id && !isMockEnabled()) {
+        await orderService.dispatchOrder(target._id, serials);
+      }
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.orderCode === orderCode
+            ? { ...o, status: 'READY_FOR_SHIPPING', serials }
+            : o
+        )
+      );
+      setSerialAssignOrder(null);
+      setToastMsg({
+        type: 'success',
+        message: `Đã gán ${serials.length} Serial và hoàn tất đóng gói đơn ${orderCode}! Sẵn sàng giao shipper.`
+      });
+    } catch (err) {
+      setToastMsg({
+        type: 'error',
+        message: 'Lỗi đóng gói: ' + (err.response?.data?.message || err.message)
+      });
+    } finally {
+      setTimeout(() => setToastMsg(null), 3500);
+    }
   };
 
   return (

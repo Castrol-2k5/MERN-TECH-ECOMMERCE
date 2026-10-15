@@ -17,7 +17,7 @@
 
 ---
 
-## 🗓️ BẢNG NHẬT KÝ CHI TIẾT THEO QUY TRÌNH PHẦN MỀM (SDLC) - TUẦN 1
+## 🗓️ BẢNG NHẬT KÝ CHI TIẾT THEO QUY TRÌNH PHẦN MỀM (SDLC) - TUẦN 1 + 2
 
 ### 1. Giai đoạn: Phân tích Nghiệp vụ & Đặc tả Yêu cầu (Business Analysis & SRS)
 
@@ -56,6 +56,25 @@
 | 24/09/2026 | Nguyễn Quốc Bảo, Trần Nguyễn Castrol | Gemini | Đặc tả Khung UI/UX & Master Prompt Figma | *"Lập khung Frontend các trang cần thiết và soạn Master Prompts để sinh UI qua Figma Plugin..."* | Danh mục 15 trang Web B2C & POS/Portal, Master Prompt cho trang PDP và quầy POS | Tổng hợp thành file `.claude/design-UIUX.md`, chỉnh sửa tone màu chuẩn royal blue `#2563EB` và dark slate `#0F172A`[cite: 1]. | `66b32bb4fc9a848fc838542d3f06088a6115bf31` |
 
 ---
+## 🗓️ BẢNG NHẬT KÝ CHI TIẾT THEO QUY TRÌNH PHẦN MỀM (SDLC) - TUẦN 3
+### 3. Giai đoạn: Lập trình Backend & Kiểm thử Tích hợp (APIs & Concurrency)
+
+| Ngày | Người thực hiện | Công cụ AI | Phạm vi áp dụng | Prompt chính (Tóm tắt) | Mã / Nội dung AI sinh ra | Phần thành viên đã chỉnh sửa / Tối ưu thực tế | Git Commit Hash liên quan |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| 28/09/2026 | Nguyễn Quốc Bảo | Gemini / Antigravity | Thiết lập CI Pipeline GitHub Actions | *"Viết cấu hình `.github/workflows/ci.yml` cho dự án Monorepo Node.js Jest..."* | File workflow YAML gồm checkout, setup-node, npm test | Tối ưu `working-directory: code/server`, thêm cờ `--runInBand` để tránh tràn RAM runner và cấu hình upload artifact coverage. | `8f84c3d78329ba10b4ac26d3a629efdfe512af88` |
+| 29/09/2026 | Nguyễn Quốc Bảo  | Gemini / Antigravity | Core APIs Branch & Category | *"Hiện thực hóa Branch (GeoJSON) và Category (attributeKeys) kèm Jest test..."* | Models, DTOs Zod, Controller và Service CRUD | Bổ sung Index `2dsphere` cho `location` và viết middleware kiểm tra quyền `SUPER_ADMIN`. | `9149106a49530e267dfe83c0efe773c1d2a734e0` |
+| 30/09/2026 | Nguyễn Quốc Bảo | Gemini / Antigravity | Product Hybrid Schema & Dynamic Filter | *"Xây dựng Dynamic Filter Engine truy vấn attributes động bằng Mongoose..."* | Filter query bóc tách params động với `$all` và `$elemMatch` | Ép sử dụng `.lean()` cho toàn bộ Read APIs nhằm giảm overhead Mongoose và đáp ứng KPI 1: `$T_{avg} < 200\text{ms}`; bổ sung validation `salePrice <= price`. | `2921546adf7f2f9c9f673a5ea02e3d0dc42094f4` |
+| 01/10/2026 | Nguyễn Quốc Bảo | Gemini / Antigravity | Inventory & Serial Lifecycle | *"Hiện thực hóa luồng tồn kho đa chi nhánh và máy trạng thái Serial/IMEI..."* | API `/inventory/adjust` và `/serials/scan`, `/verify` | Bắt buộc Compound Unique Index `{ branchId, productSkuId }` và kiểm tra trạng thái `IN_STOCK` tại đúng chi nhánh trước khi thực hiện thao tác. | `47dd70d452a2640d37cf92943e12387a85953c23` |
+| 02/10/2026 | Nguyễn Quốc Bảo | Gemini / Antigravity | Order Checkout & Concurrency Testing | *"Viết luồng POS Checkout và test case Jest mô phỏng 2 request mua đồng thời..."* | Hàm checkout đơn hàng POS/B2C và test suite `order-flow.test.js` | Áp dụng Atomic `$inc` với điều kiện `{ quantity: { $gte: qty } }` để ngăn overselling và xử lý Race Condition khi có nhiều request mua đồng thời. | `7b95e4afa9a3c8f263c9a6dac904160e6de2ba48` |
+
+### 4. Giai đoạn: Lập trình Frontend Feature-based (React + Vite + Figma MCP)
+
+| Ngày | Người thực hiện | Công cụ AI | Phạm vi áp dụng | Prompt chính (Tóm tắt) | Mã / Nội dung AI sinh ra | Phần thành viên đã chỉnh sửa / Tối ưu thực tế | Git Commit Hash liên quan |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| 03/10/2026 | Nguyễn Quốc Bảo | Gemini / Antigravity | Cấu trúc Frontend Feature-based & Storefront | *"Dựng khung client theo Feature-based từ Figma Frames P-01 đến P-07..."* | Components trong `features/products`, `warranty`, Redux store | Thiết lập Axios Silent Refresh Queue sử dụng HttpOnly Cookie và lưu Access Token trong React RAM nhằm hạn chế rủi ro lưu token lâu dài phía client. | `65e238764ebe057e4ec6e2d8553fd5d00047c370`,`831f88e0aec21cd23cd190a45df1ac2c70475e73` |
+| 04/10/2026 | Nguyễn Quốc Bảo | Gemini / Antigravity | Phân hệ Web POS & Quản trị Portal | *"Hiện thực hóa màn hình P-08 Web POS và P-12 Admin Products qua Figma MCP..."* | Giao diện Split-screen POS 60/40, Modal in hóa đơn K80 | Tích hợp hook `useBarcodeScanner` để bắt sự kiện bàn phím từ máy quét mã vạch và áp dụng debounce `< 50ms` nhằm đảm bảo tốc độ xử lý thao tác quét. | `d65c60930fc3531bf566af82fd468925fa90adbb` |
+
+
 
 ## 🚨 NHẬT KÝ PHÁT HIỆN & SỬA LỖI / ẢO GIÁC CỦA AI (HALLUCINATION LOG) ĐÂY MỚI CHỈ LÀ VÍ DỤ MẪU ĐỂ TRÌNH BÀY
 
@@ -106,3 +125,11 @@ _(Đáp ứng điều kiện Mức 5 - TC2.3: Phát hiện và phân tích nguy�
   - *Nguyên nhân:* Dữ liệu huấn luyện của AI bị lẫn lộn giữa Create React App cũ và Vite runtime mới.
   - *Cách khắc phục:* Nhóm phát hiện Vite không thể inject các biến này vào `import.meta.env`, đã sửa lại toàn bộ thành tiền tố `VITE_API_BASE_URL` và `VITE_SOCKET_URL`[cite: 1].
   - *Commit sửa lỗi:* `commit 4a5b6c7d8e`
+
+### BỔ SUNG NHẬT KÝ ẢO GIÁC & SỬA LỖI CỦA AI TRONG TUẦN 3 (HALLUCINATION LOG)
+
+- **Lỗi 9 (Quản lý State & Mock Data): AI lạm dụng dữ liệu Mock Fallback che giấu lỗi kết nối API thật**
+  - *Mô tả ảo giác:* Khi viết custom hook gọi API sản phẩm, AI bọc khối `catch` bằng việc gán một mảng sản phẩm mock tĩnh (fake data) thay vì trả về lỗi cho UI xử lý.
+  - *Nguyên nhân:* AI có xu hướng ưu tiên giao diện luôn có dữ liệu hiển thị, vô tình làm sai lệch hành vi kiểm thử và che giấu lỗi kết nối API thực tế.
+  - *Cách khắc phục:* Nhóm loại bỏ toàn bộ dữ liệu mock ngầm, chuẩn hóa trạng thái hiển thị lỗi rõ ràng bằng Error Boundary / Alert Banner để phục vụ kiểm thử dữ liệu thực tế kết nối với MongoDB.
+  - *Commit sửa lỗi:* `439015e4f4c7d4a18ce782843eaecdad0f8dbdeb`

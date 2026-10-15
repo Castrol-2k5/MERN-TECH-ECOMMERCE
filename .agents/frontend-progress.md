@@ -2,7 +2,7 @@
 
 * **Dự án:** Omnichannel Tech E-Commerce (TechOne)
 * **Kiến trúc:** Feature-based Architecture (React 18+, Vite, Tailwind CSS v4, Redux Toolkit, Lucide Icons)
-* **Cập nhật gần nhất:** 30/09/2026
+* **Cập nhật gần nhất:** 07/10/2026 (Hoàn tất Gói 4: Khắc phục lỗi Sort Enum, Tái cấu trúc UX So sánh P-04 Scoped Flow và Bộ lọc Thương hiệu Động)
 
 ---
 
@@ -29,24 +29,30 @@
   - Route: `/` ➔ `HomePage.jsx`.
 
 - [x] **P-02: Danh mục & Bộ lọc Động (PLP - Node `#21:26828`)**
-  - `DynamicFilterSidebar.jsx`: Trích xuất bộ lọc động (Hãng, Khoảng giá, CPU, RAM, VGA, Màn hình, Tình trạng kho).
-  - `SortBar.jsx`: Sắp xếp giá tăng/giảm, bán chạy, mới nhất kèm toggle Grid / List view.
+  - `DynamicFilterSidebar.jsx`: Bộ lọc Brand động truy vấn trực tiếp từ MongoDB Aggregation (`availableBrands: [{ brand, count }]`), render checkbox kèm số lượng `{item.brand} ({item.count})`, loại bỏ hoàn toàn hardcoded dead-end filters.
+  - Sửa triệt để rò rỉ mock data trong chế độ Live Database: backend tự động truy vấn đệ quy cây danh mục cha-con (`$in`), hiển thị đầy đủ hãng sản xuất và sản phẩm.
+  - `SortBar.jsx`: Đồng bộ 100% enum sắp xếp (`popular`, `newest`, `oldest`, `price_asc`, `price_desc`), xử lý triệt để lỗi HTTP 400 `VALIDATION_ERROR` khi truy cập trang danh mục.
   - `ProductCard.jsx`: Card sản phẩm chuẩn Figma, badge sale (-13%), tóm tắt cấu hình, giá gốc & giá sale, trạng thái kho, nút thêm giỏ nhanh và so sánh.
-  - `Pagination.jsx`: Phân trang chuẩn.
+  - `Pagination.jsx`: Phân trang chuẩn, fix triệt để lỗi React warning `Encountered two children with the same key, '1'` khi `totalPages === 1`.
   - Route: `/category/:slug` ➔ `CategoryPage.jsx`.
 
 - [x] **P-03: Chi tiết Sản phẩm & Tồn kho Chi nhánh (PDP - Node `#21:27168`)**
   - `ProductImageGallery.jsx`: Thumbnail slider bên trái + Main zoom image bên phải kèm badge ưu đãi.
   - `SkuVariantSelector.jsx`: Chọn biến thể RAM, màu sắc trực quan với color dots.
   - `MultiBranchStockBox.jsx`: Hiển thị danh sách tồn kho thời gian thực tại các chi nhánh (Q.1, Thủ Đức, Q.5).
-  - CTA Buttons: `[MUA NGAY - Giao tận nơi]` và `[ĐẶT GIỮ HÀNG - Click & Collect]`.
+  - CTA Buttons: `[MUA NGAY - Giao tận nơi]`, `[ĐẶT GIỮ HÀNG - Click & Collect]` và `[So sánh thông số máy này với sản phẩm khác]`.
   - `SpecsTable.jsx`: Ma trận thông số kỹ thuật động (`product.attributes`).
   - Route: `/product/:slug` ➔ `ProductDetailPage.jsx`.
 
-- [x] **P-04: So sánh Cấu hình (Compare Specs - Node `#21:27440`)**
-  - `CompareMatrixTable.jsx`: Bảng so sánh 2-4 sản phẩm theo cột ngang.
-  - Switch `Highlight Differences`: Tự động tô màu các ô thông số có sự khác biệt giữa các dòng máy.
-  - Route: `/compare` ➔ `ComparePage.jsx`.
+- [x] **P-04: So sánh Cấu hình Chuẩn UX (Compare Specs - Node `#21:27440`)**
+  - `CompareSpecsPage.jsx` & `ComparePage.jsx`: Tái cấu trúc theo mô hình **Scoped Dynamic Comparison Flow**:
+    1. *Khởi tạo Empty State:* Khi vào trang mà chưa chọn máy, không sinh hàng thông số rác; hiển thị Empty State trực quan kèm nút `[+ Chọn sản phẩm cần so sánh]`. Khi chưa có sản phẩm neo, cho phép tìm kiếm đồng loạt toàn bộ kho sản phẩm thật từ Database.
+    2. *Neo Sản phẩm 1 (Anchor Product):* Tự động truy vết lên **Danh mục cha cao nhất (Root Parent Category)** (ví dụ: iPhone -> "Điện thoại & Tablet", ASUS ROG -> "Laptop"). Trích xuất toàn bộ cấu hình động của máy 1 và `attributeKeys` danh mục để dựng tập hàng so sánh.
+    3. *Khóa phạm vi & Bộ lọc Modal (Slots 2, 3, 4):* Modal tìm kiếm tự động giới hạn trong danh mục cha cao nhất của máy neo, bổ sung thanh lọc nhanh theo **Danh mục con (Subcategory Pills)** (ví dụ: "iPhone", "Samsung" hoặc "Laptop Gaming", "Ultrabook") và **Hãng sản xuất (Brand Pills)**, hỗ trợ tìm kiếm từ khóa cục bộ. Tiêu đề ghi rõ `Chọn [Danh mục cha] khác để so sánh với [Máy 1]`.
+    4. *Ngắt hoàn toàn Mock Fallback ở Live Database:* Đảm bảo chỉ hiển thị sản phẩm thật từ MongoDB, không lẫn `fallbackProducts`.
+    5. *Làm mới / Đổi danh mục:* Nút `[Xóa so sánh / Chọn danh mục khác]` ở góc trên reset toàn bộ bảng về trạng thái Empty State ban đầu.
+  - `CompareMatrixTable.jsx`: Tự động sinh hàng thông số kỹ thuật động từ Anchor Product; Switch `Highlight Differences` tô màu điểm khác biệt.
+  - Route: `/compare` ➔ `CompareSpecsPage.jsx`.
 
 - [x] **P-07: Tra cứu Bảo hành Điện tử (e-Warranty - Node `#21:28062`)**
   - `WarrantySearchBar.jsx`: Khung hero màu tối, ô tìm kiếm Serial/IMEI hoặc SĐT.

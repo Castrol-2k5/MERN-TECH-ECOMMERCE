@@ -11,6 +11,8 @@ import BranchSalesBreakdown from '../../features/analytics/components/BranchSale
 import ChannelBreakdownPie from '../../features/analytics/components/ChannelBreakdownPie';
 import TopProductsTable from '../../features/analytics/components/TopProductsTable';
 import { branchService } from '../../features/branches/services/branchService.js';
+import { analyticsService, fallbackAnalyticsOverview } from '../../features/analytics/services/analyticsService.js';
+import { isMockEnabled } from '../../config/dataMode.js';
 
 const BRANCH_PERFORMANCE = [
   { rank: '01', branch: 'TechOne Q1 • Nguyễn Thị Minh Khai', revenue: '4,28 tỷ', orders: '1.042', aov: '4,11 triệu', returnRate: '1,8%', growth: '+22,4%' },
@@ -23,6 +25,20 @@ export const AdminAnalyticsPage = () => {
   const [selectedBranch, setSelectedBranch] = useState('ALL');
   const [dateRange, setDateRange] = useState('01/09/2026 — 30/09/2026');
   const [branches, setBranches] = useState([]);
+  const [analyticsData, setAnalyticsData] = useState(fallbackAnalyticsOverview);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const fetchOverview = async (branchId) => {
+    setIsLoading(true);
+    try {
+      const data = await analyticsService.getOverview({ branchId });
+      setAnalyticsData(data);
+    } catch {
+      setAnalyticsData(fallbackAnalyticsOverview);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     let ignore = false;
@@ -31,6 +47,9 @@ export const AdminAnalyticsPage = () => {
         setBranches(list);
       }
     }).catch(() => {});
+
+    fetchOverview(selectedBranch);
+
     return () => {
       ignore = true;
     };
@@ -100,33 +119,33 @@ export const AdminAnalyticsPage = () => {
 
         <button
           type="button"
-          onClick={() => alert('Đã áp dụng bộ lọc dữ liệu kỳ báo cáo!')}
-          className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+          onClick={() => fetchOverview(selectedBranch)}
+          className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
         >
-          Áp dụng
+          {isLoading ? 'Đang tải...' : 'Áp dụng'}
         </button>
       </div>
 
       {/* 4 KPI Metrics Cards */}
-      <KpiMetricsGrid />
+      <KpiMetricsGrid data={analyticsData.kpis} />
 
       {/* Charts Row: Revenue Over Time (60%) + Branch Breakdown (40%) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         <div className="lg:col-span-8">
-          <RevenueChart />
+          <RevenueChart data={analyticsData.revenueOverTime} />
         </div>
         <div className="lg:col-span-4">
-          <BranchSalesBreakdown />
+          <BranchSalesBreakdown data={analyticsData.branchSales} />
         </div>
       </div>
 
       {/* Second Row: Channel Donut Pie (40%) + Top Products (60%) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         <div className="lg:col-span-5">
-          <ChannelBreakdownPie />
+          <ChannelBreakdownPie data={analyticsData.channelData} />
         </div>
         <div className="lg:col-span-7">
-          <TopProductsTable />
+          <TopProductsTable data={analyticsData.topProducts} />
         </div>
       </div>
 
@@ -151,7 +170,7 @@ export const AdminAnalyticsPage = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 font-medium">
-              {BRANCH_PERFORMANCE.map((row) => (
+              {(analyticsData.branchPerformance?.length > 0 ? analyticsData.branchPerformance : BRANCH_PERFORMANCE).map((row) => (
                 <tr key={row.rank} className="hover:bg-slate-850/60 transition-colors">
                   <td className="py-3 px-4 text-center font-mono font-bold text-cyan-400">
                     {row.rank}

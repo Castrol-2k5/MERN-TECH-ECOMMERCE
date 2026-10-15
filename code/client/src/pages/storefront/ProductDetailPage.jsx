@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { Truck, RotateCcw, ShieldCheck, Gift, Star, CheckCircle2 } from 'lucide-react';
+import { Truck, RotateCcw, ShieldCheck, Gift, Star, CheckCircle2, Scale } from 'lucide-react';
 import useProductDetail from '../../features/products/hooks/useProductDetail.js';
 import ProductImageGallery from '../../features/products/components/ProductImageGallery.jsx';
 import SkuVariantSelector from '../../features/products/components/SkuVariantSelector.jsx';
@@ -11,6 +11,7 @@ import ProductCard from '../../features/products/components/ProductCard.jsx';
 import productService, { fallbackProducts } from '../../features/products/services/productService.js';
 import { createCartItem } from '../../features/products/services/productAdapter.js';
 import { addToCart } from '../../store/slices/cartSlice.js';
+import { addToCompare } from '../../store/slices/compareSlice.js';
 import Spinner from '../../components/common/Spinner.jsx';
 
 export const ProductDetailPage = () => {
@@ -86,6 +87,12 @@ export const ProductDetailPage = () => {
     dispatch(addToCart(item));
     setShowOrderToast(true);
     setTimeout(() => setShowOrderToast(false), 4000);
+  };
+
+  const handleCompare = () => {
+    if (!product) return;
+    dispatch(addToCompare(product));
+    navigate('/compare');
   };
 
   useEffect(() => {
@@ -245,6 +252,14 @@ export const ProductDetailPage = () => {
               <span className="text-[11px] font-normal text-slate-500">Nhận tại showroom 30 phút</span>
             </button>
           </div>
+
+          <button
+            onClick={handleCompare}
+            className="w-full mt-3 py-2.5 px-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 text-slate-700 hover:text-blue-600 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+          >
+            <Scale className="w-4 h-4" />
+            <span>So sánh thông số máy này với sản phẩm khác</span>
+          </button>
         </div>
       </div>
 

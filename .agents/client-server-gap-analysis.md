@@ -29,16 +29,16 @@
 
 > Server dùng `zod .strict()` → **mọi field thừa đều bị 400 `VALIDATION_ERROR`**.
 
-| # | Luồng | Client gửi | Server yêu cầu | Hậu quả | Vị trí |
-| :-: | :--- | :--- | :--- | :--- | :--- |
-| A1 | **POS checkout** | `branchId, items, paymentMethod, customerInfo` **+** `subtotal, discount, tax, totalAmount, finalAmount, customerPaid, change` | Chỉ `branchId?, items, paymentMethod?, customerInfo?` (strict) | Thanh toán POS **luôn 400** | `PosPage.jsx` L154-171 ↔ `order.dto.js` L45-72 |
-| A1b | POS checkout | `customerInfo.phone` có thể là `''` (sau `clearCart`) hoặc `0901234567` giả; `fullName` mặc định "Khách vãng lai" | `phone` bắt buộc đúng regex VN nếu có `customerInfo` | Khách vãng lai không nhập SĐT → 400 | `posCartSlice.js` L126-133, `PosCheckoutPanel.jsx` L45-52 |
-| A2 | **B2C checkout** | `items[].unitPrice` **+** `customerInfo` ở cấp ngoài **+** `shippingAddress` | `items[]` chỉ `productId, productSkuId, quantity`; không có `customerInfo` (strict) | Đặt hàng online **luôn 400** | `CartPage.jsx` L90-109 ↔ `order.dto.js` L74-114 |
-| A2b | B2C checkout | `paymentMethod` có lựa chọn **`CASH`** (COD) | Chỉ `VNPAY` hoặc `STRIPE` | Chọn "Tiền mặt khi nhận" → 400 | `CartPage.jsx` L427-443 ↔ `order.dto.js` L110 |
-| A3 | **Cập nhật sản phẩm** (Admin) | `formData`: `category, price, originalPrice, specsSummary, attributes[{name,key,type,values,isFilter}], skus[{code,options,stock,originalPrice…}]` | `updateProductSchema` strict: `categoryId`, `attributes[{key,value}]`, `skus[{sku,price,salePrice,optionValues…}]` | Lưu sản phẩm **luôn 400** | `AdminProductsPage.jsx` L28-45,128-158 ↔ `product.dto.js` |
-| A4 | **Điều chuyển kho** – chọn Serial | `GET /serials?branchId&status&productSkuId` | **Không tồn tại** (chỉ có `/serials/import`, `/scan/:sn`, `/verify/:sn`) | `availableSerials` luôn rỗng → với sản phẩm quản lý Serial, không chọn được serial → server từ chối `SERIAL_COUNT_MISMATCH` | `StockTransferPage.jsx` L126-134 |
-| A5 | **Tiếp nhận bảo hành** | `POST /warranty` | **Không có route** (chỉ có model `warrantytickets`) | Lỗi bị nuốt, client **tự sinh mã phiếu giả** | `warrantyService.js` L150-176 |
-| A6 | **Điều phối đơn B2C** | Trạng thái `READY_FOR_SHIPPING` + gán serial/đổi chi nhánh | `ORDER_STATUS`: `PENDING, PROCESSING, COMPLETED, CANCELLED`; không có API cập nhật đơn | Không lưu được; trạng thái chỉ tồn tại trong state | `OrderDispatchPage.jsx` L115-145 ↔ `order.model.js` L23-28 |
+| # | Luồng | Client gửi | Server yêu cầu | Hậu quả | Trạng thái khắc phục | Vị trí |
+| :-: | :--- | :--- | :--- | :--- | :---: | :--- |
+| A1 | **POS checkout** | Payload chuẩn hóa | `branchId?, items, paymentMethod?, customerInfo?` | Chuẩn hóa sạch payload | ✅ **Đã khắc phục** | `PosPage.jsx` ↔ `order.dto.js` |
+| A1b | POS checkout | Khách vãng lai | Chấp nhận SĐT rỗng nếu khách vãng lai | Không còn lỗi regex | ✅ **Đã khắc phục** | `order.dto.js` |
+| A2 | **B2C checkout** | Payload chuẩn hóa | `branchId, items, shippingAddress, paymentMethod` | Chuẩn hóa sạch payload | ✅ **Đã khắc phục** | `CartPage.jsx` ↔ `order.dto.js` |
+| A2b | B2C checkout | Phương thức thanh toán | Chấp nhận `CASH`, `VNPAY`, `STRIPE` | COD hoạt động chuẩn | ✅ **Đã khắc phục** | `order.dto.js` |
+| A3 | **Cập nhật sản phẩm** | Payload chuẩn hóa | `updateProductSchema` & `createProductSchema` | Admin tạo/sửa sp chuẩn | ✅ **Đã khắc phục** | `AdminProductsPage.jsx` |
+| A4 | **Query Serials** | `GET /serials?branchId&status&productSkuId` | Đã triển khai endpoint đầy đủ | Lấy serial chuẩn từ DB | ✅ **Đã khắc phục** | `serial.routes.js` |
+| A5 | **Tiếp nhận bảo hành** | `POST /warranty` | Đã triển khai route tiếp nhận RMA | Tạo phiếu RMA chuẩn vào DB | ✅ **Đã khắc phục** | `warranty.routes.js` |
+| A6 | **Điều phối đơn B2C** | Allocate & Dispatch | Đã bổ sung `PATCH /orders/:id/allocate` & `dispatch` | Đổi nhánh & gán serial chuẩn | ✅ **Đã khắc phục** | `order.routes.js` |
 
 ---
 

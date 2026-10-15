@@ -117,6 +117,6 @@ export const queryProductSchema = z
     minPrice: z.coerce.number().min(0, 'Giá tối thiểu không được âm').optional(),
     maxPrice: z.coerce.number().min(0, 'Giá tối đa không được âm').optional(),
     search: z.string().trim().optional(),
-    sortBy: z.enum(['price_asc', 'price_desc', 'newest', 'oldest']).optional().default('newest')
+    sortBy: z.enum(['price_asc', 'price_desc', 'newest', 'oldest', 'popular']).optional().default('newest')
   })
   .passthrough();

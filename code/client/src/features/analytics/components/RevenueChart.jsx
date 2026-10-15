@@ -23,7 +23,8 @@ const CHART_DATA = [
   { day: '12/09', online: 980, pos: 610, total: 1590 }
 ];
 
-export const RevenueChart = () => {
+export const RevenueChart = ({ data }) => {
+  const chartData = data && data.length > 0 ? data : CHART_DATA;
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl text-slate-100">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
@@ -49,7 +50,7 @@ export const RevenueChart = () => {
       {/* Recharts BarChart */}
       <div className="h-64 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={CHART_DATA} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} vertical={false} />
             <XAxis dataKey="day" stroke="#94a3b8" fontSize={11} tickLine={false} />
             <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} />

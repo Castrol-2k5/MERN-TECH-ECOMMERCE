@@ -173,5 +173,24 @@ export const orderService = {
 
     const response = await axiosClient.post('/orders/b2c/checkout', payload);
     return response?.data?.order || response?.data;
+  },
+
+  allocateOrder: async (orderId, branchId) => {
+    if (isMockEnabled()) {
+      return { success: true, orderId, branchId, orderStatus: 'PROCESSING' };
+    }
+    const response = await axiosClient.patch(`/orders/${orderId}/allocate`, { branchId });
+    return response?.data?.order || response?.data;
+  },
+
+  dispatchOrder: async (orderId, serials = []) => {
+    if (isMockEnabled()) {
+      return { success: true, orderId, serials, orderStatus: 'READY_FOR_SHIPPING' };
+    }
+    const response = await axiosClient.patch(`/orders/${orderId}/dispatch`, {
+      serials,
+      orderStatus: 'READY_FOR_SHIPPING'
+    });
+    return response?.data?.order || response?.data;
   }
 };

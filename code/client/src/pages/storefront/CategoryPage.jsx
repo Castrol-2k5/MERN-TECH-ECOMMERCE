@@ -36,7 +36,7 @@ export const CategoryPage = () => {
     return params;
   }, [slug, currentPage, currentSort, selectedFilters]);
 
-  const { products, meta, isLoading, error, refetch } = useProducts(queryParams);
+  const { products, meta, availableBrands, isLoading, error, refetch } = useProducts(queryParams);
 
   const handleFilterChange = (newFilters) => {
     setSelectedFilters(newFilters);
@@ -92,6 +92,7 @@ export const CategoryPage = () => {
       <div className="flex flex-col lg:flex-row gap-8 items-start">
         <DynamicFilterSidebar
           selectedFilters={selectedFilters}
+          availableBrands={availableBrands || meta?.availableBrands || []}
           onFilterChange={handleFilterChange}
           onResetFilters={() => {
             setSelectedFilters({});

@@ -279,7 +279,14 @@ export const productService = {
     if (isMockEnabled()) {
       return {
         products: fallbackProducts,
-        meta: { total: fallbackProducts.length, page: 1, limit: 12 },
+        meta: { total: fallbackProducts.length, page: 1, limit: 12, availableBrands: [] },
+        availableBrands: [
+          { brand: 'Apple', count: 1 },
+          { brand: 'ASUS', count: 1 },
+          { brand: 'Lenovo', count: 1 },
+          { brand: 'Dell', count: 1 },
+          { brand: 'HP', count: 1 },
+        ],
       };
     }
 
@@ -287,10 +294,15 @@ export const productService = {
       const response = await axiosClient.get('/products', { params });
       const rawProducts = response?.data?.products || (Array.isArray(response?.data) ? response.data : []);
       const normalizedProducts = rawProducts.map(normalizeProduct);
+      const availableBrands = response?.meta?.availableBrands || response?.data?.availableBrands || [];
 
       return {
         products: normalizedProducts,
-        meta: response?.meta || { total: normalizedProducts.length, page: 1, limit: 12 },
+        meta: {
+          ...(response?.meta || { total: normalizedProducts.length, page: 1, limit: 12 }),
+          availableBrands,
+        },
+        availableBrands,
       };
     } catch (err) {
       if (isDevOrTest()) {
@@ -299,7 +311,8 @@ export const productService = {
       }
       return {
         products: [],
-        meta: { total: 0, page: 1, limit: 12 },
+        meta: { total: 0, page: 1, limit: 12, availableBrands: [] },
+        availableBrands: [],
         error: err.message,
       };
     }
@@ -324,6 +337,14 @@ export const productService = {
       }
       return null;
     }
+  },
+
+  createProduct: async (payload) => {
+    if (isMockEnabled()) {
+      return { _id: 'prod-' + Date.now(), ...payload };
+    }
+    const response = await axiosClient.post('/products', payload);
+    return response?.data?.product || response?.data || payload;
   },
 
   createProduct: async (payload) => {
@@ -359,11 +380,14 @@ export const productService = {
   },
 
   getCompareProducts: async () => {
+    if (isMockEnabled()) {
+      return fallbackProducts.slice(0, 2);
+    }
     try {
       const res = await productService.getProducts({ limit: 4 });
-      return res.products?.slice(0, 2) || fallbackProducts.slice(0, 2);
+      return res.products?.slice(0, 2) || [];
     } catch {
-      return fallbackProducts.slice(0, 2);
+      return [];
     }
   },
 
