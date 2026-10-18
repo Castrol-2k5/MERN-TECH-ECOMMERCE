@@ -12,5 +12,9 @@ export const env = {
   JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || 'super_secret_refresh_jwt_key_tech_store_2026_very_secure',
   JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || '14d',
   BCRYPT_SALT_ROUNDS: parseInt(process.env.BCRYPT_SALT_ROUNDS, 10) || 10,
-  LOG_LEVEL: process.env.LOG_LEVEL || 'debug'
+  LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
+  VNPAY_TMN_CODE: process.env.VNPAY_TMN_CODE || 'DEMOVNPAY',
+  VNPAY_HASH_SECRET: process.env.VNPAY_HASH_SECRET || 'SECRETKEYVNPAY2026',
+  VNPAY_URL: process.env.VNPAY_URL || 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html',
+  VNPAY_RETURN_URL: process.env.VNPAY_RETURN_URL || 'http://localhost:5000/api/v1/orders/vnpay-return'
 };
