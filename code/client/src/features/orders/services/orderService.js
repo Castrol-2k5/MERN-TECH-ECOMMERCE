@@ -175,6 +175,14 @@ export const orderService = {
     return response?.data?.order || response?.data;
   },
 
+  createVnpayUrl: async (orderId) => {
+    if (isMockEnabled()) {
+      return { paymentUrl: `/checkout/success?orderCode=MOCK-${orderId}&vnp_ResponseCode=00` };
+    }
+    const response = await axiosClient.post(`/orders/${orderId}/vnpay-url`);
+    return response?.data || response;
+  },
+
   allocateOrder: async (orderId, branchId) => {
     if (isMockEnabled()) {
       return { success: true, orderId, branchId, orderStatus: 'PROCESSING' };
