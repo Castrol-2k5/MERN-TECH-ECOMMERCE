@@ -7,6 +7,8 @@ import { Product } from '../products/product.model.js';
 import { Branch } from '../branches/branch.model.js';
 import { AppError } from '../../utils/appError.js';
 import { USER_ROLES } from '../users/user.model.js';
+import { VnpayService } from './vnpay.service.js';
+import { env } from '../../config/environment.js';
 
 export class OrderService {
   /**
@@ -506,5 +508,54 @@ export class OrderService {
     await order.save();
 
     return order;
+  }
+
+  /**
+   * Tạo URL thanh toán VNPay Sandbox cho đơn hàng
+   */
+  static async createVnpayPaymentUrl(orderId, ipAddr) {
+    const order = await Order.findById(orderId);
+    if (!order) {
+      throw new AppError('Không tìm thấy đơn hàng cần thanh toán.', 404, 'ORDER_NOT_FOUND');
+    }
+
+    if (order.paymentStatus === PAYMENT_STATUS.PAID) {
+      throw new AppError('Đơn hàng này đã được thanh toán hoàn tất trước đó.', 400, 'ORDER_ALREADY_PAID');
+    }
+
+    const paymentUrl = VnpayService.createPaymentUrl(order, ipAddr);
+    return paymentUrl;
+  }
+
+  /**
+   * Xử lý callback return từ cổng VNPay sau khi khách thực hiện thanh toán
+   */
+  static async handleVnpayReturn(queryParams) {
+    const verification = VnpayService.verifyReturnUrl(queryParams);
+
+    if (!verification.orderCode) {
+      return `${env.CLIENT_URL}/checkout/success?error=invalid_order`;
+    }
+
+    const order = await Order.findOne({ orderCode: verification.orderCode });
+    if (!order) {
+      return `${env.CLIENT_URL}/checkout/success?orderCode=${verification.orderCode}&error=order_not_found`;
+    }
+
+    if (verification.isSuccess) {
+      order.paymentStatus = PAYMENT_STATUS.PAID;
+      order.paymentMethod = PAYMENT_METHODS.VNPAY;
+      if (order.orderStatus === ORDER_STATUS.PENDING) {
+        order.orderStatus = ORDER_STATUS.PROCESSING;
+      }
+      await order.save();
+
+      return `${env.CLIENT_URL}/checkout/success?orderCode=${order.orderCode}&vnp_ResponseCode=00&vnp_TransactionNo=${verification.transactionNo}&vnp_BankCode=${verification.bankCode}&vnp_Amount=${verification.amount}`;
+    } else {
+      order.paymentStatus = PAYMENT_STATUS.FAILED;
+      await order.save();
+
+      return `${env.CLIENT_URL}/checkout/success?orderCode=${order.orderCode}&vnp_ResponseCode=${verification.responseCode || '99'}&vnp_TransactionNo=${verification.transactionNo}`;
+    }
   }
 }
