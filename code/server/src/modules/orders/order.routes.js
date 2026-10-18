@@ -66,7 +66,19 @@ router.patch(
   OrderController.dispatchOrder
 );
 
-// 7. Xem chi tiết đơn hàng theo orderCode
+// 7. Cổng thanh toán VNPay (Sandbox)
+router.post(
+  '/:id/vnpay-url',
+  optionalProtect,
+  OrderController.createVnpayPaymentUrl
+);
+
+router.get(
+  '/vnpay-return',
+  OrderController.handleVnpayReturn
+);
+
+// 8. Xem chi tiết đơn hàng theo orderCode
 router.get(
   '/:orderCode',
   protect,

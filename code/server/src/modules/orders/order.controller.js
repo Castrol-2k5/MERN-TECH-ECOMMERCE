@@ -99,4 +99,26 @@ export class OrderController {
       data: { order }
     });
   });
+
+  static createVnpayPaymentUrl = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const ipAddr =
+      req.headers['x-forwarded-for'] ||
+      req.connection?.remoteAddress ||
+      req.socket?.remoteAddress ||
+      '127.0.0.1';
+
+    const paymentUrl = await OrderService.createVnpayPaymentUrl(id, ipAddr);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Tạo URL thanh toán VNPay thành công',
+      data: { paymentUrl }
+    });
+  });
+
+  static handleVnpayReturn = catchAsync(async (req, res) => {
+    const redirectUrl = await OrderService.handleVnpayReturn(req.query);
+    return res.redirect(redirectUrl);
+  });
 }
