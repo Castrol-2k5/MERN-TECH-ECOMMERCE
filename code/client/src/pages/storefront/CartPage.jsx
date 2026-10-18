@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -8,113 +7,24 @@ import {
   ArrowLeft,
   ShoppingBag,
   ShieldCheck,
-  Store,
-  CreditCard,
-  X,
-  AlertCircle,
-  Loader2,
-  CheckCircle2
+  CreditCard
 } from 'lucide-react';
 import {
   removeFromCart,
   updateQuantity,
   clearCart
 } from '../../store/slices/cartSlice.js';
-import { toB2cCheckoutPayload } from '../../features/orders/services/orderAdapter.js';
-
-import { branchService } from '../../features/branches/services/branchService.js';
-import { orderService } from '../../features/orders/services/orderService.js';
 
 export const CartPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { items, totalAmount, totalQuantity } = useSelector((state) => state.cart);
-  const authUser = useSelector((state) => state.auth?.user);
-
-  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
-  const [branches, setBranches] = useState([]);
-  const [selectedBranchId, setSelectedBranchId] = useState('');
-  const [customerInfo, setCustomerInfo] = useState({
-    fullName: authUser?.fullName || '',
-    phone: authUser?.phone || '',
-    address: authUser?.address || ''
-  });
-  const [paymentMethod, setPaymentMethod] = useState('VNPAY');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    let ignore = false;
-    const fetchBranches = async () => {
-      try {
-        const list = await branchService.getBranches();
-        if (!ignore) {
-          setBranches(list || []);
-          if (list && list.length > 0) {
-            setSelectedBranchId(list[0]._id);
-          }
-        }
-      } catch (err) {
-        console.warn('Failed to load branches for cart:', err);
-      }
-    };
-
-    fetchBranches();
-    return () => {
-      ignore = true;
-    };
-  }, []);
 
   const formatPrice = (val) => {
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
       currency: 'VND'
     }).format(val || 0);
-  };
-
-  const handleCheckoutSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-
-    if (!selectedBranchId) {
-      setError('Vui lòng chọn chi nhánh xử lý đơn hàng');
-      return;
-    }
-    if (!customerInfo.fullName.trim() || !customerInfo.phone.trim()) {
-      setError('Vui lòng nhập Họ tên và Số điện thoại nhận hàng');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const payload = toB2cCheckoutPayload(
-        { items, selectedBranchId },
-        {
-          fullName: customerInfo.fullName.trim(),
-          phone: customerInfo.phone.trim(),
-          address: customerInfo.address.trim(),
-          branchId: selectedBranchId,
-          paymentMethod
-        }
-      );
-
-      const createdOrder = await orderService.createB2cOrder(payload);
-
-      dispatch(clearCart());
-      setIsCheckoutModalOpen(false);
-
-      navigate('/checkout/success', {
-        state: { order: createdOrder }
-      });
-    } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          err.message ||
-          'Không thể hoàn tất đặt hàng. Vui lòng kiểm tra lại tồn kho chi nhánh.'
-      );
-    } finally {
-      setLoading(false);
-    }
   };
 
   return (
@@ -283,7 +193,7 @@ export const CartPage = () => {
             </div>
 
             <button
-              onClick={() => setIsCheckoutModalOpen(true)}
+              onClick={() => navigate('/checkout')}
               className="w-full py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-sm transition-colors cursor-pointer shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2"
             >
               <CreditCard className="w-4 h-4" />
@@ -294,182 +204,6 @@ export const CartPage = () => {
               <ShieldCheck className="w-4 h-4 text-emerald-500" />
               <span>Thanh toán bảo mật SSL 256-bit</span>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Checkout Modal */}
-      {isCheckoutModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-3xl border border-slate-200 max-w-lg w-full p-6 sm:p-8 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-blue-600" />
-                <span>Xác nhận thông tin đặt hàng</span>
-              </h2>
-              <button
-                onClick={() => setIsCheckoutModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {error && (
-              <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2.5">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleCheckoutSubmit} className="space-y-4 text-xs">
-              {/* Branch Selector */}
-              <div>
-                <label className="block font-bold text-slate-700 mb-1 flex items-center gap-1.5">
-                  <Store className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Chọn Chi nhánh phục vụ / Xuất kho</span>
-                </label>
-                <select
-                  value={selectedBranchId}
-                  onChange={(e) => setSelectedBranchId(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-hidden focus:border-blue-600"
-                  required
-                >
-                  {branches.map((b) => (
-                    <option key={b._id} value={b._id}>
-                      {b.name} ({b.address})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Recipient Details */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    Họ và tên người nhận
-                  </label>
-                  <input
-                    type="text"
-                    value={customerInfo.fullName}
-                    onChange={(e) =>
-                      setCustomerInfo((prev) => ({ ...prev, fullName: e.target.value }))
-                    }
-                    className="w-full p-2.5 rounded-xl border border-slate-200 text-xs"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    Số điện thoại
-                  </label>
-                  <input
-                    type="tel"
-                    value={customerInfo.phone}
-                    onChange={(e) =>
-                      setCustomerInfo((prev) => ({ ...prev, phone: e.target.value }))
-                    }
-                    className="w-full p-2.5 rounded-xl border border-slate-200 text-xs"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  Địa chỉ giao hàng (hoặc ghi Nhận tại quầy)
-                </label>
-                <input
-                  type="text"
-                  value={customerInfo.address}
-                  onChange={(e) =>
-                    setCustomerInfo((prev) => ({ ...prev, address: e.target.value }))
-                  }
-                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs"
-                  required
-                />
-              </div>
-
-              {/* Payment Method */}
-              <div>
-                <label className="block font-bold text-slate-700 mb-1.5">
-                  Phương thức thanh toán
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <label
-                    className={`p-3 rounded-xl border flex items-center gap-2 cursor-pointer transition-colors ${
-                      paymentMethod === 'VNPAY'
-                        ? 'border-blue-600 bg-blue-50/70 text-blue-900 font-bold'
-                        : 'border-slate-200 text-slate-700'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="VNPAY"
-                      checked={paymentMethod === 'VNPAY'}
-                      onChange={() => setPaymentMethod('VNPAY')}
-                      className="text-blue-600"
-                    />
-                    <span>Cổng VNPAY QR</span>
-                  </label>
-
-                  <label
-                    className={`p-3 rounded-xl border flex items-center gap-2 cursor-pointer transition-colors ${
-                      paymentMethod === 'CASH'
-                        ? 'border-blue-600 bg-blue-50/70 text-blue-900 font-bold'
-                        : 'border-slate-200 text-slate-700'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="CASH"
-                      checked={paymentMethod === 'CASH'}
-                      onChange={() => setPaymentMethod('CASH')}
-                      className="text-blue-600"
-                    />
-                    <span>Tiền mặt khi nhận</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Total Summary */}
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex justify-between items-center text-xs">
-                <span className="font-semibold text-slate-600">Tổng thanh toán:</span>
-                <span className="font-black text-base text-blue-600">
-                  {formatPrice(totalAmount)}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsCheckoutModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold text-xs"
-                >
-                  Hủy bỏ
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-blue-600/25 disabled:opacity-60"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Đang tạo đơn...</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Xác nhận đặt hàng</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}

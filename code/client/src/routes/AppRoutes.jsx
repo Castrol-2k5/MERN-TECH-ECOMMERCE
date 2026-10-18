@@ -10,6 +10,7 @@ import ProductDetailPage from '../pages/storefront/ProductDetailPage.jsx';
 import ComparePage from '../pages/storefront/ComparePage.jsx';
 import WarrantyCheckPage from '../pages/storefront/WarrantyCheckPage.jsx';
 import CartPage from '../pages/storefront/CartPage.jsx';
+import CheckoutPage from '../pages/storefront/CheckoutPage.jsx';
 import NotFoundPage from '../pages/storefront/NotFoundPage.jsx';
 import CheckoutSuccessPage from '../pages/storefront/CheckoutSuccessPage.jsx';
 
@@ -66,6 +67,7 @@ export const AppRoutes = () => {
         <Route path="/compare" element={<ComparePage />} />
         <Route path="/warranty-check" element={<WarrantyCheckPage />} />
         <Route path="/cart" element={<CartPage />} />
+        <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
 
         {/* Public Auth Routes (P-00, P-16, P-17) */}
