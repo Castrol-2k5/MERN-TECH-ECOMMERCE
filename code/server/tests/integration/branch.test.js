@@ -47,6 +47,7 @@ describe('Branch Module Integration Tests', () => {
       phone: '0922000222',
       passwordHash: 'Pass@123',
       role: USER_ROLES.STAFF,
+      branchId: new mongoose.Types.ObjectId(),
       isActive: true
     });
     const staffLogin = await request(app).post('/api/v1/auth/login').send({

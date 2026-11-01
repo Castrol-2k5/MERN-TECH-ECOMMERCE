@@ -26,6 +26,7 @@ export const LoginForm = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const infoMessage = location.state?.message || '';
   const from = location.state?.from?.pathname || null;
 
   const handleLoginSuccess = (user, accessToken) => {
@@ -102,6 +103,13 @@ export const LoginForm = () => {
 
       {/* Main Card */}
       <div className="bg-white rounded-3xl border border-slate-200/80 p-8 shadow-xl shadow-slate-200/40">
+        {infoMessage && !error && (
+          <div className="mb-6 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-start gap-3 animate-fade-in">
+            <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
+            <div className="leading-relaxed font-semibold">{infoMessage}</div>
+          </div>
+        )}
+
         {error && (
           <div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200/80 text-red-700 text-xs flex items-start gap-3 animate-fade-in">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />

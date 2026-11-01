@@ -74,8 +74,12 @@ export const OrderDetailPage = () => {
     switch (status) {
       case 'PENDING':
         return 1;
+      case 'CONFIRMED':
       case 'PROCESSING':
         return 2;
+      case 'READY_FOR_SHIPPING':
+      case 'SHIPPING':
+        return 3;
       case 'COMPLETED':
         return 4;
       default:
@@ -151,7 +155,9 @@ export const OrderDetailPage = () => {
             className={`px-3 py-1 rounded-full text-xs font-black ${
               order.orderStatus === 'COMPLETED'
                 ? 'bg-emerald-100 text-emerald-800'
-                : order.orderStatus === 'PROCESSING'
+                : order.orderStatus === 'READY_FOR_SHIPPING'
+                ? 'bg-indigo-100 text-indigo-800'
+                : order.orderStatus === 'PROCESSING' || order.orderStatus === 'CONFIRMED'
                 ? 'bg-blue-100 text-blue-800'
                 : order.orderStatus === 'CANCELLED'
                 ? 'bg-red-100 text-red-800'
@@ -160,6 +166,10 @@ export const OrderDetailPage = () => {
           >
             {order.orderStatus === 'COMPLETED'
               ? 'ĐÃ HOÀN TẤT'
+              : order.orderStatus === 'READY_FOR_SHIPPING'
+              ? 'ĐANG VẬN CHUYỂN'
+              : order.orderStatus === 'CONFIRMED'
+              ? 'ĐÃ XÁC NHẬN'
               : order.orderStatus === 'PROCESSING'
               ? 'ĐANG XỬ LÝ'
               : order.orderStatus === 'CANCELLED'
@@ -226,7 +236,7 @@ export const OrderDetailPage = () => {
 
           {order.branchId ? (
             <div className="space-y-2 text-xs text-slate-600">
-              <p className="font-bold text-slate-900 text-sm">{order.branchId.name}</p>
+              <p className="font-bold text-slate-900 text-sm">{order.branchId.name || order.branchId.branchName}</p>
               <div className="flex items-start gap-2">
                 <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
                 <span>{order.branchId.address}</span>
@@ -239,7 +249,7 @@ export const OrderDetailPage = () => {
               )}
             </div>
           ) : (
-            <p className="text-xs text-slate-500">Đơn hàng phân bổ tự động từ kho tổng.</p>
+            <p className="text-xs text-slate-500">Đơn hàng phân bổ tự động từ kho tổng TechOne.</p>
           )}
 
           {/* Customer / Delivery Info */}

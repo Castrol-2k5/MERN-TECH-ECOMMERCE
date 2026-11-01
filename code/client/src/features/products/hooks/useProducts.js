@@ -3,7 +3,14 @@ import productService from '../services/productService.js';
 
 export const useProducts = (initialParams = {}) => {
   const [products, setProducts] = useState([]);
-  const [meta, setMeta] = useState({ total: 0, page: 1, limit: 12, availableBrands: [] });
+  const [meta, setMeta] = useState({
+    total: 0,
+    page: 1,
+    limit: 12,
+    availableBrands: [],
+    availableAttributes: [],
+    categoryInfo: null,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -21,6 +28,8 @@ export const useProducts = (initialParams = {}) => {
           const metaData = {
             ...(data.meta || { total: data.products?.length || 0, page: 1, limit: 12 }),
             availableBrands: data.availableBrands || data.meta?.availableBrands || [],
+            availableAttributes: data.availableAttributes || data.meta?.availableAttributes || [],
+            categoryInfo: data.categoryInfo || data.meta?.categoryInfo || null,
           };
           setMeta(metaData);
         }
@@ -46,6 +55,8 @@ export const useProducts = (initialParams = {}) => {
       const metaData = {
         ...(data.meta || { total: data.products?.length || 0, page: 1, limit: 12 }),
         availableBrands: data.availableBrands || data.meta?.availableBrands || [],
+        availableAttributes: data.availableAttributes || data.meta?.availableAttributes || [],
+        categoryInfo: data.categoryInfo || data.meta?.categoryInfo || null,
       };
       setMeta(metaData);
     } catch (err) {
@@ -59,6 +70,8 @@ export const useProducts = (initialParams = {}) => {
     products,
     meta,
     availableBrands: meta?.availableBrands || [],
+    availableAttributes: meta?.availableAttributes || [],
+    categoryInfo: meta?.categoryInfo || null,
     isLoading,
     error,
     refetch,

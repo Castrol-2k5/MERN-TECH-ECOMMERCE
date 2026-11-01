@@ -1,7 +1,16 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { Truck, RotateCcw, ShieldCheck, Gift, Star, CheckCircle2, Scale } from 'lucide-react';
+import {
+  Truck,
+  RotateCcw,
+  ShieldCheck,
+  Gift,
+  Star,
+  CheckCircle2,
+  Scale,
+  ShoppingCart
+} from 'lucide-react';
 import useProductDetail from '../../features/products/hooks/useProductDetail.js';
 import ProductImageGallery from '../../features/products/components/ProductImageGallery.jsx';
 import SkuVariantSelector from '../../features/products/components/SkuVariantSelector.jsx';
@@ -23,11 +32,12 @@ export const ProductDetailPage = () => {
   const [userSelectedOptions, setUserSelectedOptions] = useState({});
   const [activeTab, setActiveTab] = useState('specs');
   const [selectedBranch, setSelectedBranch] = useState(null);
-  const [showOrderToast, setShowOrderToast] = useState(false);
+  const [toastInfo, setToastInfo] = useState(null);
   const [relatedProducts, setRelatedProducts] = useState([]);
+  const [stockSummary, setStockSummary] = useState({ totalStock: null, branches: [] });
 
   const defaultOptions = useMemo(() => {
-    if (product?.skus?.[0]?.options) {
+    if (product?.skus?.[0]?.options && Object.keys(product.skus[0].options).length > 0) {
       return product.skus[0].options;
     }
     if (product?.options?.length > 0) {
@@ -46,9 +56,30 @@ export const ProductDetailPage = () => {
 
   const activeSku =
     product?.skus?.find((s) => {
-      if (!s.options) return false;
+      if (!s.options || Object.keys(s.options).length === 0) return false;
       return Object.entries(selectedOptions).every(([k, v]) => s.options[k] === v);
     }) || product?.skus?.[0];
+
+  const currentPrice =
+    activeSku?.salePrice && activeSku.salePrice > 0
+      ? Number(activeSku.salePrice)
+      : Number(activeSku?.price ?? product?.price ?? 0);
+
+  const currentOriginalPrice = Number(
+    activeSku?.originalPrice ?? activeSku?.price ?? product?.originalPrice ?? currentPrice
+  );
+
+  const currentSkuCode = activeSku?.sku || activeSku?.code || product?.skuCode || 'MBA-M4-16-256';
+  const currentImages =
+    Array.isArray(activeSku?.images) && activeSku.images.length > 0
+      ? activeSku.images
+      : product?.images;
+
+  const isOutOfStockAllBranches =
+    product?.stockStatus === 'OUT_OF_STOCK_ONLINE' ||
+    (stockSummary.totalStock !== null &&
+      stockSummary.branches.length > 0 &&
+      stockSummary.totalStock <= 0);
 
   const handleSelectOption = (optionName, value) => {
     setUserSelectedOptions((prev) => ({
@@ -64,29 +95,68 @@ export const ProductDetailPage = () => {
     }).format(val || 0);
   };
 
-  const handleBuyNow = () => {
-    if (!product) return;
+  const showToast = (title, subtitle) => {
+    setToastInfo({ title, subtitle });
+    setTimeout(() => setToastInfo(null), 3500);
+  };
+
+  const handleAddToCartOnly = () => {
+    if (!product || isOutOfStockAllBranches) return;
     const item = createCartItem({
       product,
       activeSku,
       quantity: 1,
+      options: selectedOptions,
     });
     dispatch(addToCart(item));
-    navigate('/cart');
+    showToast(
+      'Đã thêm sản phẩm vào giỏ hàng!',
+      `${product.name} (${currentSkuCode})`
+    );
+  };
+
+  const handleBuyNow = () => {
+    if (!product || isOutOfStockAllBranches) return;
+    const item = createCartItem({
+      product,
+      activeSku,
+      quantity: 1,
+      options: selectedOptions,
+      fulfillmentType: 'DELIVERY',
+    });
+    dispatch(addToCart(item));
+    navigate('/checkout?mode=DELIVERY');
   };
 
   const handleReserveClickCollect = () => {
-    if (!product) return;
+    if (!product || isOutOfStockAllBranches) return;
+    const branchId = selectedBranch?.branchId || selectedBranch?._id || '';
+    const branchName = selectedBranch?.branchName || selectedBranch?.name || 'TechOne Q1 Flagship';
     const item = createCartItem({
       product,
       activeSku,
       quantity: 1,
+      options: selectedOptions,
       fulfillmentType: 'CLICK_AND_COLLECT',
-      pickupBranch: selectedBranch?.branchName || 'TechOne Q1 Flagship',
+      pickupBranch: branchName,
+      pickupBranchId: branchId,
     });
     dispatch(addToCart(item));
-    setShowOrderToast(true);
-    setTimeout(() => setShowOrderToast(false), 4000);
+    if (selectedBranch) {
+      try {
+        localStorage.setItem(
+          'techone_selected_branch',
+          JSON.stringify({
+            _id: branchId,
+            name: branchName,
+            address: selectedBranch.address || '',
+          })
+        );
+      } catch {
+        // ignore
+      }
+    }
+    navigate(`/checkout?mode=CLICK_COLLECT${branchId ? `&branchId=${branchId}` : ''}`);
   };
 
   const handleCompare = () => {
@@ -145,14 +215,12 @@ export const ProductDetailPage = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-12 py-6">
-      {showOrderToast && (
+      {toastInfo && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-slide-up">
           <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
           <div className="text-xs">
-            <p className="font-bold">Đã đặt giữ hàng Click & Collect thành công!</p>
-            <p className="text-slate-300">
-              Nhận máy tại: {selectedBranch?.branchName || 'TechOne Q1 Flagship'} sau 30 phút.
-            </p>
+            <p className="font-bold">{toastInfo.title}</p>
+            <p className="text-slate-300">{toastInfo.subtitle}</p>
           </div>
         </div>
       )}
@@ -162,8 +230,8 @@ export const ProductDetailPage = () => {
           Trang chủ
         </Link>
         <span>/</span>
-        <Link to="/category/laptop" className="hover:text-blue-600 transition-colors">
-          Laptop chính hãng
+        <Link to={`/category/${product.category || 'laptop'}`} className="hover:text-blue-600 transition-colors capitalize">
+          {product.categoryName || 'Laptop chính hãng'}
         </Link>
         <span>/</span>
         <span className="text-slate-800 font-bold truncate max-w-xs">{product.name}</span>
@@ -172,9 +240,13 @@ export const ProductDetailPage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start mb-12">
         <div className="lg:col-span-6">
           <ProductImageGallery
-            images={product.images}
+            images={currentImages}
             productName={product.name}
-            discountPercentage={product.discountPercentage}
+            discountPercentage={
+              currentOriginalPrice > currentPrice && currentOriginalPrice > 0
+                ? Math.round(((currentOriginalPrice - currentPrice) / currentOriginalPrice) * 100)
+                : product.discountPercentage
+            }
           />
         </div>
 
@@ -189,21 +261,21 @@ export const ProductDetailPage = () => {
               <span>4.9 (286 đánh giá)</span>
             </span>
             <span>•</span>
-            <span className="font-mono">SKU: {product.skuCode || 'MBA-M4-16-256'}</span>
+            <span className="font-mono font-semibold text-slate-700">SKU: {currentSkuCode}</span>
           </div>
 
-          <div className="flex items-baseline gap-3 pt-2">
+          <div className="flex flex-wrap items-baseline gap-3 pt-2">
             <span className="text-3xl sm:text-4xl font-black text-blue-600">
-              {formatPrice(product.price)}
+              {formatPrice(currentPrice)}
             </span>
-            {product.originalPrice > product.price && (
+            {currentOriginalPrice > currentPrice && (
               <span className="text-base text-slate-400 line-through">
-                {formatPrice(product.originalPrice)}
+                {formatPrice(currentOriginalPrice)}
               </span>
             )}
-            {product.originalPrice > product.price && (
+            {currentOriginalPrice > currentPrice && (
               <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-lg border border-emerald-200">
-                Tiết kiệm {formatPrice(product.originalPrice - product.price)}
+                Tiết kiệm {formatPrice(currentOriginalPrice - currentPrice)}
               </span>
             )}
           </div>
@@ -238,28 +310,47 @@ export const ProductDetailPage = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
             <button
               onClick={handleBuyNow}
-              className="py-3.5 px-6 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-sm flex flex-col items-center justify-center transition-all cursor-pointer shadow-lg shadow-blue-600/30"
+              disabled={isOutOfStockAllBranches}
+              className="py-3.5 px-6 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-sm flex flex-col items-center justify-center transition-all cursor-pointer shadow-lg shadow-blue-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <span>MUA NGAY</span>
-              <span className="text-[11px] font-normal text-blue-100">Giao hàng tận nơi</span>
+              <span>{isOutOfStockAllBranches ? 'TẠM HẾT HÀNG' : 'MUA NGAY'}</span>
+              <span className="text-[11px] font-normal text-blue-100">
+                {isOutOfStockAllBranches ? 'Đang chờ nhập thêm kho' : 'Giao hàng tận nơi'}
+              </span>
             </button>
 
             <button
               onClick={handleReserveClickCollect}
-              className="py-3.5 px-6 rounded-2xl bg-white hover:bg-blue-50 text-blue-600 border-2 border-blue-600 font-black text-sm flex flex-col items-center justify-center transition-all cursor-pointer shadow-xs"
+              disabled={isOutOfStockAllBranches}
+              className="py-3.5 px-6 rounded-2xl bg-white hover:bg-blue-50 text-blue-600 border-2 border-blue-600 font-black text-sm flex flex-col items-center justify-center transition-all cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <span>ĐẶT GIỮ HÀNG</span>
-              <span className="text-[11px] font-normal text-slate-500">Nhận tại showroom 30 phút</span>
+              <span>ĐẶT GIỮ HÀNG (CLICK & COLLECT)</span>
+              <span className="text-[11px] font-normal text-slate-500">
+                {selectedBranch?.branchName
+                  ? `Nhận tại: ${selectedBranch.branchName}`
+                  : 'Nhận tại showroom sau 30 phút'}
+              </span>
             </button>
           </div>
 
-          <button
-            onClick={handleCompare}
-            className="w-full mt-3 py-2.5 px-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 text-slate-700 hover:text-blue-600 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
-          >
-            <Scale className="w-4 h-4" />
-            <span>So sánh thông số máy này với sản phẩm khác</span>
-          </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+            <button
+              onClick={handleAddToCartOnly}
+              disabled={isOutOfStockAllBranches}
+              className="py-2.5 px-4 rounded-xl border border-blue-200 bg-blue-50/60 hover:bg-blue-100/70 text-blue-700 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ShoppingCart className="w-4 h-4" />
+              <span>Thêm vào giỏ hàng</span>
+            </button>
+
+            <button
+              onClick={handleCompare}
+              className="py-2.5 px-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 text-slate-700 hover:text-blue-600 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+            >
+              <Scale className="w-4 h-4" />
+              <span>So sánh cấu hình</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -267,7 +358,9 @@ export const ProductDetailPage = () => {
         <div className="lg:col-span-7">
           <MultiBranchStockBox
             skuId={activeSku?._id || product.skus?.[0]?._id}
+            selectedBranchId={selectedBranch?.branchId}
             onSelectBranch={setSelectedBranch}
+            onStockSummaryChange={setStockSummary}
           />
         </div>
 

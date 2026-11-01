@@ -1,30 +1,40 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import WarrantySearchBar from '../../features/warranty/components/WarrantySearchBar.jsx';
 import WarrantyResultCard from '../../features/warranty/components/WarrantyResultCard.jsx';
 import warrantyService from '../../features/warranty/services/warrantyService.js';
 import { HelpCircle } from 'lucide-react';
 
 export const WarrantyCheckPage = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlSerial = searchParams.get('serial') || searchParams.get('sn') || '';
+
   const [warrantyData, setWarrantyData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [searchError, setSearchError] = useState(null);
 
   const handleSearch = async (serial) => {
+    if (!serial || !serial.trim()) return;
+    const cleanSerial = serial.trim().toUpperCase();
     setIsLoading(true);
     setSearchError(null);
+
+    // Sync serial into URL query param
+    setSearchParams({ serial: cleanSerial }, { replace: true });
+
     try {
-      const data = await warrantyService.verifySerial(serial);
+      const data = await warrantyService.verifySerial(cleanSerial);
       if (data) {
         setWarrantyData(data);
       } else {
-        setSearchError(`Không tìm thấy mã Serial/IMEI '${serial}' trong hệ thống bảo hành.`);
+        setSearchError(`Không tìm thấy mã Serial/IMEI '${cleanSerial}' trong hệ thống bảo hành.`);
         setWarrantyData(null);
       }
     } catch (err) {
       setSearchError(
         err.response?.data?.message ||
           err.message ||
-          `Không tìm thấy mã Serial/IMEI '${serial}' trong hệ thống bảo hành.`
+          `Không tìm thấy mã Serial/IMEI '${cleanSerial}' trong hệ thống bảo hành.`
       );
       setWarrantyData(null);
     } finally {
@@ -32,12 +42,20 @@ export const WarrantyCheckPage = () => {
     }
   };
 
+  // Auto trigger query if serial present in URL
+  useEffect(() => {
+    if (urlSerial) {
+      handleSearch(urlSerial);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-12 py-4">
       {/* 1. Large Hero Search Bar (Figma #21:28103) */}
       <WarrantySearchBar
         onSearch={handleSearch}
-        initialValue=""
+        initialValue={urlSerial}
         isLoading={isLoading}
       />
 

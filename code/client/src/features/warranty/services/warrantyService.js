@@ -18,7 +18,16 @@ export const DEMO_WARRANTY_ITEMS = {
     branchPurchased: 'TechOne Q1 • 138 Trần Quang Khải',
     isEligible: true,
     statusLabel: 'ĐỦ ĐIỀU KIỆN TIẾP NHẬN BẢO HÀNH CHÍNH HÃNG',
-    daysRemaining: 315
+    daysRemaining: 315,
+    history: [
+      {
+        id: 'EVT-01',
+        title: 'Xuất kho và kích hoạt bảo hành điện tử',
+        date: '2026-08-15T10:30:00Z',
+        description: 'Thiết bị kích hoạt bảo hành 12 tháng tại hệ thống TechOne Quận 1',
+        status: 'COMPLETED'
+      }
+    ]
   },
   'ROG-SOLD-EXPIRED': {
     serialNumber: 'ROG-SOLD-EXPIRED',
@@ -36,7 +45,8 @@ export const DEMO_WARRANTY_ITEMS = {
     branchPurchased: 'TechOne Q5 • 382 Trần Hưng Đạo',
     isEligible: false,
     statusLabel: 'HẾT HẠN BẢO HÀNH CHÍNH HÃNG (Hỗ trợ sửa chữa dịch vụ tính phí)',
-    daysRemaining: 0
+    daysRemaining: 0,
+    history: []
   },
   'C02ZQ0ABQ6L7': {
     serialNumber: 'C02ZQ0ABQ6L7',
@@ -54,7 +64,8 @@ export const DEMO_WARRANTY_ITEMS = {
     branchPurchased: 'TechOne Q1 • 138 Trần Quang Khải',
     isEligible: true,
     statusLabel: 'ĐỦ ĐIỀU KIỆN TIẾP NHẬN BẢO HÀNH CHÍNH HÃNG',
-    daysRemaining: 360
+    daysRemaining: 360,
+    history: []
   },
   'SN-IP16-VN-9075': {
     serialNumber: 'SN-IP16-VN-9075',
@@ -72,7 +83,8 @@ export const DEMO_WARRANTY_ITEMS = {
     branchPurchased: 'TechOne Q1 • 138 Trần Quang Khải',
     isEligible: true,
     statusLabel: 'ĐỦ ĐIỀU KIỆN TIẾP NHẬN BẢO HÀNH CHÍNH HÃNG',
-    daysRemaining: 344
+    daysRemaining: 344,
+    history: []
   }
 };
 
@@ -115,7 +127,8 @@ const normalizeWarrantyResult = (raw, serialNumber) => {
         : isExpired
         ? 'HẾT HẠN BẢO HÀNH CHÍNH HÃNG (Hỗ trợ sửa chữa dịch vụ tính phí)'
         : 'ĐỦ ĐIỀU KIỆN TIẾP NHẬN BẢO HÀNH CHÍNH HÃNG',
-    daysRemaining
+    daysRemaining,
+    history: Array.isArray(raw.history) ? raw.history : []
   };
 };
 

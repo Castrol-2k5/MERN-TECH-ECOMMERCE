@@ -67,7 +67,7 @@ export const ForgotPasswordPage = () => {
               </div>
 
               {/* Development / E2E Manual testing link */}
-              {successData.resetToken && (
+              {successData.resetToken ? (
                 <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200/80 text-xs space-y-3">
                   <div className="font-bold text-blue-900 flex items-center gap-1.5">
                     <span>🎯 Liên kết đặt lại mật khẩu nhanh (Test Mode):</span>
@@ -81,6 +81,20 @@ export const ForgotPasswordPage = () => {
                     className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
                   >
                     <span>Mở trang đặt lại mật khẩu ngay</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-3">
+                  <p className="text-slate-600 leading-relaxed">
+                    Tuân thủ chuẩn an toàn thông tin (H1), mã xác thực không trả về trong JSON response mà được gửi qua email (hoặc in tại log máy chủ trong môi trường phát triển). Nếu bạn đã nhận mã token, bấm bên dưới để đặt lại mật khẩu:
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/reset-password')}
+                    className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <span>Nhập mã xác thực & Đặt lại mật khẩu</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>

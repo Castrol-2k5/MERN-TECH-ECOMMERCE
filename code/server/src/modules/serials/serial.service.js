@@ -1,4 +1,5 @@
 import { Serial, SERIAL_STATUS } from './serial.model.js';
+import { WarrantyTicket } from '../warranty/warranty.model.js';
 import { BranchInventory } from '../inventory/inventory.model.js';
 import { Branch } from '../branches/branch.model.js';
 import { Product } from '../products/product.model.js';
@@ -156,7 +157,7 @@ export class SerialService {
 
   /**
    * Public e-Warranty verification
-   * Returns product, SKU, warranty date, and active/expired status
+   * Returns product, SKU, warranty date, and active/expired status + warranty history
    */
   static async verifySerial(serialNumber) {
     if (!serialNumber || !serialNumber.trim()) {
@@ -182,6 +183,21 @@ export class SerialService {
     const now = new Date();
     const isExpired = serial.warrantyEndDate ? new Date(serial.warrantyEndDate) < now : null;
 
+    // Fetch related warranty tickets for history timeline
+    const warrantyTickets = await WarrantyTicket.find({ serialNumber: cleanSerial })
+      .populate('branchId', 'name')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const history = (warrantyTickets || []).map((t) => ({
+      id: t.ticketCode || t._id.toString(),
+      title: t.issueDescription ? `Bảo hành: ${t.issueDescription.slice(0, 45)}` : 'Phiếu tiếp nhận bảo hành',
+      date: t.receivedDate || t.createdAt,
+      description: t.resolution || t.issueDescription || 'Đang xử lý tại trung tâm kỹ thuật',
+      status: t.status,
+      branchName: t.branchId?.name || ''
+    }));
+
     return {
       serialNumber: serial.serialNumber,
       productId: serial.productId?._id || null,
@@ -201,7 +217,8 @@ export class SerialService {
       status: serial.status,
       soldAt: serial.soldAt || null,
       warrantyEndDate: serial.warrantyEndDate || null,
-      isExpired
+      isExpired,
+      history
     };
   }
 
@@ -241,4 +258,3 @@ export class SerialService {
     };
   }
 }
-

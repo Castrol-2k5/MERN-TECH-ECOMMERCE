@@ -21,14 +21,18 @@ export class ProductController {
       message: 'Lấy danh sách sản phẩm thành công',
       data: {
         products: result.products,
-        availableBrands: result.availableBrands
+        availableBrands: result.availableBrands,
+        availableAttributes: result.availableAttributes,
+        categoryInfo: result.categoryInfo
       },
       meta: {
         page: result.page,
         limit: result.limit,
         total: result.total,
         totalPages: result.totalPages,
-        availableBrands: result.availableBrands
+        availableBrands: result.availableBrands,
+        availableAttributes: result.availableAttributes,
+        categoryInfo: result.categoryInfo
       }
     });
   });

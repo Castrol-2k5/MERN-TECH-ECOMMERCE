@@ -136,9 +136,11 @@ export class ProductService {
       filterConditions.isActive = true;
     }
 
+    let targetCategory = null;
+
     // 1. Lọc theo Category (hỗ trợ cả slug lẫn ObjectId, bao gồm toàn bộ danh mục con trong cây phân cấp)
-    if (category) {
-      const targetCategory = mongoose.Types.ObjectId.isValid(category)
+    if (category && String(category).trim().toLowerCase() !== 'all') {
+      targetCategory = mongoose.Types.ObjectId.isValid(category)
         ? await Category.findOne({ _id: category, isActive: true }).lean()
         : await Category.findOne({
             slug: category.toLowerCase().trim(),
@@ -152,7 +154,9 @@ export class ProductService {
           page: pageNum,
           totalPages: 0,
           limit: limitNum,
-          availableBrands: []
+          availableBrands: [],
+          availableAttributes: [],
+          categoryInfo: null
         };
       }
 
@@ -171,14 +175,27 @@ export class ProductService {
         matchedCategoryIds.length > 1 ? { $in: matchedCategoryIds } : targetCategory._id;
     }
 
-    // 2. Lọc theo Brand (case-insensitive)
-    if (brand && brand.trim()) {
-      filterConditions.brand = { $regex: new RegExp(`^${brand.trim()}$`, 'i') };
+    // 2. Lọc theo Brand (hỗ trợ 1 hoặc nhiều thương hiệu cách nhau dấu phẩy, case-insensitive)
+    if (brand && String(brand).trim()) {
+      const brandList = String(brand)
+        .split(',')
+        .map((b) => b.trim())
+        .filter(Boolean);
+      if (brandList.length === 1) {
+        filterConditions.brand = {
+          $regex: new RegExp(`^${brandList[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
+        };
+      } else if (brandList.length > 1) {
+        filterConditions.brand = {
+          $in: brandList.map((b) => new RegExp(`^${b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'))
+        };
+      }
     }
 
     // 3. Tìm kiếm từ khóa trên name hoặc brand
     if (search && search.trim()) {
-      const searchRegex = new RegExp(search.trim(), 'i');
+      const escapedSearch = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchRegex = new RegExp(escapedSearch, 'i');
       filterConditions.$or = [{ name: searchRegex }, { brand: searchRegex }];
     }
 
@@ -212,9 +229,20 @@ export class ProductService {
 
     if (dynamicAttributesArray.length > 0) {
       filterConditions.attributes = {
-        $all: dynamicAttributesArray.map(({ key, value }) => ({
-          $elemMatch: { key, value }
-        }))
+        $all: dynamicAttributesArray.map(({ key, value }) => {
+          const vals = value
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean);
+          const valueMatcher =
+            vals.length > 1
+              ? { $in: vals.map((v) => new RegExp(v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')) }
+              : new RegExp(vals[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+
+          return {
+            $elemMatch: { key, value: valueMatcher }
+          };
+        })
       };
     }
 
@@ -247,7 +275,7 @@ export class ProductService {
       }
     }
 
-    const [total, products, brandFacets] = await Promise.all([
+    const [total, products, brandFacets, attributeFacetsRaw] = await Promise.all([
       Product.countDocuments(filterConditions),
       Product.find(filterConditions)
         .sort(sortOptions)
@@ -271,8 +299,58 @@ export class ProductService {
           }
         },
         { $sort: { count: -1 } }
+      ]),
+      Product.aggregate([
+        { $match: brandMatch },
+        { $unwind: '$attributes' },
+        {
+          $group: {
+            _id: {
+              key: '$attributes.key',
+              value: '$attributes.value'
+            },
+            count: { $sum: 1 }
+          }
+        },
+        {
+          $group: {
+            _id: '$_id.key',
+            options: {
+              $push: {
+                value: '$_id.value',
+                count: '$count'
+              }
+            }
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            key: '$_id',
+            options: 1
+          }
+        }
       ])
     ]);
+
+    // Sắp xếp availableAttributes theo thứ tự attributeKeys của Category (nếu có)
+    const allowedAttrKeys = Array.isArray(targetCategory?.attributeKeys)
+      ? targetCategory.attributeKeys.map((k) => k.trim().toLowerCase())
+      : null;
+
+    let availableAttributes = (attributeFacetsRaw || []).map((grp) => ({
+      key: grp.key,
+      options: (grp.options || [])
+        .filter((o) => o && o.value)
+        .sort((a, b) => String(a.value).localeCompare(String(b.value), 'vi'))
+    }));
+
+    if (allowedAttrKeys && allowedAttrKeys.length > 0) {
+      const orderMap = new Map(allowedAttrKeys.map((k, idx) => [k, idx]));
+      availableAttributes = availableAttributes
+        .filter((g) => orderMap.has(g.key))
+        .sort((a, b) => (orderMap.get(a.key) ?? 99) - (orderMap.get(b.key) ?? 99));
+    }
 
     const totalPages = Math.ceil(total / limitNum) || (total === 0 ? 0 : 1);
 
@@ -282,7 +360,16 @@ export class ProductService {
       page: pageNum,
       totalPages,
       limit: limitNum,
-      availableBrands: brandFacets || []
+      availableBrands: brandFacets || [],
+      availableAttributes,
+      categoryInfo: targetCategory
+        ? {
+            _id: targetCategory._id,
+            name: targetCategory.name,
+            slug: targetCategory.slug,
+            attributeKeys: targetCategory.attributeKeys || []
+          }
+        : null
     };
   }
 

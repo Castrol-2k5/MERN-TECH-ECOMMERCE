@@ -51,6 +51,7 @@ describe('Category Module Integration Tests', () => {
       phone: '0933555666',
       passwordHash: 'Pass@123',
       role: USER_ROLES.STAFF,
+      branchId: new mongoose.Types.ObjectId(),
       isActive: true
     });
     const staffLogin = await request(app).post('/api/v1/auth/login').send({

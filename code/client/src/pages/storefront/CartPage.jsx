@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -7,24 +8,67 @@ import {
   ArrowLeft,
   ShoppingBag,
   ShieldCheck,
-  CreditCard
+  CreditCard,
+  MapPin,
+  Store
 } from 'lucide-react';
 import {
   removeFromCart,
   updateQuantity,
   clearCart
 } from '../../store/slices/cartSlice.js';
+import { branchService } from '../../features/branches/services/branchService.js';
 
 export const CartPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { items, totalAmount, totalQuantity } = useSelector((state) => state.cart);
 
+  const [branches, setBranches] = useState([]);
+  const [selectedBranchId, setSelectedBranchId] = useState(() => {
+    return localStorage.getItem('techone_selected_branch') || '';
+  });
+
+  useEffect(() => {
+    let ignore = false;
+    const loadBranches = async () => {
+      try {
+        const list = await branchService.getBranches();
+        if (!ignore && list && list.length > 0) {
+          setBranches(list);
+          if (!selectedBranchId || !list.some((b) => b._id === selectedBranchId)) {
+            setSelectedBranchId(list[0]._id);
+            localStorage.setItem('techone_selected_branch', list[0]._id);
+          }
+        }
+      } catch (err) {
+        console.warn('[CartPage] Failed to load branches:', err);
+      }
+    };
+    loadBranches();
+    return () => {
+      ignore = true;
+    };
+  }, [selectedBranchId]);
+
+  const handleBranchChange = (e) => {
+    const newId = e.target.value;
+    setSelectedBranchId(newId);
+    localStorage.setItem('techone_selected_branch', newId);
+    window.dispatchEvent(new CustomEvent('techone_branch_changed', { detail: { branchId: newId } }));
+  };
+
+  const selectedBranch = branches.find((b) => b._id === selectedBranchId) || branches[0];
+
   const formatPrice = (val) => {
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
       currency: 'VND'
     }).format(val || 0);
+  };
+
+  const handleProceedToCheckout = () => {
+    navigate(`/checkout?branchId=${selectedBranchId || selectedBranch?._id || ''}`);
   };
 
   return (
@@ -48,7 +92,7 @@ export const CartPage = () => {
               Giỏ hàng ({totalQuantity} sản phẩm)
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Đơn hàng được giữ trong 30 phút • Kiểm tra hàng trước khi thanh toán
+              Đơn hàng được giữ trong 30 phút • Đổi trả 30 ngày chính hãng
             </p>
           </div>
         </div>
@@ -163,6 +207,38 @@ export const CartPage = () => {
                 </div>
               </div>
             ))}
+
+            {/* UC-CU09 Step 6: Select Branch for Pickup/Fulfillment */}
+            <div className="bg-blue-50/60 rounded-3xl border border-blue-100 p-5 shadow-xs">
+              <div className="flex items-center gap-2.5 mb-2.5">
+                <Store className="w-4 h-4 text-blue-600" />
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                  Chi nhánh xử lý & Giao hàng
+                </h3>
+              </div>
+              <p className="text-xs text-slate-500 mb-3">
+                Chọn chi nhánh TechOne gần bạn nhất để được phục vụ và giao hàng nhanh chóng:
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+                <select
+                  value={selectedBranchId}
+                  onChange={handleBranchChange}
+                  className="bg-white border border-blue-200 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer shadow-xs flex-1"
+                >
+                  {branches.map((b) => (
+                    <option key={b._id} value={b._id}>
+                      {b.name || b.branchName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {selectedBranch?.address && (
+                <div className="mt-2.5 flex items-start gap-1.5 text-xs text-slate-600">
+                  <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                  <span>{selectedBranch.address}</span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Cart Summary Card */}
@@ -184,6 +260,12 @@ export const CartPage = () => {
                 <span>Bảo hiểm vận chuyển:</span>
                 <span className="font-bold text-slate-900">TechOne Care Free</span>
               </div>
+              {selectedBranch && (
+                <div className="pt-2 border-t border-slate-100 text-slate-500">
+                  <span className="block text-[11px] text-slate-400 font-semibold mb-0.5">XỬ LÝ TẠI:</span>
+                  <span className="font-bold text-slate-800 text-xs">{selectedBranch.name || selectedBranch.branchName}</span>
+                </div>
+              )}
               <div className="pt-3 border-t border-slate-100 flex justify-between items-baseline">
                 <span className="text-sm font-bold text-slate-900">Tổng thanh toán:</span>
                 <span className="text-2xl font-black text-blue-600">
@@ -193,7 +275,7 @@ export const CartPage = () => {
             </div>
 
             <button
-              onClick={() => navigate('/checkout')}
+              onClick={handleProceedToCheckout}
               className="w-full py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-sm transition-colors cursor-pointer shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2"
             >
               <CreditCard className="w-4 h-4" />

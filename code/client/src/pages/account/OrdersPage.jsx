@@ -55,13 +55,20 @@ export const OrdersPage = () => {
   const tabs = [
     { id: 'ALL', label: 'Tất cả' },
     { id: 'PENDING', label: 'Chờ thanh toán' },
-    { id: 'PROCESSING', label: 'Đang xử lý' },
+    { id: 'PROCESSING', label: 'Đang xử lý / Vận chuyển' },
     { id: 'COMPLETED', label: 'Đã hoàn tất' },
     { id: 'CANCELLED', label: 'Đã hủy' }
   ];
 
   const filteredOrders = orders.filter((order) => {
     if (activeTab === 'ALL') return true;
+    if (activeTab === 'PROCESSING') {
+      return (
+        order.orderStatus === 'PROCESSING' ||
+        order.orderStatus === 'CONFIRMED' ||
+        order.orderStatus === 'READY_FOR_SHIPPING'
+      );
+    }
     return order.orderStatus === activeTab;
   });
 
@@ -91,6 +98,20 @@ export const OrdersPage = () => {
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
             Đã hoàn tất
+          </span>
+        );
+      case 'READY_FOR_SHIPPING':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800">
+            <Truck className="w-3.5 h-3.5 text-indigo-600" />
+            Đang vận chuyển
+          </span>
+        );
+      case 'CONFIRMED':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-cyan-100 text-cyan-800">
+            <CheckCircle2 className="w-3.5 h-3.5 text-cyan-600" />
+            Đã xác nhận
           </span>
         );
       case 'PROCESSING':
@@ -152,10 +173,10 @@ export const OrdersPage = () => {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
               activeTab === tab.id
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-                : 'text-slate-600 hover:bg-slate-100'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
             }`}
           >
             {tab.label}
@@ -163,119 +184,120 @@ export const OrdersPage = () => {
         ))}
       </div>
 
-      {/* Content */}
-      {loading ? (
-        <div className="py-20 text-center">
-          <div className="w-10 h-10 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-xs text-slate-500 font-semibold">Đang tải danh sách đơn hàng...</p>
+      {/* Error Alert */}
+      {error && (
+        <div className="p-4 rounded-2xl bg-red-50 border border-red-200 flex items-start gap-3 text-xs text-red-700 mb-6">
+          <AlertCircle className="w-4 h-4 shrink-0 text-red-500 mt-0.5" />
+          <span>{error}</span>
         </div>
-      ) : error ? (
-        <div className="p-6 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 shrink-0" />
-          <div>
-            <p className="font-bold">Đã xảy ra lỗi</p>
-            <p className="mt-0.5">{error}</p>
-          </div>
+      )}
+
+      {/* Loading Skeleton */}
+      {loading ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="h-32 bg-white rounded-3xl border border-slate-200/80 animate-pulse p-6"
+            />
+          ))}
         </div>
       ) : filteredOrders.length === 0 ? (
-        <div className="py-20 text-center bg-white rounded-3xl border border-slate-200 p-8 shadow-xs">
-          <div className="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-4">
+        /* Empty State */
+        <div className="bg-white rounded-3xl border border-slate-200/80 p-12 text-center shadow-xs">
+          <div className="w-16 h-16 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-4">
             <ShoppingBag className="w-8 h-8" />
           </div>
-          <h2 className="text-base font-bold text-slate-900 mb-1">Chưa có đơn hàng nào</h2>
+          <h2 className="text-base font-bold text-slate-900 mb-1">
+            Không tìm thấy đơn hàng nào
+          </h2>
           <p className="text-xs text-slate-500 max-w-sm mx-auto mb-6">
-            Bạn chưa có đơn hàng nào trong mục này. Hãy khám phá ngay các sản phẩm công nghệ mới nhất!
+            Bạn chưa có đơn hàng nào ở trạng thái này. Hãy tiếp tục mua sắm các thiết bị công nghệ đỉnh cao!
           </p>
           <Link
             to="/"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-lg shadow-blue-600/25 transition-all"
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-600/20 transition-all"
           >
-            <span>Khám phá sản phẩm ngay</span>
-            <ExternalLink className="w-4 h-4" />
+            Khám phá sản phẩm
           </Link>
         </div>
       ) : (
+        /* Orders List */
         <div className="space-y-4">
-          {filteredOrders.map((order) => {
-            const totalItemsCount = order.items?.reduce((sum, it) => sum + (it.quantity || 1), 0) || 0;
-            const hasSerials = order.items?.some((it) => it.serialsAssigned?.length > 0);
-
-            return (
-              <div
-                key={order._id}
-                className="bg-white rounded-2xl border border-slate-200/80 p-5 hover:border-blue-300 transition-all shadow-xs hover:shadow-md"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-100 gap-3">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="font-mono font-black text-sm text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200/60">
-                      {order.orderCode}
-                    </span>
-                    <span className="text-xs text-slate-400 flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5" />
-                      {formatDate(order.createdAt)}
-                    </span>
-                    {order.branchId && (
-                      <span className="text-xs text-slate-500 flex items-center gap-1 font-medium">
-                        <Store className="w-3.5 h-3.5 text-slate-400" />
-                        {order.branchId.name || 'Chi nhánh TechOne'}
-                      </span>
-                    )}
-                  </div>
-                  <div>{getStatusBadge(order.orderStatus)}</div>
+          {filteredOrders.map((order) => (
+            <div
+              key={order._id || order.id}
+              className="bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-6 shadow-xs hover:border-blue-200 transition-all space-y-4"
+            >
+              {/* Order Card Top Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-slate-100">
+                <div className="flex items-center gap-3">
+                  <span className="font-mono font-black text-sm text-blue-600">
+                    {order.orderCode}
+                  </span>
+                  <span className="text-xs text-slate-400 flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5" />
+                    {formatDate(order.createdAt)}
+                  </span>
                 </div>
 
-                {/* Items preview */}
-                <div className="py-4 space-y-2">
-                  {order.items?.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2 truncate pr-4">
-                        <span className="w-5 h-5 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-[10px] shrink-0">
-                          {item.quantity}x
-                        </span>
-                        <span className="font-semibold text-slate-800 truncate">
-                          {item.productName} ({item.sku})
-                        </span>
-                        {item.serialsAssigned?.length > 0 && (
-                          <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-bold border border-purple-200 shrink-0">
-                            Serial: {item.serialsAssigned.join(', ')}
-                          </span>
-                        )}
-                      </div>
-                      <span className="font-bold text-slate-900 shrink-0">
-                        {formatPrice(item.subtotal || item.unitPrice * item.quantity)}
+                <div className="flex items-center gap-3">
+                  {getStatusBadge(order.orderStatus)}
+                </div>
+              </div>
+
+              {/* Order Items Preview */}
+              <div className="space-y-2">
+                {order.items?.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between text-xs py-1"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 rounded-full bg-slate-300" />
+                      <span className="font-bold text-slate-900 line-clamp-1 max-w-[280px] sm:max-w-md">
+                        {item.productName}
+                      </span>
+                      <span className="text-slate-400 font-mono text-[11px]">
+                        x{item.quantity}
                       </span>
                     </div>
-                  ))}
+                    <span className="font-bold text-slate-700">
+                      {formatPrice(item.unitPrice * item.quantity)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Order Footer & Actions */}
+              <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
+                <div className="flex items-center gap-4 text-slate-500">
+                  {order.branchId?.name && (
+                    <span className="flex items-center gap-1.5">
+                      <Store className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{order.branchId.name}</span>
+                    </span>
+                  )}
+                  <span>
+                    Tổng thanh toán:{' '}
+                    <strong className="text-sm font-black text-blue-600">
+                      {formatPrice(order.totalAmount)}
+                    </strong>
+                  </span>
                 </div>
 
-                {/* Footer with Total and Link */}
-                <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="flex items-center gap-4 text-xs">
-                    <span className="text-slate-500">
-                      Tổng cộng ({totalItemsCount} sản phẩm):
-                    </span>
-                    <span className="text-base font-black text-blue-600">
-                      {formatPrice(order.totalAmount)}
-                    </span>
-                    {hasSerials && (
-                      <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                        <ShieldCheck className="w-3 h-3" />
-                        Có mã Serial bảo hành
-                      </span>
-                    )}
-                  </div>
-
+                <div className="flex items-center gap-2">
                   <Link
-                    to={`/account/orders/${order.orderCode || order._id}`}
-                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-slate-100 hover:bg-blue-50 text-slate-800 hover:text-blue-600 font-bold text-xs transition-colors"
+                    to={`/account/orders/${order._id || order.id}`}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold transition-colors"
                   >
-                    <span>Xem chi tiết</span>
-                    <ChevronRight className="w-4 h-4" />
+                    <span>Chi tiết đơn hàng</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
                   </Link>
                 </div>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       )}
     </div>

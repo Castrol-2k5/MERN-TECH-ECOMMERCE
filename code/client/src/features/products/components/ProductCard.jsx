@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { ShoppingCart, Scale, Check } from 'lucide-react';
 import { addToCart } from '../../../store/slices/cartSlice.js';
 import { addToCompare, removeFromCompare } from '../../../store/slices/compareSlice.js';
+import { createCartItem } from '../services/productAdapter.js';
 
 export const ProductCard = ({ product }) => {
   const dispatch = useDispatch();
@@ -19,17 +20,13 @@ export const ProductCard = ({ product }) => {
   const handleAddToCart = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    const sku = product.skus?.[0];
-    dispatch(
-      addToCart({
-        productId: product._id || product.id,
-        productSkuId: sku?._id || `sku-${product._id || product.id}`,
-        name: product.name,
-        price: product.price,
-        image: product.images?.[0] || '',
-        quantity: 1,
-      })
-    );
+    const activeSku = product.skus?.[0];
+    const item = createCartItem({
+      product,
+      activeSku,
+      quantity: 1,
+    });
+    dispatch(addToCart(item));
   };
 
   const handleToggleCompare = (e) => {

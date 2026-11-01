@@ -410,14 +410,20 @@ export const productService = {
       const rawProducts = response?.data?.products || (Array.isArray(response?.data) ? response.data : []);
       const normalizedProducts = rawProducts.map(normalizeProduct);
       const availableBrands = response?.meta?.availableBrands || response?.data?.availableBrands || [];
+      const availableAttributes = response?.meta?.availableAttributes || response?.data?.availableAttributes || [];
+      const categoryInfo = response?.meta?.categoryInfo || response?.data?.categoryInfo || null;
 
       return {
         products: normalizedProducts,
         meta: {
           ...(response?.meta || { total: normalizedProducts.length, page: 1, limit: 12 }),
           availableBrands,
+          availableAttributes,
+          categoryInfo,
         },
         availableBrands,
+        availableAttributes,
+        categoryInfo,
       };
     } catch (err) {
       if (isDevOrTest()) {

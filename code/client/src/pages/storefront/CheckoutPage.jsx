@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   Truck,
   Store,
@@ -26,14 +26,20 @@ import { toB2cCheckoutPayload } from '../../features/orders/services/orderAdapte
 export const CheckoutPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const urlMode = searchParams.get('mode');
+  const urlBranchId = searchParams.get('branchId') || localStorage.getItem('techone_selected_branch') || '';
 
   const { items, totalAmount, totalQuantity } = useSelector((state) => state.cart);
   const authUser = useSelector((state) => state.auth?.user);
 
   // Delivery options: 'DELIVERY' (Giao tận nơi) hoặc 'CLICK_COLLECT' (Nhận tại cửa hàng)
-  const [deliveryType, setDeliveryType] = useState('DELIVERY');
+  const [deliveryType, setDeliveryType] = useState(
+    urlMode === 'CLICK_COLLECT' ? 'CLICK_COLLECT' : 'DELIVERY'
+  );
   const [branches, setBranches] = useState([]);
-  const [selectedBranchId, setSelectedBranchId] = useState('');
+  const [selectedBranchId, setSelectedBranchId] = useState(urlBranchId);
 
   // Customer form inputs
   const [fullName, setFullName] = useState(authUser?.fullName || '');
@@ -53,7 +59,9 @@ export const CheckoutPage = () => {
         const list = await branchService.getBranches();
         if (!ignore && list && list.length > 0) {
           setBranches(list);
-          setSelectedBranchId(list[0]._id);
+          const found = list.find((b) => b._id === urlBranchId);
+          const activeId = found ? found._id : list[0]._id;
+          setSelectedBranchId(activeId);
         }
       } catch (err) {
         console.warn('Failed to load branches for checkout:', err);
@@ -64,7 +72,12 @@ export const CheckoutPage = () => {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [urlBranchId]);
+
+  const handleSelectBranch = (branchId) => {
+    setSelectedBranchId(branchId);
+    localStorage.setItem('techone_selected_branch', branchId);
+  };
 
   const formatPrice = (val) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -102,7 +115,7 @@ export const CheckoutPage = () => {
         setError('Vui lòng chọn chi nhánh cửa hàng bạn muốn đến nhận máy');
         return;
       }
-      finalAddress = `[Nhận tại cửa hàng] ${chosenBranch?.name || 'Chi nhánh'} - ${chosenBranch?.address || ''}${note ? ` (Ghi chú: ${note})` : ''}`;
+      finalAddress = `[Nhận tại cửa hàng] ${chosenBranch?.name || chosenBranch?.branchName || 'Chi nhánh'} - ${chosenBranch?.address || ''}${note ? ` (Ghi chú: ${note})` : ''}`;
     } else {
       if (!address.trim()) {
         setError('Vui lòng nhập địa chỉ giao hàng chi tiết (Số nhà, đường, phường/xã, quận/huyện)');
@@ -310,12 +323,12 @@ export const CheckoutPage = () => {
                           name="branchSelection"
                           value={b._id}
                           checked={selectedBranchId === b._id}
-                          onChange={() => setSelectedBranchId(b._id)}
+                          onChange={() => handleSelectBranch(b._id)}
                           className="mt-1 text-blue-600 cursor-pointer"
                         />
                         <div className="flex-1 text-xs">
                           <div className="font-bold flex items-center gap-2">
-                            <span>{b.name}</span>
+                            <span>{b.name || b.branchName}</span>
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
                               Có sẵn hàng
                             </span>

@@ -7,6 +7,7 @@ import {
   toggleHighlightDifferences,
 } from '../../../store/slices/compareSlice.js';
 import { addToCart } from '../../../store/slices/cartSlice.js';
+import { createCartItem } from '../services/productAdapter.js';
 
 const ATTRIBUTE_LABELS = {
   cpu: 'Vi xử lý (CPU)',
@@ -114,16 +115,12 @@ export const CompareMatrixTable = ({ onAddProductClick }) => {
   }, [products]);
 
   const handleAddToCart = (product) => {
-    dispatch(
-      addToCart({
-        productId: product._id || product.id,
-        productSkuId: product.skus?.[0]?._id || `sku-${product._id || product.id}`,
-        name: product.name,
-        price: product.price,
-        image: product.images?.[0] || '',
-        quantity: 1,
-      })
-    );
+    const item = createCartItem({
+      product,
+      activeSku: product.skus?.[0],
+      quantity: 1,
+    });
+    dispatch(addToCart(item));
   };
 
   const checkRowHasDifferences = (key) => {

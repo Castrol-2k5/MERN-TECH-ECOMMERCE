@@ -27,18 +27,20 @@ export const CheckoutSuccessPage = () => {
     orderState?.totalAmount ||
     (searchParams.get('vnp_Amount') ? Number(searchParams.get('vnp_Amount')) : 0);
 
-  const customerInfo = orderState?.shippingAddress || orderState?.customerInfo || {
+  const customerInfo = orderState?.customerInfo || orderState?.shippingAddress || {
     fullName: searchParams.get('customerName') || 'Khách hàng',
     phone: searchParams.get('phone') || '',
     address: searchParams.get('address') || ''
   };
 
   const isClickAndCollect =
-    !orderState?.shippingAddress ||
+    orderState?.orderType === 'CLICK_COLLECT' ||
     (typeof orderState?.shippingAddress === 'string' &&
-      orderState?.shippingAddress?.includes('Click & Collect')) ||
-    (typeof customerInfo.address === 'string' &&
-      customerInfo.address?.includes('Click & Collect'));
+      (orderState.shippingAddress.includes('Click & Collect') ||
+        orderState.shippingAddress.includes('[Nhận tại cửa hàng]'))) ||
+    (typeof customerInfo?.address === 'string' &&
+      (customerInfo.address.includes('Click & Collect') ||
+        customerInfo.address.includes('[Nhận tại cửa hàng]')));
 
   // VNPay query verification
   const vnpResponseCode = searchParams.get('vnp_ResponseCode');
@@ -94,11 +96,11 @@ export const CheckoutSuccessPage = () => {
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
             {isVnpayFailed
               ? 'Đơn hàng của bạn đã được tiếp nhận!'
-              : 'Cảm ơn bạn đã mua sắm tại TechStore!'}
+              : 'Cảm ơn bạn đã mua sắm tại TechOne!'}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-2 max-w-md mx-auto">
             {isVnpayFailed
-              ? 'Giao dịch qua VNPAY chưa hoàn tất. Nhân viên TechStore sẽ liên hệ xác nhận để bạn thanh toán tiền mặt khi nhận hàng (COD).'
+              ? 'Giao dịch qua VNPAY chưa hoàn tất. Nhân viên TechOne sẽ liên hệ xác nhận để bạn thanh toán tiền mặt khi nhận hàng (COD).'
               : 'Đơn hàng của bạn đã được xác nhận và đang được chi nhánh chuẩn bị sản phẩm kèm phiếu bảo hành điện tử.'}
           </p>
         </div>
@@ -140,7 +142,7 @@ export const CheckoutSuccessPage = () => {
                 Mã đơn hàng
               </span>
               <span className="font-mono font-black text-base text-blue-600">
-                {orderCode || 'ORD-TECHSTORE'}
+                {orderCode || 'ORD-TECHONE'}
               </span>
             </div>
             {orderCode && (
@@ -194,7 +196,7 @@ export const CheckoutSuccessPage = () => {
               <p className="flex items-start gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
                 <span>
-                  <strong className="text-slate-800">Chi nhánh nhận máy:</strong> TechStore chi nhánh đã chọn
+                  <strong className="text-slate-800">Chi nhánh nhận máy:</strong> {orderState?.branchId?.name || customerInfo.address || 'Hệ thống showroom TechOne'}
                 </span>
               </p>
               <p className="flex items-center gap-1.5 text-[11px] text-slate-500">

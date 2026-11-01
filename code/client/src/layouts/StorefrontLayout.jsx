@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
@@ -15,12 +15,14 @@ import {
   Scale,
   LogOut,
   Package,
-  LayoutDashboard
+  LayoutDashboard,
+  ArrowRight
 } from 'lucide-react';
 import { logout } from '../store/slices/authSlice.js';
 import axiosClient from '../services/axiosClient.js';
 import branchService from '../features/branches/services/branchService.js';
 import categoryService from '../features/categories/services/categoryService.js';
+import productService from '../features/products/services/productService.js';
 
 export const StorefrontLayout = () => {
   const navigate = useNavigate();
@@ -37,7 +39,10 @@ export const StorefrontLayout = () => {
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [isSuggestOpen, setIsSuggestOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const searchContainerRef = useRef(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -47,18 +52,86 @@ export const StorefrontLayout = () => {
       ]);
       setBranches(branchList);
       if (branchList.length > 0) {
-        setSelectedBranch(branchList[0]);
+        let initialBranch = branchList[0];
+        try {
+          const saved = localStorage.getItem('techone_selected_branch');
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            const found = branchList.find((b) => b._id === parsed._id);
+            if (found) initialBranch = found;
+          }
+        } catch {
+          // ignore
+        }
+        setSelectedBranch(initialBranch);
       }
       setCategories(catList);
     };
     fetchData();
   }, []);
 
+  // Auto-suggest search debounce
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) {
+      setSuggestions([]);
+      return;
+    }
+
+    let isMounted = true;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await productService.getProducts({ search: q, limit: 5 });
+        if (isMounted) {
+          setSuggestions(res?.products || []);
+        }
+      } catch {
+        if (isMounted) setSuggestions([]);
+      }
+    }, 220);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [searchQuery]);
+
+  // Close auto-suggest when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
+        setIsSuggestOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelectBranch = (branch) => {
+    setSelectedBranch(branch);
+    setIsBranchDropdownOpen(false);
+    try {
+      localStorage.setItem('techone_selected_branch', JSON.stringify(branch));
+      window.dispatchEvent(new CustomEvent('techone-branch-changed', { detail: branch }));
+    } catch {
+      // ignore
+    }
+  };
+
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      navigate(`/category/laptop?search=${encodeURIComponent(searchQuery.trim())}`);
+      setIsSuggestOpen(false);
+      setIsMobileMenuOpen(false);
+      navigate(`/category/all?search=${encodeURIComponent(searchQuery.trim())}`);
     }
+  };
+
+  const formatPrice = (val) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+    }).format(val || 0);
   };
 
   return (
@@ -102,27 +175,93 @@ export const StorefrontLayout = () => {
           </Link>
 
           {/* Search Bar Auto-suggest */}
-          <form
-            onSubmit={handleSearchSubmit}
-            className="flex-1 max-w-xl relative hidden md:block"
-          >
-            <div className="relative flex items-center">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Tìm MacBook Air M4, ASUS ROG, Gaming Gear... (⌘K)"
-                className="w-full h-11 pl-10 pr-24 text-sm bg-slate-50 border border-slate-200 rounded-xl placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all"
-              />
-              <button
-                type="submit"
-                className="absolute right-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors cursor-pointer"
-              >
-                Tìm kiếm
-              </button>
-            </div>
-          </form>
+          <div ref={searchContainerRef} className="flex-1 max-w-xl relative hidden md:block">
+            <form onSubmit={handleSearchSubmit}>
+              <div className="relative flex items-center">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onFocus={() => setIsSuggestOpen(true)}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setIsSuggestOpen(true);
+                  }}
+                  placeholder="Tìm MacBook Air M4, iPhone, ASUS ROG, Màn hình... (⌘K)"
+                  className="w-full h-11 pl-10 pr-24 text-sm bg-slate-50 border border-slate-200 rounded-xl placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSuggestions([]);
+                    }}
+                    className="absolute right-21 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  className="absolute right-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors cursor-pointer"
+                >
+                  Tìm kiếm
+                </button>
+              </div>
+            </form>
+
+            {/* Auto-suggest Dropdown */}
+            {isSuggestOpen && searchQuery.trim().length > 0 && (
+              <div className="absolute left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-50">
+                {suggestions.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-slate-500">
+                    Không tìm thấy gợi ý nhanh cho &ldquo;<strong className="text-slate-800">{searchQuery.trim()}</strong>&rdquo;. Nhấn Enter để tìm toàn bộ.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    <div className="px-3.5 py-2 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Sản phẩm gợi ý ({suggestions.length})
+                    </div>
+                    {suggestions.map((item) => (
+                      <button
+                        key={item._id || item.id}
+                        type="button"
+                        onClick={() => {
+                          setIsSuggestOpen(false);
+                          navigate(`/product/${item.slug}`);
+                        }}
+                        className="w-full px-3.5 py-2.5 flex items-center gap-3 hover:bg-blue-50/60 text-left transition-colors cursor-pointer"
+                      >
+                        <img
+                          src={item.images?.[0]}
+                          alt={item.name}
+                          className="w-10 h-10 rounded-lg object-contain bg-slate-50 border border-slate-100 p-1 shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-slate-900 truncate">{item.name}</p>
+                          <p className="text-[11px] text-slate-400 truncate">
+                            {item.brand} • {item.specsSummary}
+                          </p>
+                        </div>
+                        <span className="text-xs font-black text-blue-600 shrink-0">
+                          {formatPrice(item.price)}
+                        </span>
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={handleSearchSubmit}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 hover:bg-blue-50 text-blue-600 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <span>Xem tất cả kết quả cho &ldquo;{searchQuery.trim()}&rdquo;</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Header Action Items */}
           <div className="flex items-center gap-2 sm:gap-4 shrink-0">
@@ -153,11 +292,8 @@ export const StorefrontLayout = () => {
                     {branches.map((b) => (
                       <button
                         key={b._id}
-                        onClick={() => {
-                          setSelectedBranch(b);
-                          setIsBranchDropdownOpen(false);
-                        }}
-                        className={`w-full text-left p-2.5 rounded-xl text-xs hover:bg-blue-50 transition-colors flex flex-col gap-0.5 ${
+                        onClick={() => handleSelectBranch(b)}
+                        className={`w-full text-left p-2.5 rounded-xl text-xs hover:bg-blue-50 transition-colors flex flex-col gap-0.5 cursor-pointer ${
                           selectedBranch?._id === b._id ? 'bg-blue-50/70 border-l-3 border-blue-600' : ''
                         }`}
                       >
@@ -261,7 +397,7 @@ export const StorefrontLayout = () => {
                           }
                           dispatch(logout());
                           setIsUserDropdownOpen(false);
-                          navigate('/login');
+                          navigate('/');
                         }}
                         className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-red-50 text-red-600 font-semibold transition-colors text-left cursor-pointer"
                       >
@@ -303,18 +439,39 @@ export const StorefrontLayout = () => {
             {/* Mobile Menu Button */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="p-2 rounded-xl text-slate-700 hover:bg-slate-100 md:hidden"
+              className="p-2 rounded-xl text-slate-700 hover:bg-slate-100 md:hidden cursor-pointer"
             >
               {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           </div>
         </div>
 
+        {/* Mobile Search Bar */}
+        {isMobileMenuOpen && (
+          <div className="px-4 pb-3 md:hidden border-t border-slate-100 pt-3 bg-white">
+            <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Tìm kiếm sản phẩm công nghệ..."
+                className="flex-1 h-10 px-3.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-600"
+              />
+              <button
+                type="submit"
+                className="px-3.5 h-10 text-xs font-bold text-white bg-blue-600 rounded-xl"
+              >
+                Tìm
+              </button>
+            </form>
+          </div>
+        )}
+
         {/* 3. NAVIGATION BAR (FIGMA #11:1123) */}
         <nav className="border-t border-slate-100 bg-white">
           <div className="max-w-7xl mx-auto px-4 md:px-12 flex items-center gap-6 overflow-x-auto scrollbar-none h-12 text-sm font-semibold text-slate-600">
             <Link
-              to="/category/laptop"
+              to="/category/all"
               className="flex items-center gap-2 text-blue-600 hover:text-blue-700 shrink-0 font-bold"
             >
               <span>☰</span>

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import {
   User,
   Phone,
@@ -13,9 +14,11 @@ import {
   ArrowRight
 } from 'lucide-react';
 import axiosClient from '../../../services/axiosClient.js';
+import { setCredentials } from '../../../store/slices/authSlice.js';
 
 export const RegisterForm = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const [formData, setFormData] = useState({
     fullName: '',
@@ -65,8 +68,13 @@ export const RegisterForm = () => {
       setError('Vui lòng nhập Họ và tên');
       return;
     }
-    if (!formData.phone.trim()) {
+    const cleanPhone = formData.phone.trim();
+    if (!cleanPhone) {
       setError('Vui lòng nhập Số điện thoại');
+      return;
+    }
+    if (!/^(0|\+84)(3|5|7|8|9)[0-9]{8}$/.test(cleanPhone)) {
+      setError('Số điện thoại không hợp lệ (gồm 10 chữ số chuẩn Việt Nam, VD: 0912345678)');
       return;
     }
     if (!formData.email.trim()) {
@@ -77,8 +85,8 @@ export const RegisterForm = () => {
       setError('Vui lòng nhập Mật khẩu');
       return;
     }
-    if (formData.password.length < 6) {
-      setError('Mật khẩu tối thiểu 6 ký tự');
+    if (formData.password.length < 6 || !(/[A-Za-z]/.test(formData.password) && /[0-9]/.test(formData.password))) {
+      setError('Mật khẩu phải có tối thiểu 6 ký tự, bao gồm cả chữ cái và chữ số');
       return;
     }
     if (formData.password !== formData.confirmPassword) {
@@ -92,19 +100,26 @@ export const RegisterForm = () => {
 
     try {
       setLoading(true);
-      await axiosClient.post('/auth/register', {
+      const res = await axiosClient.post('/auth/register', {
         fullName: formData.fullName.trim(),
-        phone: formData.phone.trim(),
+        phone: cleanPhone,
         email: formData.email.trim().toLowerCase(),
         password: formData.password
       });
 
+      const user = res?.data?.user;
+      const accessToken = res?.data?.accessToken;
+      if (user && accessToken) {
+        dispatch(setCredentials({ user, accessToken }));
+      }
+
       setSuccess(true);
       setTimeout(() => {
-        navigate('/login', {
-          state: { message: 'Đăng ký tài khoản thành công! Vui lòng đăng nhập.' }
+        navigate(user && accessToken ? '/' : '/login', {
+          replace: true,
+          state: { message: 'Đăng ký tài khoản thành công!' }
         });
-      }, 2000);
+      }, 1200);
     } catch (err) {
       setError(
         err.response?.data?.message ||
@@ -139,9 +154,9 @@ export const RegisterForm = () => {
           <div className="mb-6 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-3 animate-fade-in">
             <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
             <div>
-              <p className="font-bold">Đăng ký thành công!</p>
+              <p className="font-bold">Đăng ký tài khoản thành công!</p>
               <p className="text-[11px] text-emerald-600">
-                Đang chuyển hướng sang trang đăng nhập...
+                Đã tự động đăng nhập • Đang chuyển hướng về Trang chủ...
               </p>
             </div>
           </div>
@@ -226,7 +241,7 @@ export const RegisterForm = () => {
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
-                  placeholder="Tối thiểu 6 ký tự"
+                  placeholder="Tối thiểu 6 ký tự (chữ & số)"
                   className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all"
                   disabled={loading}
                 />

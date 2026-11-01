@@ -259,6 +259,9 @@ export class AuthService {
     user.passwordResetToken = hashToken(resetToken);
     user.passwordResetExpires = new Date(Date.now() + 15 * 60 * 1000);
     await user.save({ validateBeforeSave: false });
+    if (process.env.NODE_ENV !== 'test') {
+      console.info(`[TechOne Auth] Reset Password Token for ${identifier}: /reset-password?token=${resetToken}`);
+    }
 
     return {
       message: 'Yêu cầu khôi phục mật khẩu đã được xử lý thành công.',
