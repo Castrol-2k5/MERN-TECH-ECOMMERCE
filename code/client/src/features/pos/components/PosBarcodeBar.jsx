@@ -43,6 +43,7 @@ export const PosBarcodeBar = ({
           </div>
           <input
             ref={inputRef}
+            autoFocus
             type="text"
             value={inputValue}
             onChange={handleInputChange}

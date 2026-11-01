@@ -1,6 +1,9 @@
+import { useSelector } from 'react-redux';
 import { Printer, CheckCircle, RotateCcw, X, QrCode } from 'lucide-react';
 
 export const InvoiceK80Modal = ({ isOpen, onClose, orderData, onNewOrder }) => {
+  const authUser = useSelector((state) => state.auth?.user);
+
   if (!isOpen || !orderData) return null;
 
   const formatVnd = (num) =>
@@ -23,6 +26,13 @@ export const InvoiceK80Modal = ({ isOpen, onClose, orderData, onNewOrder }) => {
     paymentMethod = 'CASH',
     customerInfo = {}
   } = orderData;
+
+  const cashierName = orderData.staffName || authUser?.fullName || 'Thu ngân tại quầy';
+  const branchName = orderData.branchName || authUser?.branch?.name || 'TECHONE RETAIL';
+  const branchAddress =
+    orderData.branchAddress ||
+    authUser?.branch?.address ||
+    'Hệ thống Thiết bị Công nghệ Chính hãng';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
@@ -58,9 +68,9 @@ export const InvoiceK80Modal = ({ isOpen, onClose, orderData, onNewOrder }) => {
           >
             {/* Header */}
             <div className="text-center space-y-1 border-b border-dashed border-slate-300 pb-3">
-              <h2 className="font-extrabold text-sm tracking-wider uppercase">TECHONE RETAIL</h2>
+              <h2 className="font-extrabold text-sm tracking-wider uppercase">{branchName}</h2>
               <p className="text-[10px] text-slate-600">HỆ THỐNG THIẾT BỊ CÔNG NGHỆ CHÍNH HÃNG</p>
-              <p className="text-[10px] text-slate-600">138 Trần Quang Khải, P. Tân Định, Q.1, TP.HCM</p>
+              <p className="text-[10px] text-slate-600">{branchAddress}</p>
               <p className="text-[10px] text-slate-600">Hotline: 1900.6369 - www.techone.vn</p>
               <h3 className="font-bold text-xs uppercase pt-2">HÓA ĐƠN BÁN HÀNG</h3>
             </div>
@@ -77,11 +87,14 @@ export const InvoiceK80Modal = ({ isOpen, onClose, orderData, onNewOrder }) => {
               </div>
               <div className="flex justify-between">
                 <span>Thu ngân:</span>
-                <span>Nguyễn Văn Thu Ngân</span>
+                <span>{cashierName}</span>
               </div>
               <div className="flex justify-between">
                 <span>Khách hàng:</span>
-                <span>{customerInfo.fullName || 'Khách vãng lai'} - {customerInfo.phone || ''}</span>
+                <span>
+                  {customerInfo.fullName || 'Khách vãng lai'}
+                  {customerInfo.phone ? ` - ${customerInfo.phone}` : ''}
+                </span>
               </div>
             </div>
 
@@ -151,11 +164,11 @@ export const InvoiceK80Modal = ({ isOpen, onClose, orderData, onNewOrder }) => {
                 <>
                   <div className="flex justify-between">
                     <span>Tiền khách đưa:</span>
-                    <span>{formatVnd(customerPaid)}</span>
+                    <span>{formatVnd(customerPaid || total)}</span>
                   </div>
                   <div className="flex justify-between font-bold text-slate-800">
                     <span>Tiền thừa:</span>
-                    <span>{formatVnd(change)}</span>
+                    <span>{formatVnd(Math.max(0, change))}</span>
                   </div>
                 </>
               )}

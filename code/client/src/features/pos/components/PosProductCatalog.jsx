@@ -31,7 +31,7 @@ export const PosProductCatalog = ({ products = [], onSelectProduct, loading = fa
 
         return (
           <div
-            key={product._id || product.sku}
+            key={product.skuId || product.sku || product._id}
             onClick={() => !isOutOfStock && onSelectProduct(product)}
             className={`group bg-slate-900 border rounded-xl p-2.5 flex flex-col justify-between transition-all select-none relative ${
               isOutOfStock

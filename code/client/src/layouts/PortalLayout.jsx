@@ -20,6 +20,7 @@ import {
   ShieldAlert
 } from 'lucide-react';
 import { logout } from '../store/slices/authSlice.js';
+import { clearCart } from '../store/slices/posCartSlice.js';
 import axiosClient from '../services/axiosClient.js';
 
 export const PortalLayout = () => {
@@ -29,6 +30,7 @@ export const PortalLayout = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const authUser = useSelector((state) => state.auth?.user);
+  const posCartItems = useSelector((state) => state.posCart?.items || []);
 
   // If on POS Page, POS has its own specialized fullscreen layout
   const isPosPage = location.pathname.includes('/portal/pos');
@@ -44,12 +46,19 @@ export const PortalLayout = () => {
 
   const handleLogout = async () => {
     if (loggingOut) return;
+    if (posCartItems.length > 0) {
+      const confirmed = window.confirm(
+        'Giỏ hàng hiện tại đang có sản phẩm. Bạn có chắc chắn muốn đăng xuất và hủy giỏ hàng này không?'
+      );
+      if (!confirmed) return;
+    }
     setLoggingOut(true);
     try {
       await axiosClient.post('/auth/logout');
     } catch {
       // Kịch bản phụ 2.a: Mất kết nối mạng vẫn xóa phiên cục bộ
     } finally {
+      dispatch(clearCart());
       dispatch(logout());
       setLoggingOut(false);
       navigate('/login', { replace: true });
@@ -104,10 +113,10 @@ export const PortalLayout = () => {
     },
     {
       to: '/portal/branch/transfers',
-      label: 'Điều Chuyển Kho',
+      label: userRole === 'STAFF' ? 'Kiểm Nhận Điều Chuyển' : 'Điều Chuyển Kho',
       badge: 'P-20',
       icon: ArrowLeftRight,
-      roles: ['BRANCH_MANAGER', 'SUPER_ADMIN']
+      roles: ['STAFF', 'BRANCH_MANAGER', 'SUPER_ADMIN']
     }
   ].filter((item) => item.roles.includes(userRole));
 

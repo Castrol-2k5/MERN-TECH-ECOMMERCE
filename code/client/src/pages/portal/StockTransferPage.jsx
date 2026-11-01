@@ -18,7 +18,7 @@ import usePosAudio from '../../features/pos/hooks/usePosAudio.js';
 export const StockTransferPage = () => {
   const authUser = useSelector((state) => state.auth?.user);
   const { playSuccessBeep, playErrorBeep } = usePosAudio();
-  const [activeTab, setActiveTab] = useState('outbound'); // 'outbound' | 'inbound'
+  const [activeTab, setActiveTab] = useState(authUser?.role === 'STAFF' ? 'inbound' : 'outbound'); // 'outbound' | 'inbound'
   const [selectedBranchFilter, setSelectedBranchFilter] = useState('ALL');
   const [transfers, setTransfers] = useState([]);
   const [branches, setBranches] = useState([]);
@@ -294,7 +294,7 @@ export const StockTransferPage = () => {
               handleProductChange(products[0]._id);
             }
           }}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-lg shadow-blue-600/30 cursor-pointer"
+          className={`${authUser?.role === 'STAFF' ? 'hidden ' : ''}inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-lg shadow-blue-600/30 cursor-pointer`}
         >
           <Plus className="w-4 h-4" />
           <span>TẠO PHIẾU ĐIỀU CHUYỂN</span>

@@ -99,10 +99,12 @@ export const posCartSlice = createSlice({
       state.customerInfo = { ...state.customerInfo, ...action.payload };
     },
     setDiscount: (state, action) => {
-      state.discount = action.payload || 0;
+      const subtotal = state.items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
+      const raw = Math.max(0, Number(action.payload) || 0);
+      state.discount = subtotal > 0 ? Math.min(subtotal, raw) : raw;
     },
     setCustomerPaid: (state, action) => {
-      state.customerPaid = action.payload || 0;
+      state.customerPaid = Math.max(0, Number(action.payload) || 0);
     },
     setPaymentMethod: (state, action) => {
       state.paymentMethod = action.payload;
@@ -114,7 +116,7 @@ export const posCartSlice = createSlice({
       state.items = [];
       state.discount = 0;
       state.customerPaid = 0;
-      state.customerInfo = { fullName: 'Khách vãng lai', phone: '' };
+      state.customerInfo = { fullName: '', phone: '', address: '' };
       state.note = '';
       state.paymentMethod = 'CASH';
     },
@@ -150,13 +152,14 @@ export const selectPosCart = (state) => state.posCart;
 export const selectPosCartTotals = (state) => {
   const { items, discount, customerPaid } = state.posCart;
   const subtotal = items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
-  const tax = Math.round((subtotal - discount) * 0.1);
-  const total = Math.max(0, subtotal - discount + (tax > 0 ? tax : 0));
-  const change = Math.max(0, customerPaid - total);
+  const effectiveDiscount = Math.min(subtotal, Math.max(0, discount || 0));
+  const tax = Math.round((subtotal - effectiveDiscount) * 0.1);
+  const total = Math.max(0, subtotal - effectiveDiscount + (tax > 0 ? tax : 0));
+  const change = customerPaid > 0 ? customerPaid - total : 0;
 
   return {
     subtotal,
-    discount,
+    discount: effectiveDiscount,
     tax,
     total,
     customerPaid,

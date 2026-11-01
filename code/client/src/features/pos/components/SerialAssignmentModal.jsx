@@ -1,5 +1,8 @@
-import { useState } from 'react';
-import { X, Hash, ScanBarcode, Check, Plus, AlertTriangle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Hash, ScanBarcode, Check, Plus, AlertTriangle, RefreshCw } from 'lucide-react';
+import apiClient from '../../../services/api';
+import { isMockEnabled } from '../../../config/dataMode.js';
+import usePosAudio from '../hooks/usePosAudio.js';
 
 export const SerialAssignmentModal = ({
   isOpen,
@@ -8,29 +11,74 @@ export const SerialAssignmentModal = ({
   onSaveSerials
 }) => {
   const [inputSerial, setInputSerial] = useState('');
-  const [serials, setSerials] = useState(item?.serialsAssigned || []);
+  const [serials, setSerials] = useState([]);
   const [errorMsg, setErrorMsg] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  const { playSuccessBeep, playErrorBeep } = usePosAudio();
+
+  useEffect(() => {
+    if (isOpen && item) {
+      setSerials(Array.isArray(item.serialsAssigned) ? item.serialsAssigned : []);
+      setInputSerial('');
+      setErrorMsg('');
+    }
+  }, [isOpen, item]);
 
   if (!isOpen || !item) return null;
 
   const requiredCount = item.quantity || 1;
   const availableDemoSerials = item.availableSerials || [];
 
-  const handleAddSerial = (sn) => {
+  const handleAddSerial = async (sn) => {
     const cleanSn = String(sn || inputSerial).trim().toUpperCase();
-    if (!cleanSn) return;
+    if (!cleanSn || isVerifying) return;
 
     if (serials.includes(cleanSn)) {
+      playErrorBeep();
       setErrorMsg(`Mã Serial [${cleanSn}] đã được thêm vào danh sách!`);
       return;
     }
 
     if (serials.length >= requiredCount) {
+      playErrorBeep();
       setErrorMsg(`Đã đủ số lượng ${requiredCount} Serial cho mặt hàng này!`);
       return;
     }
 
-    setSerials([...serials, cleanSn]);
+    // Kiểm tra 3 lớp qua Backend API nếu đang ở Live Mode
+    if (!isMockEnabled()) {
+      setIsVerifying(true);
+      try {
+        const res = await apiClient.get(`/serials/scan/${encodeURIComponent(cleanSn)}`);
+        const data = res?.data || res;
+
+        if (
+          data?.sku?._id &&
+          item.productSkuId &&
+          String(data.sku._id) !== String(item.productSkuId)
+        ) {
+          playErrorBeep();
+          setErrorMsg(
+            `Mã Serial [${cleanSn}] thuộc biến thể "${data.product?.name || ''} (${data.sku?.sku || ''})", không khớp với sản phẩm đang chọn!`
+          );
+          return;
+        }
+      } catch (err) {
+        playErrorBeep();
+        setErrorMsg(
+          err?.response?.data?.message ||
+            err?.response?.data?.error?.message ||
+            `Mã Serial [${cleanSn}] không hợp lệ hoặc không khả dụng tại chi nhánh!`
+        );
+        return;
+      } finally {
+        setIsVerifying(false);
+      }
+    }
+
+    playSuccessBeep();
+    setSerials((prev) => [...prev, cleanSn]);
     setInputSerial('');
     setErrorMsg('');
   };
@@ -42,6 +90,7 @@ export const SerialAssignmentModal = ({
 
   const handleSave = () => {
     if (serials.length !== requiredCount) {
+      playErrorBeep();
       setErrorMsg(`Cần gán chính xác ${requiredCount} Serial (hiện có ${serials.length})!`);
       return;
     }
@@ -59,7 +108,7 @@ export const SerialAssignmentModal = ({
               <Hash className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-bold text-slate-100 text-sm">Gán Serial / IMEI cho sản phẩm</h3>
+              <h3 className="font-bold text-slate-100 text-sm">Gán Serial / IMEI cho sản phẩm (Xác thực 3 lớp)</h3>
               <p className="text-xs text-slate-400 truncate max-w-sm">{item.name}</p>
             </div>
           </div>
@@ -115,17 +164,21 @@ export const SerialAssignmentModal = ({
               </div>
               <button
                 type="submit"
-                disabled={!inputSerial.trim()}
+                disabled={!inputSerial.trim() || isVerifying}
                 className="px-3.5 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-semibold text-xs rounded-xl flex items-center gap-1 cursor-pointer transition-colors"
               >
-                <Plus className="w-3.5 h-3.5" />
-                Thêm
+                {isVerifying ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Plus className="w-3.5 h-3.5" />
+                )}
+                <span>Thêm</span>
               </button>
             </div>
             {errorMsg && (
               <p className="text-xs text-rose-400 flex items-center gap-1 mt-1">
-                <AlertTriangle className="w-3.5 h-3.5" />
-                {errorMsg}
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                <span>{errorMsg}</span>
               </p>
             )}
           </form>
@@ -178,7 +231,7 @@ export const SerialAssignmentModal = ({
                     <button
                       key={sn}
                       type="button"
-                      disabled={isSelected || serials.length >= requiredCount}
+                      disabled={isSelected || serials.length >= requiredCount || isVerifying}
                       onClick={() => handleAddSerial(sn)}
                       className={`px-2 py-1 rounded text-[11px] font-mono transition-all cursor-pointer ${
                         isSelected

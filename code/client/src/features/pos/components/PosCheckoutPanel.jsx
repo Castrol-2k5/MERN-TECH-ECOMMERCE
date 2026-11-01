@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   User, 
   Banknote, 
@@ -6,6 +6,8 @@ import {
   Tag, 
   AlertTriangle
 } from 'lucide-react';
+
+const VN_PHONE_REGEX = /^(0|\+84)(3|5|7|8|9)[0-9]{8}$/;
 
 export const PosCheckoutPanel = ({
   customerInfo,
@@ -29,7 +31,16 @@ export const PosCheckoutPanel = ({
 }) => {
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [phoneInput, setPhoneInput] = useState(customerInfo?.phone || '');
-  const [nameInput, setNameInput] = useState(customerInfo?.fullName || 'Khách vãng lai');
+  const [nameInput, setNameInput] = useState(customerInfo?.fullName || '');
+  const [customerError, setCustomerError] = useState('');
+
+  useEffect(() => {
+    if (showCustomerModal) {
+      setPhoneInput(customerInfo?.phone || '');
+      setNameInput(customerInfo?.fullName || '');
+      setCustomerError('');
+    }
+  }, [showCustomerModal, customerInfo]);
 
   const formatVnd = (num) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num || 0);
 
@@ -44,14 +55,25 @@ export const PosCheckoutPanel = ({
 
   const handleSaveCustomer = (e) => {
     e.preventDefault();
+    const cleanPhone = phoneInput.trim();
+    const cleanName = nameInput.trim();
+
+    if (cleanPhone && !VN_PHONE_REGEX.test(cleanPhone)) {
+      setCustomerError('Số điện thoại không đúng định dạng di động Việt Nam (VD: 0912345678).');
+      return;
+    }
+
     onUpdateCustomer({
-      fullName: nameInput.trim() || 'Khách vãng lai',
-      phone: phoneInput.trim() || '0901234567'
+      fullName: cleanName || (cleanPhone ? 'Khách hàng tại quầy' : 'Khách vãng lai'),
+      phone: cleanPhone
     });
+    setCustomerError('');
     setShowCustomerModal(false);
   };
 
-  const isCheckoutDisabled = itemCount === 0 || missingSerialCount > 0 || isProcessing;
+  const isInsufficientCash = paymentMethod === 'CASH' && customerPaid > 0 && customerPaid < total;
+  const isCheckoutDisabled =
+    itemCount === 0 || missingSerialCount > 0 || isProcessing || isInsufficientCash;
 
   return (
     <div className="w-full lg:w-96 bg-slate-900 border-l border-slate-800 flex flex-col justify-between h-full select-none text-slate-100">
@@ -64,7 +86,7 @@ export const PosCheckoutPanel = ({
             </div>
             <div>
               <p className="text-xs font-semibold text-slate-200">{customerInfo?.fullName || 'Khách vãng lai'}</p>
-              <p className="text-[11px] font-mono text-slate-400">{customerInfo?.phone || 'Chưa có SĐT'}</p>
+              <p className="text-[11px] font-mono text-slate-400">{customerInfo?.phone || 'Khách lẻ (Không lưu SĐT)'}</p>
             </div>
           </div>
           <button
@@ -95,9 +117,13 @@ export const PosCheckoutPanel = ({
                 ref={discountInputRef}
                 type="number"
                 min="0"
+                max={subtotal}
                 step="10000"
                 value={discount}
-                onChange={(e) => onUpdateDiscount(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                onChange={(e) => {
+                  const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+                  onUpdateDiscount(subtotal > 0 ? Math.min(subtotal, val) : val);
+                }}
                 className="w-24 text-right bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-rose-400 font-mono focus:outline-none focus:border-blue-500"
               />
               <kbd className="text-[9px] text-slate-500 bg-slate-800 px-1 py-0.5 rounded border border-slate-700">F8</kbd>
@@ -193,6 +219,11 @@ export const PosCheckoutPanel = ({
                 {change >= 0 ? formatVnd(change) : `Thiếu ${formatVnd(Math.abs(change))}`}
               </span>
             </div>
+            {isInsufficientCash && (
+              <p className="text-[11px] text-rose-400 font-medium">
+                ⚠️ Số tiền khách đưa chưa đủ để thanh toán đơn hàng.
+              </p>
+            )}
           </div>
         ) : (
           <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center space-y-2">
@@ -244,16 +275,19 @@ export const PosCheckoutPanel = ({
           <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm p-5 space-y-4">
             <h4 className="font-bold text-sm text-slate-100 flex items-center gap-2">
               <User className="w-4 h-4 text-blue-400" />
-              Thông tin khách hàng tích điểm
+              Thông tin khách hàng & Kích hoạt E-Warranty
             </h4>
             <form onSubmit={handleSaveCustomer} className="space-y-3">
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Số điện thoại:</label>
+                <label className="text-xs text-slate-400 block mb-1">Số điện thoại (Tùy chọn cho khách lẻ):</label>
                 <input
                   type="text"
                   value={phoneInput}
-                  onChange={(e) => setPhoneInput(e.target.value)}
-                  placeholder="0901234567"
+                  onChange={(e) => {
+                    setPhoneInput(e.target.value);
+                    if (customerError) setCustomerError('');
+                  }}
+                  placeholder="Để trống nếu khách vãng lai không cung cấp"
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-blue-500 font-mono"
                   autoFocus
                 />
@@ -264,10 +298,13 @@ export const PosCheckoutPanel = ({
                   type="text"
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
-                  placeholder="Nguyễn Văn A"
+                  placeholder="Khách vãng lai"
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-blue-500"
                 />
               </div>
+              {customerError && (
+                <p className="text-xs text-rose-400">{customerError}</p>
+              )}
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"

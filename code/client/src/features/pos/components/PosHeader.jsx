@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
-import { Link } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Store, 
   User, 
@@ -10,13 +10,20 @@ import {
   Clock, 
   Wifi, 
   ShoppingBag,
-  ArrowLeft
+  ArrowLeft,
+  LogOut
 } from 'lucide-react';
+import { logout } from '../../../store/slices/authSlice.js';
+import { clearCart } from '../../../store/slices/posCartSlice.js';
+import axiosClient from '../../../services/axiosClient.js';
 
 export const PosHeader = ({ activeCartCount = 0 }) => {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
   const authUser = useSelector((state) => state.auth?.user);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const branchName =
     authUser?.branch?.name ||
@@ -48,6 +55,28 @@ export const PosHeader = ({ activeCartCount = 0 }) => {
         document.exitFullscreen().catch(() => {});
       }
       setIsFullscreen(false);
+    }
+  };
+
+  const handlePosLogout = async () => {
+    if (loggingOut) return;
+    if (activeCartCount > 0) {
+      const confirmed = window.confirm(
+        'Giỏ hàng hiện tại đang có sản phẩm. Bạn có chắc chắn muốn đăng xuất và hủy giỏ hàng này không?'
+      );
+      if (!confirmed) return;
+    }
+
+    setLoggingOut(true);
+    try {
+      await axiosClient.post('/auth/logout');
+    } catch {
+      // Vẫn xóa phiên cục bộ nếu mất kết nối mạng
+    } finally {
+      dispatch(clearCart());
+      dispatch(logout());
+      setLoggingOut(false);
+      navigate('/login', { replace: true });
     }
   };
 
@@ -144,6 +173,18 @@ export const PosHeader = ({ activeCartCount = 0 }) => {
         <div className="p-2 text-emerald-400" title="Mạng nội bộ ổn định">
           <Wifi className="w-4 h-4" />
         </div>
+
+        {/* Kết thúc ca / Đăng xuất (UC-ST13) */}
+        <button
+          type="button"
+          onClick={handlePosLogout}
+          disabled={loggingOut}
+          title="Kết thúc ca làm việc & Đăng xuất"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-xs font-semibold text-rose-400 transition-colors cursor-pointer"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          <span className="hidden md:inline">{loggingOut ? 'Đang thoát...' : 'Kết thúc ca'}</span>
+        </button>
       </div>
     </header>
   );

@@ -8,8 +8,12 @@ import {
   Package, 
   AlertTriangle, 
   CheckCircle2, 
-  XCircle 
+  XCircle,
+  Store,
+  Phone,
+  X
 } from 'lucide-react';
+import inventoryService from '../services/inventoryService.js';
 
 export const BranchStockTable = ({
   items = [],
@@ -24,6 +28,9 @@ export const BranchStockTable = ({
   canAdjust = true
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [crossBranchItem, setCrossBranchItem] = useState(null);
+  const [crossBranchStocks, setCrossBranchStocks] = useState([]);
+  const [loadingCrossBranch, setLoadingCrossBranch] = useState(false);
 
   const categories = ['TẤT CẢ', 'Điện thoại', 'Laptop', 'Phụ kiện', 'Máy tính bảng'];
 
@@ -31,6 +38,19 @@ export const BranchStockTable = ({
     const val = e.target.value;
     setSearchTerm(val);
     onSearch?.(val);
+  };
+
+  const handleOpenCrossBranchStock = async (item) => {
+    setCrossBranchItem(item);
+    setLoadingCrossBranch(true);
+    try {
+      const branches = await inventoryService.getBranchesWithSkuStock(item.productSkuId);
+      setCrossBranchStocks(Array.isArray(branches) ? branches : []);
+    } catch {
+      setCrossBranchStocks([]);
+    } finally {
+      setLoadingCrossBranch(false);
+    }
   };
 
   const getStockStatusBadge = (item) => {
@@ -203,24 +223,29 @@ export const BranchStockTable = ({
 
                   {/* Actions */}
                   <td className="py-3 px-4 text-right">
-                    {canAdjust ? (
+                    <div className="inline-flex items-center justify-end gap-1.5">
                       <button
                         type="button"
-                        onClick={() => onOpenAdjust(item)}
-                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer border border-slate-700/60"
-                        title="Kiểm kê / Điều chỉnh số lượng tồn"
+                        onClick={() => handleOpenCrossBranchStock(item)}
+                        className="px-2.5 py-1 bg-slate-800/80 hover:bg-blue-600/20 text-slate-300 hover:text-blue-300 rounded-lg text-[11px] font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer border border-slate-700/60 hover:border-blue-500/40"
+                        title="Tra cứu tồn kho SKU này tại các chi nhánh khác trong chuỗi (UC-ST09)"
                       >
-                        <SlidersHorizontal className="w-3 h-3 text-blue-400" />
-                        <span>Điều chỉnh</span>
+                        <Store className="w-3 h-3 text-blue-400" />
+                        <span>Tồn chuỗi</span>
                       </button>
-                    ) : (
-                      <span
-                        className="px-2.5 py-1 bg-slate-900 text-slate-400 rounded-lg text-[11px] font-semibold inline-flex items-center gap-1 border border-slate-800"
-                        title="Tồn kho chi nhánh bán lẻ do Quản lý chi nhánh trực tiếp kiểm kê; Trụ sở thực hiện giám sát"
-                      >
-                        Giám sát (Chỉ xem)
-                      </span>
-                    )}
+
+                      {canAdjust && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenAdjust(item)}
+                          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer border border-slate-700/60"
+                          title="Kiểm kê / Điều chỉnh số lượng tồn"
+                        >
+                          <SlidersHorizontal className="w-3 h-3 text-blue-400" />
+                          <span>Điều chỉnh</span>
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -234,6 +259,93 @@ export const BranchStockTable = ({
         <span>Hiển thị {items.length} mặt hàng SKU tại kho</span>
         <span className="text-[11px]">Đồng bộ dữ liệu thời gian thực với Server</span>
       </div>
+
+      {/* Cross-Branch Stock Inquiry Modal (UC-ST09 4.a) */}
+      {crossBranchItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Store className="w-4 h-4 text-blue-400" />
+                  Tra Cứu Tồn Kho Liên Chi Nhánh (UC-ST09)
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {crossBranchItem.productName} • <span className="font-mono text-blue-400">{crossBranchItem.sku}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCrossBranchItem(null)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 max-h-[65vh] overflow-y-auto space-y-2.5">
+              {loadingCrossBranch ? (
+                <div className="py-8 text-center text-xs text-slate-400">
+                  Đang kiểm tra tồn kho tại các chi nhánh trên toàn chuỗi...
+                </div>
+              ) : crossBranchStocks.length === 0 ? (
+                <div className="p-6 text-center rounded-xl border border-dashed border-slate-800 text-xs text-slate-400">
+                  Hiện không có chi nhánh nào còn tồn kho khả dụng cho mã SKU này.
+                </div>
+              ) : (
+                crossBranchStocks.map((b) => (
+                  <div
+                    key={b.branchId}
+                    className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/70 flex items-center justify-between gap-3"
+                  >
+                    <div className="space-y-1">
+                      <div className="text-xs font-bold text-slate-100 flex items-center gap-2">
+                        <span>{b.branchName}</span>
+                        {b.isHeadquarter && (
+                          <span className="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px]">
+                            Kho Trung Tâm
+                          </span>
+                        )}
+                      </div>
+                      {b.address && (
+                        <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                          <MapPin className="w-3 h-3 text-slate-500 shrink-0" />
+                          <span>{b.address}</span>
+                        </div>
+                      )}
+                      {b.phone && (
+                        <div className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
+                          <Phone className="w-3 h-3 text-slate-500 shrink-0" />
+                          <span>{b.phone}</span>
+                        </div>
+                      )}
+                    </div>
+                    <span
+                      className={`px-2.5 py-1 rounded-lg font-mono text-xs font-bold shrink-0 ${
+                        b.quantity > 0
+                          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                      }`}
+                    >
+                      {b.statusLabel || `Còn ${b.quantity}`}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="px-5 py-3 border-t border-slate-800 bg-slate-950/60 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setCrossBranchItem(null)}
+                className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
