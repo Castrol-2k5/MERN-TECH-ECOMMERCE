@@ -25,14 +25,28 @@ export const OrderSerialAssignDrawer = ({
     }
 
     let ignore = false;
-    inventoryService
-      .getSerials({
-        branchId: order.branchId,
-        productSkuId: order.productSkuId,
-        status: 'IN_STOCK'
-      })
-      .then((list) => {
-        if (!ignore) setAvailableSerials(list || []);
+    const skuIds = Array.from(
+      new Set(
+        (Array.isArray(order.items) && order.items.length > 0
+          ? order.items.map((it) => it.productSkuId)
+          : [order.productSkuId]
+        ).filter(Boolean)
+      )
+    );
+
+    Promise.all(
+      skuIds.map((skuId) =>
+        inventoryService.getSerials({
+          branchId: order.branchId,
+          productSkuId: skuId,
+          status: 'IN_STOCK'
+        })
+      )
+    )
+      .then((results) => {
+        if (!ignore) {
+          setAvailableSerials(results.flat());
+        }
       })
       .catch(() => {
         if (!ignore) setAvailableSerials([]);
@@ -115,9 +129,25 @@ export const OrderSerialAssignDrawer = ({
                   {order.fulfillmentType || 'Giao 2 giờ'}
                 </span>
               </div>
-              <div className="pt-2 border-t border-slate-900 text-xs">
-                <p className="font-semibold text-slate-200">{order.productName || 'iPhone 16 Pro Max 256GB'}</p>
-                <p className="text-[11px] font-mono text-slate-400">SKU: {order.sku || 'IP16PM-256-DESERT'} • SL: {requiredCount}</p>
+              <div className="pt-2 border-t border-slate-900 text-xs space-y-1.5">
+                {Array.isArray(order.items) && order.items.length > 0 ? (
+                  order.items.map((it, idx) => (
+                    <div key={it.productSkuId || idx} className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-slate-200">{it.productName}</p>
+                        <p className="text-[11px] font-mono text-slate-400">SKU: {it.sku}</p>
+                      </div>
+                      <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 font-mono text-[11px] text-cyan-300 font-bold">
+                        SL: {it.quantity}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div>
+                    <p className="font-semibold text-slate-200">{order.productName || 'Thiết bị công nghệ'}</p>
+                    <p className="text-[11px] font-mono text-slate-400">SKU: {order.sku} • SL: {requiredCount}</p>
+                  </div>
+                )}
               </div>
             </div>
 

@@ -30,6 +30,7 @@ import PosPage from '../pages/portal/PosPage.jsx';
 import BranchInventoryPage from '../pages/portal/BranchInventoryPage.jsx';
 import WarrantyReceptionPage from '../pages/portal/WarrantyReceptionPage.jsx';
 import StockTransferPage from '../pages/portal/StockTransferPage.jsx';
+import BranchOrdersPage from '../pages/portal/BranchOrdersPage.jsx';
 
 // HQ Admin & Operations Pages (Phase 3)
 import AdminProductsPage from '../pages/portal/AdminProductsPage.jsx';
@@ -58,6 +59,7 @@ export const AppRoutes = () => {
           <Route path="pos" element={<PosPage />} />
           <Route path="inventory" element={<BranchInventoryPage />} />
           <Route path="warranty-reception" element={<WarrantyReceptionPage />} />
+          <Route path="branch/orders" element={<BranchOrdersPage />} />
 
           {/* Branch Manager & Super Admin Operations */}
           <Route element={<RoleProtectedRoute allowedRoles={['BRANCH_MANAGER', 'SUPER_ADMIN']} />}>

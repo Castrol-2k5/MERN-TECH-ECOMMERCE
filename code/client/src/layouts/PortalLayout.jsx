@@ -96,6 +96,13 @@ export const PortalLayout = () => {
       roles: ['STAFF', 'BRANCH_MANAGER', 'SUPER_ADMIN']
     },
     {
+      to: '/portal/branch/orders',
+      label: 'Đơn Hàng Chi Nhánh',
+      badge: 'POS & B2C',
+      icon: ShoppingBag,
+      roles: ['STAFF', 'BRANCH_MANAGER', 'SUPER_ADMIN']
+    },
+    {
       to: '/portal/branch/transfers',
       label: 'Điều Chuyển Kho',
       badge: 'P-20',

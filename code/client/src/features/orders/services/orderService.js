@@ -142,7 +142,10 @@ export const orderService = {
     }
 
     try {
-      const queryString = new URLSearchParams(params).toString();
+      const cleanParams = Object.fromEntries(
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '' && v !== 'ALL')
+      );
+      const queryString = new URLSearchParams(cleanParams).toString();
       const endpoint = `/orders/branch${queryString ? `?${queryString}` : ''}`;
       const response = await axiosClient.get(endpoint);
       return response?.data?.orders || [];

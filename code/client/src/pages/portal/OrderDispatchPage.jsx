@@ -95,25 +95,37 @@ export const OrderDispatchPage = () => {
       const retailBranches = (branchList || []).filter((b) => !b.isHeadquarter && b.branchCode !== 'BR-HQ');
       setBranches(retailBranches.length > 0 ? retailBranches : branchList || []);
 
-      const mapped = (liveList || []).map((o) => ({
-        _id: o._id,
-        orderCode: o.orderCode || o._id,
-        customerName: o.shippingAddress?.fullName || o.customerInfo?.fullName || 'Khách Hàng',
-        phone: o.shippingAddress?.phone || o.customerInfo?.phone || '',
-        shippingAddress: o.shippingAddress?.address || o.customerInfo?.address || 'Tại chi nhánh',
-        slaRemaining: '01:30:00',
-        fulfillmentType: o.orderType === 'POS_STORE' ? 'Tại quầy' : 'Giao tiêu chuẩn',
-        totalAmount: o.totalAmount || 0,
-        status: o.orderStatus || 'PENDING',
-        branchId: o.branchId?._id || o.branchId || '',
-        assignedBranchName: o.branchId?.name || o.branchId?.branchName || 'Chưa phân bổ',
-        productId: o.items?.[0]?.productId || '',
-        productSkuId: o.items?.[0]?.productSkuId || '',
-        productName: o.items?.[0]?.productName || 'Thiết bị công nghệ',
-        sku: o.items?.[0]?.sku || '',
-        quantity: o.items?.[0]?.quantity || 1,
-        serials: o.items?.[0]?.serialsAssigned || []
-      }));
+      const mapped = (liveList || []).map((o) => {
+        const rawItems = Array.isArray(o.items) ? o.items : [];
+        const totalQty = rawItems.reduce((sum, it) => sum + Number(it.quantity || 1), 0) || 1;
+        const allSerials = rawItems.flatMap((it) => it.serialsAssigned || []);
+        const firstItem = rawItems[0] || {};
+        const summaryName =
+          rawItems.length > 1
+            ? `${firstItem.productName || 'Thiết bị'} (+${rawItems.length - 1} SP khác)`
+            : firstItem.productName || 'Thiết bị công nghệ';
+
+        return {
+          _id: o._id,
+          orderCode: o.orderCode || o._id,
+          customerName: o.shippingAddress?.fullName || o.customerInfo?.fullName || 'Khách Hàng',
+          phone: o.shippingAddress?.phone || o.customerInfo?.phone || '',
+          shippingAddress: o.shippingAddress?.address || o.customerInfo?.address || 'Tại chi nhánh',
+          slaRemaining: '01:30:00',
+          fulfillmentType: o.orderType === 'POS_STORE' ? 'Tại quầy' : 'Giao tiêu chuẩn',
+          totalAmount: o.totalAmount || 0,
+          status: o.orderStatus || 'PENDING',
+          branchId: o.branchId?._id || o.branchId || '',
+          assignedBranchName: o.branchId?.name || o.branchId?.branchName || 'Chưa phân bổ',
+          items: rawItems,
+          productId: firstItem.productId || '',
+          productSkuId: firstItem.productSkuId || '',
+          productName: summaryName,
+          sku: firstItem.sku || '',
+          quantity: totalQty,
+          serials: allSerials
+        };
+      });
       setOrders(mapped);
     } catch (err) {
       setOrders([]);

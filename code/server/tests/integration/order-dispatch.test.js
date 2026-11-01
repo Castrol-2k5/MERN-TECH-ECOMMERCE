@@ -175,4 +175,68 @@ describe('Order Dispatch & Fulfillment Integration Tests (UC-BM-04 -> UC-BM-06)'
     expect(updatedSerial.soldAt).toBeDefined();
     expect(updatedSerial.warrantyEndDate).toBeDefined();
   });
+
+  it('UC-BM07 & UC-BM08: Hỗ trợ đóng gói đơn nhiều dòng sản phẩm (multi-item) và tìm kiếm đơn chi nhánh', async () => {
+    const secondSkuId = new mongoose.Types.ObjectId();
+    const secondSerial = await Serial.create({
+      serialNumber: 'SN-TEST-DISPATCH-002',
+      productId: testProduct._id,
+      productSkuId: secondSkuId,
+      branchId: branchQ1._id,
+      status: SERIAL_STATUS.IN_STOCK,
+      warrantyMonths: 12
+    });
+
+    const multiOrder = await Order.create({
+      orderCode: 'ORD-MULTI-BM07',
+      orderType: ORDER_TYPES.B2C_ONLINE,
+      branchId: branchQ1._id,
+      customerInfo: { fullName: 'Nguyễn Đa Sản Phẩm', phone: '0909777666', address: 'Q1, HCM' },
+      items: [
+        {
+          productId: testProduct._id,
+          productSkuId: testSkuId,
+          productName: 'iPhone 16 Pro Max 256GB',
+          sku: 'IP16PM-256-TEST',
+          quantity: 1,
+          unitPrice: 34990000,
+          subtotal: 34990000
+        },
+        {
+          productId: testProduct._id,
+          productSkuId: secondSkuId,
+          productName: 'iPhone 16 Pro Max 512GB',
+          sku: 'IP16PM-512-TEST',
+          quantity: 1,
+          unitPrice: 40990000,
+          subtotal: 40990000
+        }
+      ],
+      totalAmount: 75980000,
+      paymentMethod: PAYMENT_METHODS.VNPAY,
+      paymentStatus: PAYMENT_STATUS.PAID,
+      orderStatus: ORDER_STATUS.PROCESSING
+    });
+
+    const dispatchRes = await request(app)
+      .patch(`/api/v1/orders/${multiOrder._id}/dispatch`)
+      .set('Authorization', `Bearer ${managerToken}`)
+      .send({
+        serials: [testSerial.serialNumber, secondSerial.serialNumber],
+        orderStatus: ORDER_STATUS.READY_FOR_SHIPPING
+      });
+
+    expect(dispatchRes.status).toBe(200);
+    const updatedOrder = dispatchRes.body.data.order;
+    expect(updatedOrder.items[0].serialsAssigned).toEqual([testSerial.serialNumber]);
+    expect(updatedOrder.items[1].serialsAssigned).toEqual([secondSerial.serialNumber]);
+
+    const searchRes = await request(app)
+      .get('/api/v1/orders/branch?search=Đa Sản Phẩm')
+      .set('Authorization', `Bearer ${managerToken}`);
+
+    expect(searchRes.status).toBe(200);
+    expect(searchRes.body.data.orders.length).toBe(1);
+    expect(searchRes.body.data.orders[0].orderCode).toBe('ORD-MULTI-BM07');
+  });
 });

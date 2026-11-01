@@ -387,6 +387,15 @@ export class OrderService {
     if (query.orderType) {
       filter.orderType = query.orderType;
     }
+    if (query.search && String(query.search).trim()) {
+      const q = String(query.search).trim();
+      const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      filter.$or = [
+        { orderCode: regex },
+        { 'customerInfo.fullName': regex },
+        { 'customerInfo.phone': regex }
+      ];
+    }
 
     const total = await Order.countDocuments(filter);
     const orders = await Order.find(filter)
@@ -562,9 +571,28 @@ export class OrderService {
         }
       }
 
-      // Gán serials vào item đầu tiên hoặc các items
+      // Gán serials vào các items theo đúng productSkuId hoặc phân bổ tuần tự theo quantity
       if (order.items && order.items.length > 0) {
-        order.items[0].serialsAssigned = cleanSerials;
+        const serialBySkuMap = new Map();
+        for (const s of foundSerials) {
+          const skuKey = s.productSkuId?.toString();
+          if (!serialBySkuMap.has(skuKey)) {
+            serialBySkuMap.set(skuKey, []);
+          }
+          serialBySkuMap.get(skuKey).push(s.serialNumber);
+        }
+
+        let offset = 0;
+        for (const item of order.items) {
+          const skuKey = item.productSkuId?.toString();
+          const matchedForSku = serialBySkuMap.get(skuKey) || [];
+          if (matchedForSku.length > 0) {
+            item.serialsAssigned = matchedForSku.splice(0, item.quantity || 1);
+          } else {
+            item.serialsAssigned = cleanSerials.slice(offset, offset + (item.quantity || 1));
+            offset += item.quantity || 1;
+          }
+        }
       }
 
       // Cập nhật trạng thái Serial sang SOLD và kích hoạt bảo hành
