@@ -166,7 +166,7 @@ export const StockAdjustModal = ({ isOpen, onClose, item, onSubmit }) => {
             <div className="p-3 bg-cyan-950/40 border border-cyan-800/40 rounded-xl text-xs text-cyan-300 flex items-start gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 text-cyan-400 mt-0.5" />
               <span>
-                Sản phẩm này có quản lý Serial. Nếu số lượng giảm trừ, vui lòng cập nhật trạng thái serial tương ứng trong Drawer Serials.
+                Sản phẩm này có quản lý theo mã định danh Serial/IMEI. Nếu nhập lô máy mới kèm mã IMEI, vui lòng sử dụng chức năng <strong>Nhập Lô Serial / IMEI</strong> để đồng bộ cả danh sách Serial lẫn số lượng tồn kho.
               </span>
             </div>
           )}

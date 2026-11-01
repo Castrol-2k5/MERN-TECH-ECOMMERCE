@@ -8,6 +8,7 @@ import { Branch } from '../../src/modules/branches/branch.model.js';
 import { Category } from '../../src/modules/categories/category.model.js';
 import { Product } from '../../src/modules/products/product.model.js';
 import { BranchInventory } from '../../src/modules/inventory/inventory.model.js';
+import { Serial, SERIAL_STATUS } from '../../src/modules/serials/serial.model.js';
 
 setupTestDB();
 
@@ -405,6 +406,103 @@ describe('Inventory Module Integration Tests', () => {
 
       expect(res.status).toBe(400);
       expect(res.body.errorCode).toBe('VALIDATION_ERROR');
+    });
+  });
+
+  describe('Stock Transfers (UC-BM05 Outbound & UC-BM06 Inbound Receive)', () => {
+    let branchManagerBToken;
+
+    beforeEach(async () => {
+      await User.create({
+        fullName: 'Manager Branch B',
+        email: 'manager.b@techstore.com',
+        phone: '0955666777',
+        passwordHash: 'Pass@123',
+        role: USER_ROLES.BRANCH_MANAGER,
+        branchId: branchB._id,
+        isActive: true
+      });
+      const managerBLogin = await request(app).post('/api/v1/auth/login').send({
+        identifier: 'manager.b@techstore.com',
+        password: 'Pass@123'
+      });
+      branchManagerBToken = managerBLogin.body.data.accessToken;
+
+      await BranchInventory.create({
+        branchId: branchA._id,
+        productId: productIphone._id,
+        productSkuId: sku1._id,
+        quantity: 2
+      });
+
+      await Serial.create([
+        {
+          serialNumber: 'SN-TRF-A-001',
+          productId: productIphone._id,
+          productSkuId: sku1._id,
+          branchId: branchA._id,
+          status: SERIAL_STATUS.IN_STOCK
+        },
+        {
+          serialNumber: 'SN-TRF-A-002',
+          productId: productIphone._id,
+          productSkuId: sku1._id,
+          branchId: branchA._id,
+          status: SERIAL_STATUS.IN_STOCK
+        }
+      ]);
+    });
+
+    test('Happy Path: Manager A creates outbound transfer -> Serials become TRANSIT -> Manager B scans & receives -> Serials become IN_STOCK at Branch B', async () => {
+      // 1. Manager A creates transfer from Branch A to Branch B
+      const createRes = await request(app)
+        .post('/api/v1/inventory/transfers')
+        .set('Authorization', `Bearer ${branchManagerAToken}`)
+        .send({
+          sourceBranchId: branchA._id.toString(),
+          destinationBranchId: branchB._id.toString(),
+          productId: productIphone._id.toString(),
+          productSkuId: sku1._id.toString(),
+          quantity: 1,
+          serialNumbers: ['SN-TRF-A-001'],
+          notes: 'Điều chuyển hỗ trợ CN Quận 7'
+        });
+
+      expect(createRes.status).toBe(201);
+      expect(createRes.body.success).toBe(true);
+      const transferId = createRes.body.data.transfer._id;
+
+      // Verify Branch A stock deducted to 1 and serial in TRANSIT
+      const invA = await BranchInventory.findOne({ branchId: branchA._id, productSkuId: sku1._id });
+      expect(invA.quantity).toBe(1);
+      const serialInTransit = await Serial.findOne({ serialNumber: 'SN-TRF-A-001' });
+      expect(serialInTransit.status).toBe(SERIAL_STATUS.TRANSIT);
+
+      // 2. Manager B lists inbound transfers
+      const inboundRes = await request(app)
+        .get('/api/v1/inventory/transfers?type=inbound')
+        .set('Authorization', `Bearer ${branchManagerBToken}`);
+
+      expect(inboundRes.status).toBe(200);
+      expect(inboundRes.body.data.transfers.length).toBe(1);
+
+      // 3. Manager B scans and receives transfer
+      const receiveRes = await request(app)
+        .patch(`/api/v1/inventory/transfers/${transferId}/receive`)
+        .set('Authorization', `Bearer ${branchManagerBToken}`)
+        .send({
+          scannedSerials: ['SN-TRF-A-001']
+        });
+
+      expect(receiveRes.status).toBe(200);
+      expect(receiveRes.body.data.transfer.status).toBe('COMPLETED');
+
+      // Verify Branch B stock incremented to 1 and serial is IN_STOCK at Branch B
+      const invB = await BranchInventory.findOne({ branchId: branchB._id, productSkuId: sku1._id });
+      expect(invB.quantity).toBe(1);
+      const receivedSerial = await Serial.findOne({ serialNumber: 'SN-TRF-A-001' });
+      expect(receivedSerial.status).toBe(SERIAL_STATUS.IN_STOCK);
+      expect(receivedSerial.branchId.toString()).toBe(branchB._id.toString());
     });
   });
 });

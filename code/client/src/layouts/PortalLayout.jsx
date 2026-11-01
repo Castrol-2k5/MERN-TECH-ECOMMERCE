@@ -115,9 +115,9 @@ export const PortalLayout = () => {
     {
       to: '/portal/admin/import-serials',
       label: 'Nhập Lô Serial / IMEI',
-      badge: 'Kho HQ',
+      badge: userRole === 'SUPER_ADMIN' ? 'Kho HQ' : 'Kho CN',
       icon: Barcode,
-      roles: ['SUPER_ADMIN']
+      roles: ['BRANCH_MANAGER', 'SUPER_ADMIN']
     },
     {
       to: '/portal/admin/orders-dispatch',

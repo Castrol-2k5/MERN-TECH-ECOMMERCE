@@ -214,6 +214,7 @@ export const SerialImportPage = () => {
         onSelectBranch={setSelectedBranchId}
         onSelectSku={setSelectedSku}
         onFileUploaded={(content) => setRawText(content)}
+        isBranchLocked={authUser?.role === 'BRANCH_MANAGER'}
       />
 
       {/* Step 2: Live Parser Textarea */}

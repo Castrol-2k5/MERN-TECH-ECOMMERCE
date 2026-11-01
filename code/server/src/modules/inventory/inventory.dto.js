@@ -29,6 +29,11 @@ export const adjustStockSchema = z
 
 export const createTransferSchema = z
   .object({
+    branchId: z
+      .string()
+      .trim()
+      .regex(/^[0-9a-fA-F]{24}$/, 'Mã chi nhánh không hợp lệ')
+      .optional(),
     sourceBranchId: z
       .string({ required_error: 'Chi nhánh xuất chuyển là bắt buộc' })
       .trim()
@@ -61,6 +66,11 @@ export const createTransferSchema = z
 
 export const receiveTransferSchema = z
   .object({
+    branchId: z
+      .string()
+      .trim()
+      .regex(/^[0-9a-fA-F]{24}$/, 'Mã chi nhánh không hợp lệ')
+      .optional(),
     scannedSerials: z
       .array(z.string().trim().toUpperCase())
       .optional()

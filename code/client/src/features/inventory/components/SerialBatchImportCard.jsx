@@ -8,7 +8,8 @@ export const SerialBatchImportCard = ({
   selectedSku,
   onSelectBranch,
   onSelectSku,
-  onFileUploaded
+  onFileUploaded,
+  isBranchLocked = false
 }) => {
   const [fileName, setFileName] = useState('');
   const [fileDetails, setFileDetails] = useState('');
@@ -60,8 +61,9 @@ export const SerialBatchImportCard = ({
           </label>
           <select
             value={selectedBranchId}
+            disabled={isBranchLocked}
             onChange={(e) => onSelectBranch(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+            className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-blue-500 disabled:opacity-75 disabled:cursor-not-allowed"
           >
             {branches.map((b) => (
               <option key={b._id || b.code} value={b._id || b.code}>

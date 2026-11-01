@@ -32,6 +32,24 @@ export const bootstrapAuth = createAsyncThunk(
   }
 );
 
+const normalizeAuthUser = (rawUser) => {
+  if (!rawUser) return null;
+  const u = rawUser.user || rawUser;
+  const branchObj = typeof u.branchId === 'object' && u.branchId !== null ? u.branchId : u.branch || null;
+  const branchIdStr =
+    typeof u.branchId === 'object' && u.branchId !== null
+      ? String(u.branchId._id || u.branchId.id || '')
+      : u.branchId
+      ? String(u.branchId)
+      : null;
+
+  return {
+    ...u,
+    branch: branchObj,
+    branchId: branchIdStr
+  };
+};
+
 const initialState = {
   user: null,
   accessToken: null,
@@ -46,7 +64,7 @@ export const authSlice = createSlice({
   reducers: {
     setCredentials: (state, action) => {
       const { user, accessToken } = action.payload;
-      state.user = user?.user || user;
+      state.user = normalizeAuthUser(user);
       state.accessToken = accessToken;
       state.isAuthenticated = Boolean(accessToken);
       state.isInitialized = true;
@@ -70,7 +88,7 @@ export const authSlice = createSlice({
       .addCase(bootstrapAuth.fulfilled, (state, action) => {
         state.isLoading = false;
         state.isInitialized = true;
-        state.user = action.payload.user;
+        state.user = normalizeAuthUser(action.payload.user);
         state.accessToken = action.payload.accessToken;
         state.isAuthenticated = true;
       })

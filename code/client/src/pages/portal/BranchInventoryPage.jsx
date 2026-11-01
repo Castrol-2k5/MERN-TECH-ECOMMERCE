@@ -141,17 +141,23 @@ export const BranchInventoryPage = () => {
             <Store className="w-4 h-4" />
             <span>Kho Chi Nhánh:</span>
             {branches.length > 0 && (
-              <select
-                value={selectedBranchId}
-                onChange={(e) => setSelectedBranchId(e.target.value)}
-                className="bg-slate-800 text-slate-200 border border-slate-700 rounded-lg px-2.5 py-1 text-xs font-bold cursor-pointer hover:bg-slate-700 transition-colors"
-              >
-                {branches.map((b) => (
-                  <option key={b._id} value={b._id}>
-                    {b.branchName || b.name}
-                  </option>
-                ))}
-              </select>
+              authUser?.role === 'SUPER_ADMIN' ? (
+                <select
+                  value={selectedBranchId}
+                  onChange={(e) => setSelectedBranchId(e.target.value)}
+                  className="bg-slate-800 text-slate-200 border border-slate-700 rounded-lg px-2.5 py-1 text-xs font-bold cursor-pointer hover:bg-slate-700 transition-colors"
+                >
+                  {branches.map((b) => (
+                    <option key={b._id} value={b._id}>
+                      {b.branchName || b.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className="bg-slate-800/80 text-cyan-300 border border-slate-700 rounded-lg px-2.5 py-1 text-xs font-bold normal-case">
+                  {selectedBranch?.branchName || selectedBranch?.name || authUser?.branch?.name || 'Chi nhánh trực thuộc'}
+                </span>
+              )
             )}
           </div>
           <h1 className="text-xl font-black text-slate-100 tracking-tight">

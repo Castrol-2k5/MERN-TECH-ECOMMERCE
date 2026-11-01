@@ -109,6 +109,14 @@ export class AuthService {
       throw new AppError('Tài khoản của bạn đã bị khóa hoặc ngừng hoạt động.', 403, 'ACCOUNT_LOCKED');
     }
 
+    if ((user.role === USER_ROLES.BRANCH_MANAGER || user.role === USER_ROLES.STAFF) && !user.branchId) {
+      throw new AppError(
+        'Tài khoản nhân sự chưa được gán chi nhánh công tác. Vui lòng liên hệ Quản lý cấp cao.',
+        403,
+        'BRANCH_NOT_ASSIGNED'
+      );
+    }
+
     // Role-differentiated session duration: B2C (14 days) vs POS Staff / Admin (8 hours)
     const durationMs = getSessionDuration(user.role);
     const rawRefreshToken = generateRefreshToken();

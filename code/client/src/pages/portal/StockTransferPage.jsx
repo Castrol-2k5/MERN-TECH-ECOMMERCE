@@ -13,9 +13,11 @@ import {
   Layers
 } from 'lucide-react';
 import axiosClient from '../../services/axiosClient.js';
+import usePosAudio from '../../features/pos/hooks/usePosAudio.js';
 
 export const StockTransferPage = () => {
   const authUser = useSelector((state) => state.auth?.user);
+  const { playSuccessBeep, playErrorBeep } = usePosAudio();
   const [activeTab, setActiveTab] = useState('outbound'); // 'outbound' | 'inbound'
   const [selectedBranchFilter, setSelectedBranchFilter] = useState('ALL');
   const [transfers, setTransfers] = useState([]);
@@ -216,13 +218,16 @@ export const StockTransferPage = () => {
     const clean = serial.trim().toUpperCase();
     if (!clean) return;
     if (!selectedTransferForReceive?.serialNumbers?.includes(clean)) {
+      playErrorBeep();
       setReceiveError(`Mã Serial '${clean}' không thuộc danh mục phiếu điều chuyển này.`);
       return;
     }
     if (scannedSerials.includes(clean)) {
+      playErrorBeep();
       setReceiveError(`Mã Serial '${clean}' đã được quét trước đó.`);
       return;
     }
+    playSuccessBeep();
     setScannedSerials((prev) => [...prev, clean]);
     setScanInput('');
     setReceiveError('');
@@ -506,6 +511,7 @@ export const StockTransferPage = () => {
                   <label className="block text-slate-400 font-bold mb-1">Chi nhánh xuất</label>
                   <select
                     value={createForm.sourceBranchId}
+                    disabled={authUser?.role === 'BRANCH_MANAGER'}
                     onChange={(e) => {
                       const val = e.target.value;
                       setCreateForm((prev) => ({ ...prev, sourceBranchId: val }));
@@ -513,7 +519,7 @@ export const StockTransferPage = () => {
                         fetchAvailableSerials(val, createForm.productSkuId);
                       }
                     }}
-                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white"
+                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white disabled:opacity-75 disabled:cursor-not-allowed"
                     required
                   >
                     {branches.map((b) => (
@@ -534,11 +540,13 @@ export const StockTransferPage = () => {
                     className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white"
                     required
                   >
-                    {branches.map((b) => (
-                      <option key={b._id} value={b._id}>
-                        {b.name}
-                      </option>
-                    ))}
+                    {branches
+                      .filter((b) => String(b._id) !== String(createForm.sourceBranchId))
+                      .map((b) => (
+                        <option key={b._id} value={b._id}>
+                          {b.name}
+                        </option>
+                      ))}
                   </select>
                 </div>
               </div>
