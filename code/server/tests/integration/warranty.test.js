@@ -287,6 +287,42 @@ describe('Warranty Module Integration Tests', () => {
       expect(resB.body.data.length).toBe(1);
       expect(resB.body.data[0].ticketCode).toBe('RMA-20261003-BB02');
     });
+
+    test('UC-BM09: PATCH /api/v1/warranty/:id/status - Cập nhật trạng thái phiếu bảo hành và tự động khôi phục Serial về SOLD khi RETURNED', async () => {
+      // Tạo phiếu bảo hành mới cho soldSerial tại Chi nhánh A
+      const createRes = await request(app)
+        .post('/api/v1/warranty')
+        .set('Authorization', `Bearer ${staffAToken}`)
+        .send({
+          serialNumber: soldSerial.serialNumber,
+          issueDescription: 'Lỗi sạc không vào điện',
+          appearanceCondition: 'Đẹp 99%',
+          accessories: ['Thân máy', 'Cáp sạc'],
+          estimatedReturnDate: '2026-11-10'
+        });
+
+      expect(createRes.status).toBe(201);
+      const ticketId = createRes.body.data._id;
+
+      // Chặn chi nhánh B cập nhật phiếu của chi nhánh A
+      const crossBranchRes = await request(app)
+        .patch(`/api/v1/warranty/${ticketId}/status`)
+        .set('Authorization', `Bearer ${staffBToken}`)
+        .send({ status: WARRANTY_STATUS.PROCESSING });
+      expect(crossBranchRes.status).toBe(403);
+
+      // Chi nhánh A chuyển sang RETURNED -> Serial tự động khôi phục về SOLD
+      const returnRes = await request(app)
+        .patch(`/api/v1/warranty/${ticketId}/status`)
+        .set('Authorization', `Bearer ${staffAToken}`)
+        .send({ status: WARRANTY_STATUS.RETURNED, notes: 'Đã bàn giao máy cho khách' });
+
+      expect(returnRes.status).toBe(200);
+      expect(returnRes.body.data.status).toBe(WARRANTY_STATUS.RETURNED);
+
+      const refreshedSerial = await Serial.findById(soldSerial._id);
+      expect(refreshedSerial.status).toBe(SERIAL_STATUS.SOLD);
+    });
   });
 });
 

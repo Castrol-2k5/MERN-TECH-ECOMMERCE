@@ -167,6 +167,8 @@ export class SerialService {
 
     const serial = await Serial.findOne({ serialNumber: cleanSerial })
       .populate('productId', 'name slug images brand skus')
+      .populate('branchId', 'name branchCode address')
+      .populate('orderId', 'customerInfo shippingAddress orderCode createdAt')
       .lean();
 
     if (!serial) {
@@ -182,7 +184,19 @@ export class SerialService {
 
     return {
       serialNumber: serial.serialNumber,
+      productId: serial.productId?._id || null,
       productName: serial.productId?.name || '',
+      image: sku?.images?.[0] || serial.productId?.images?.[0] || '',
+      branchId: serial.branchId?._id || serial.branchId || null,
+      branchPurchased: serial.branchId?.name
+        ? `${serial.branchId.name}${serial.branchId.address ? ` • ${serial.branchId.address}` : ''}`
+        : 'TechOne Retail',
+      customer: {
+        fullName: (serial.orderId?.customerInfo?.fullName || serial.orderId?.shippingAddress?.fullName) || '',
+        phone: (serial.orderId?.customerInfo?.phone || serial.orderId?.shippingAddress?.phone) || '',
+        address: (serial.orderId?.customerInfo?.address || serial.orderId?.shippingAddress?.address) || ''
+      },
+      warrantyExpiresAt: serial.warrantyEndDate || null,
       sku: sku ? sku.sku : '',
       status: serial.status,
       soldAt: serial.soldAt || null,

@@ -43,6 +43,11 @@ const warrantyTicketSchema = new Schema(
         type: String,
         trim: true,
         default: ''
+      },
+      address: {
+        type: String,
+        trim: true,
+        default: ''
       }
     },
     branchId: {
@@ -59,6 +64,18 @@ const warrantyTicketSchema = new Schema(
       type: String,
       required: [true, 'Mô tả lỗi/sự cố là bắt buộc'],
       trim: true
+    },
+    appearanceCondition: {
+      type: String,
+      default: ''
+    },
+    accessories: {
+      type: [String],
+      default: []
+    },
+    estimatedReturnDate: {
+      type: String,
+      default: ''
     },
     status: {
       type: String,

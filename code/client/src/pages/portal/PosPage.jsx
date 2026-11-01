@@ -31,6 +31,11 @@ import { toPosCheckoutPayload } from '../../features/orders/services/orderAdapte
 export const PosPage = () => {
   const dispatch = useDispatch();
   const authUser = useSelector((state) => state.auth?.user);
+  const userBranchId =
+    typeof authUser?.branchId === 'object'
+      ? authUser?.branchId?._id || ''
+      : authUser?.branchId || '';
+
   const cart = useSelector(selectPosCart);
   const totals = useSelector(selectPosCartTotals);
   const missingSerialCount = useSelector(selectMissingSerialsCount);
@@ -40,23 +45,33 @@ export const PosPage = () => {
   // Local state
   const [products, setProducts] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('TẤT CẢ');
+  const [searchKeyword, setSearchKeyword] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [scanNotification, setScanNotification] = useState(null);
 
-  useEffect(() => {
-    let ignore = false;
-    posService.searchProducts().then((data) => {
-      if (!ignore && Array.isArray(data)) {
-        setProducts(data);
+  const loadPosCatalog = useCallback(
+    async (opts = {}) => {
+      setIsSearching(true);
+      try {
+        const data = await posService.searchProducts({
+          keyword: opts.keyword !== undefined ? opts.keyword : searchKeyword,
+          category: opts.category !== undefined ? opts.category : selectedCategory,
+          branchId: userBranchId
+        });
+        setProducts(Array.isArray(data) ? data : []);
+      } catch {
+        setProducts([]);
+      } finally {
+        setIsSearching(false);
       }
-    }).catch(() => {
-      if (!ignore) setProducts([]);
-    });
-    return () => {
-      ignore = true;
-    };
-  }, []);
+    },
+    [userBranchId, searchKeyword, selectedCategory]
+  );
+
+  useEffect(() => {
+    loadPosCatalog({ keyword: '', category: 'TẤT CẢ' });
+  }, [userBranchId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Modals state
   const [activeSerialModalItem, setActiveSerialModalItem] = useState(null);
@@ -71,34 +86,19 @@ export const PosPage = () => {
   // Search products when category changes
   const handleCategorySelect = async (category) => {
     setSelectedCategory(category);
-    setIsSearching(true);
-    try {
-      const data = await posService.searchProducts({ category });
-      setProducts(data);
-    } catch {
-      // ignore
-    } finally {
-      setIsSearching(false);
-    }
+    await loadPosCatalog({ category });
   };
 
   const handleSearchFilter = async (keyword) => {
-    setIsSearching(true);
-    try {
-      const data = await posService.searchProducts({ keyword, category: selectedCategory });
-      setProducts(data);
-    } catch {
-      // ignore
-    } finally {
-      setIsSearching(false);
-    }
+    setSearchKeyword(keyword);
+    await loadPosCatalog({ keyword });
   };
 
   // Handle barcode scanned from camera, hardware barcode scanner, or manual search submit
   const handleBarcodeScan = useCallback(async (barcode) => {
     setIsScanning(true);
     try {
-      const result = await posService.scanBarcode(barcode);
+      const result = await posService.scanBarcode(barcode, userBranchId);
       playSuccessBeep();
 
       if (result.type === 'SERIAL') {
@@ -131,7 +131,7 @@ export const PosPage = () => {
       setTimeout(() => setScanNotification(null), 4000);
       barcodeInputRef.current?.focus();
     }
-  }, [dispatch, playErrorBeep, playSuccessBeep]);
+  }, [dispatch, playErrorBeep, playSuccessBeep, userBranchId]);
 
   // Handle clicking product in catalog
   const handleSelectProduct = (product) => {
@@ -154,7 +154,7 @@ export const PosPage = () => {
 
     setIsCheckingOut(true);
     try {
-      const payload = toPosCheckoutPayload(cart, authUser?.branchId);
+      const payload = toPosCheckoutPayload(cart, userBranchId);
 
       const res = await posService.checkoutPos(payload);
       playSuccessBeep();
@@ -172,6 +172,9 @@ export const PosPage = () => {
         paymentMethod: cart.paymentMethod,
         customerInfo: cart.customerInfo
       });
+
+      // Tải lại danh mục tồn kho & Serial khả dụng sau khi thanh toán thành công
+      loadPosCatalog();
     } catch (err) {
       playErrorBeep();
       setScanNotification({

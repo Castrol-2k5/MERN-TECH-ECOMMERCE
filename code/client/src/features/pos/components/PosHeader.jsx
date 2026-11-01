@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
+import { Link } from 'react-router-dom';
 import { 
   Store, 
   User, 
@@ -7,12 +9,30 @@ import {
   Minimize2, 
   Clock, 
   Wifi, 
-  ShoppingBag
+  ShoppingBag,
+  ArrowLeft
 } from 'lucide-react';
 
 export const PosHeader = ({ activeCartCount = 0 }) => {
+  const authUser = useSelector((state) => state.auth?.user);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  const branchName =
+    authUser?.branch?.name ||
+    (typeof authUser?.branchId === 'object' ? authUser?.branchId?.name : '') ||
+    'Chi nhánh TechOne';
+  const branchCode =
+    authUser?.branch?.branchCode ||
+    (typeof authUser?.branchId === 'object' ? authUser?.branchId?.branchCode : '') ||
+    'POS #01';
+  const staffName = authUser?.fullName || 'Nhân viên Thu Ngân';
+  const roleLabel =
+    authUser?.role === 'BRANCH_MANAGER'
+      ? 'Quản lý Chi nhánh'
+      : authUser?.role === 'SUPER_ADMIN'
+      ? 'Super Admin'
+      : 'Thu ngân tại quầy';
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -35,6 +55,15 @@ export const PosHeader = ({ activeCartCount = 0 }) => {
     <header className="bg-slate-900 border-b border-slate-800 text-white px-4 py-2.5 flex items-center justify-between select-none">
       {/* Brand & Branch Info */}
       <div className="flex items-center gap-4">
+        <Link
+          to="/portal/inventory"
+          title="Quay lại Cổng Quản Lý Chi Nhánh"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200 transition-colors"
+        >
+          <ArrowLeft className="w-3.5 h-3.5 text-blue-400" />
+          <span className="hidden sm:inline">Về Cổng Quản Lý</span>
+        </Link>
+
         <div className="flex items-center gap-2">
           <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center font-black text-xl shadow-lg shadow-blue-500/30 text-white">
             T
@@ -49,9 +78,9 @@ export const PosHeader = ({ activeCartCount = 0 }) => {
             </div>
             <div className="flex items-center gap-1.5 text-xs text-slate-400">
               <Store className="w-3.5 h-3.5 text-blue-400" />
-              <span className="font-medium text-slate-300">TechOne Q1 - 138 Trần Quang Khải</span>
+              <span className="font-medium text-slate-300">{branchName}</span>
               <span className="text-slate-600">•</span>
-              <span className="text-slate-400">Quầy #01</span>
+              <span className="font-mono text-slate-400">{branchCode}</span>
             </div>
           </div>
         </div>
@@ -63,8 +92,8 @@ export const PosHeader = ({ activeCartCount = 0 }) => {
               <User className="w-4 h-4 text-blue-400" />
             </div>
             <div>
-              <p className="font-semibold text-slate-200">Nguyễn Văn Thu Ngân</p>
-              <p className="text-[11px] text-slate-400">Ca sáng (08:00 - 16:00)</p>
+              <p className="font-semibold text-slate-200">{staffName}</p>
+              <p className="text-[11px] text-slate-400">{roleLabel}</p>
             </div>
           </div>
           <div className="flex items-center gap-1.5 text-slate-400 bg-slate-800/60 px-2.5 py-1 rounded-md border border-slate-700/50">

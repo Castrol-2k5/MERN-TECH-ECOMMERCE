@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { WarrantyTicket, WARRANTY_STATUS } from './warranty.model.js';
 import { Serial, SERIAL_STATUS } from '../serials/serial.model.js';
 import { Order } from '../orders/order.model.js';
-import { User } from '../users/user.model.js';
+import { User, USER_ROLES } from '../users/user.model.js';
 import { AppError } from '../../utils/appError.js';
 
 export class WarrantyService {
@@ -20,7 +20,15 @@ export class WarrantyService {
    * Quyền: STAFF, BRANCH_MANAGER, SUPER_ADMIN
    */
   static async createTicket(payload, currentUser) {
-    const { serialNumber, issueDescription, customerInfo, notes } = payload;
+    const {
+      serialNumber,
+      issueDescription,
+      customerInfo,
+      appearanceCondition,
+      accessories,
+      estimatedReturnDate,
+      notes
+    } = payload;
     const cleanSerial = serialNumber.trim().toUpperCase();
 
     // 1. Kiểm tra Serial/IMEI có tồn tại không
@@ -48,7 +56,7 @@ export class WarrantyService {
     }
 
     // 4. Xác định chi nhánh tiếp nhận
-    const branchId = currentUser.branchId || currentUser.scopedBranchId || serial.branchId;
+    const branchId = currentUser.branchId || currentUser.scopedBranchId || payload.branchId || serial.branchId;
 
     // 5. Xác định khách hàng (từ số điện thoại gửi lên hoặc từ đơn hàng gốc của Serial)
     let customerId = null;
@@ -71,11 +79,15 @@ export class WarrantyService {
       customerId,
       customerInfo: {
         fullName: customerInfo?.fullName || '',
-        phone: customerInfo?.phone || ''
+        phone: customerInfo?.phone || '',
+        address: customerInfo?.address || ''
       },
       branchId,
       staffId: currentUser._id || currentUser.id,
       issueDescription,
+      appearanceCondition: appearanceCondition || '',
+      accessories: Array.isArray(accessories) ? accessories : [],
+      estimatedReturnDate: estimatedReturnDate || '',
       status: WARRANTY_STATUS.RECEIVED,
       notes: notes || ''
     });
@@ -83,15 +95,25 @@ export class WarrantyService {
     // 7. Chuyển trạng thái Serial sang WARRANTY
     await Serial.updateOne({ _id: serial._id }, { status: SERIAL_STATUS.WARRANTY });
 
-    return ticket;
+    const populatedTicket = await WarrantyTicket.findById(ticket._id)
+      .populate('productId', 'name slug images brand')
+      .populate('branchId', 'name branchCode')
+      .populate('staffId', 'fullName email')
+      .lean();
+
+    return populatedTicket || ticket;
   }
 
   /**
    * Tra cứu danh sách phiếu bảo hành có lọc và phân trang
    */
-  static async getTickets(query = {}, _currentUser) {
+  static async getTickets(query = {}, currentUser) {
     const filter = {};
-    if (query.branchId) filter.branchId = query.branchId;
+    if (currentUser && currentUser.role !== USER_ROLES.SUPER_ADMIN && currentUser.branchId) {
+      filter.branchId = currentUser.branchId;
+    } else if (query.branchId) {
+      filter.branchId = query.branchId;
+    }
     if (query.status) filter.status = query.status;
     if (query.serialNumber) filter.serialNumber = query.serialNumber.trim().toUpperCase();
     if (query.ticketCode) filter.ticketCode = query.ticketCode.trim().toUpperCase();
@@ -122,5 +144,55 @@ export class WarrantyService {
         totalPages: Math.ceil(total / limit)
       }
     };
+  }
+
+  /**
+   * Cập nhật trạng thái phiếu bảo hành (RECEIVED -> PROCESSING -> COMPLETED -> RETURNED)
+   * Khi chuyển sang RETURNED, Serial của thiết bị tự động khôi phục về trạng thái SOLD
+   */
+  static async updateTicketStatus(ticketId, payload, currentUser) {
+    const ticket = await WarrantyTicket.findById(ticketId);
+    if (!ticket) {
+      throw new AppError('Không tìm thấy phiếu bảo hành yêu cầu.', 404, 'WARRANTY_TICKET_NOT_FOUND');
+    }
+
+    if (
+      currentUser &&
+      currentUser.role !== USER_ROLES.SUPER_ADMIN &&
+      currentUser.branchId &&
+      ticket.branchId.toString() !== currentUser.branchId.toString()
+    ) {
+      throw new AppError(
+        'Bạn không có quyền cập nhật phiếu bảo hành của chi nhánh khác.',
+        403,
+        'CROSS_BRANCH_ACCESS_DENIED'
+      );
+    }
+
+    ticket.status = payload.status;
+    if (payload.notes !== undefined) {
+      ticket.notes = payload.notes;
+    }
+    await ticket.save();
+
+    if (payload.status === WARRANTY_STATUS.RETURNED) {
+      await Serial.updateOne(
+        { serialNumber: ticket.serialNumber },
+        { status: SERIAL_STATUS.SOLD }
+      );
+    } else {
+      await Serial.updateOne(
+        { serialNumber: ticket.serialNumber },
+        { status: SERIAL_STATUS.WARRANTY }
+      );
+    }
+
+    const populated = await WarrantyTicket.findById(ticket._id)
+      .populate('productId', 'name slug images brand')
+      .populate('branchId', 'name branchCode')
+      .populate('staffId', 'fullName email')
+      .lean();
+
+    return populated;
   }
 }

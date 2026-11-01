@@ -23,4 +23,14 @@ export class WarrantyController {
       meta: { pagination: result.pagination }
     });
   });
+
+  static updateTicketStatus = catchAsync(async (req, res) => {
+    const ticket = await WarrantyService.updateTicketStatus(req.params.id, req.body, req.user);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Cập nhật trạng thái phiếu bảo hành thành công',
+      data: ticket
+    });
+  });
 }

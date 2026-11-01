@@ -96,8 +96,8 @@ export const DEMO_POS_PRODUCTS = [
 ];
 
 export const posService = {
-  // Quét barcode (có thể là SKU Barcode hoặc Serial cụ thể)
-  scanBarcode: async (barcode) => {
+  // Quét barcode (có thể là Serial/IMEI cụ thể hoặc mã SKU sản phẩm)
+  scanBarcode: async (barcode, branchId = '') => {
     const clean = String(barcode).trim();
 
     if (!isMockEnabled()) {
@@ -118,15 +118,49 @@ export const posService = {
               productSkuId: sku._id,
               price: sku.salePrice || sku.price || 0,
               hasSerial: true,
-              image: prod.images?.[0] || '',
-            },
+              image: sku.images?.[0] || prod.images?.[0] || '',
+              availableSerials: [data.serialNumber]
+            }
           };
         }
       } catch (err) {
+        const status = err?.response?.status;
+        // Nếu không phải mã Serial (404), thử tìm theo mã SKU/Barcode trong danh mục tồn kho chi nhánh
+        if (status === 404) {
+          const branchCatalog = await posService.searchProducts({ keyword: clean, branchId });
+          const lowerClean = clean.toLowerCase();
+          const matchedSku = branchCatalog.find(
+            (p) =>
+              p.sku?.toLowerCase() === lowerClean ||
+              p.barcode?.toLowerCase() === lowerClean
+          );
+          if (matchedSku) {
+            return {
+              type: 'SKU',
+              barcode: matchedSku.barcode,
+              product: {
+                _id: matchedSku._id,
+                name: matchedSku.name,
+                sku: matchedSku.sku,
+                productSkuId: matchedSku.skuId,
+                price: matchedSku.price,
+                hasSerial: matchedSku.hasSerial,
+                image: matchedSku.image,
+                availableSerials: matchedSku.availableSerials || []
+              }
+            };
+          }
+        }
+
         if (isDevOrTest()) {
           console.error(`[posService.scanBarcode] Không tìm thấy serial/barcode "${clean}":`, err);
         }
-        throw new Error(err.response?.data?.message || `Không tìm thấy sản phẩm hay serial khớp với mã [${clean}]`, { cause: err });
+        throw new Error(
+          err.response?.data?.message ||
+            err.response?.data?.error?.message ||
+            `Không tìm thấy sản phẩm hay serial khả dụng khớp với mã [${clean}]`,
+          { cause: err }
+        );
       }
     }
 
@@ -146,7 +180,8 @@ export const posService = {
             price: p.price,
             hasSerial: true,
             image: p.image,
-          },
+            availableSerials: p.availableSerials
+          }
         };
       }
     }
@@ -166,17 +201,84 @@ export const posService = {
           price: found.price,
           hasSerial: found.hasSerial,
           image: found.image,
-          availableSerials: found.availableSerials,
-        },
+          availableSerials: found.availableSerials
+        }
       };
     }
     throw new Error(`Không tìm thấy sản phẩm hay serial khớp với mã [${clean}]`);
   },
 
-  // Tìm kiếm sản phẩm POS theo từ khóa / danh mục
-  searchProducts: async ({ keyword = '', category = '' } = {}) => {
+  // Tìm kiếm sản phẩm POS theo từ khóa / danh mục và tồn kho thực tế tại chi nhánh (branchId)
+  searchProducts: async ({ keyword = '', category = '', branchId = '' } = {}) => {
     if (!isMockEnabled()) {
       try {
+        // Ưu tiên lấy tồn kho thực tế + danh sách Serial IN_STOCK tại chi nhánh của thu ngân/quản lý
+        if (branchId) {
+          const invRes = await apiClient.get(`/inventory/branch/${branchId}`);
+          const rawInventories =
+            invRes?.data?.inventories || (Array.isArray(invRes?.data) ? invRes.data : []);
+
+          let mapped = rawInventories
+            .filter((inv) => inv.productId && inv.productId.isActive !== false)
+            .map((inv) => {
+              const p = inv.productId || {};
+              const skus = Array.isArray(p.skus) ? p.skus : [];
+              const matchedSku =
+                skus.find((s) => String(s._id) === String(inv.productSkuId)) || skus[0] || {};
+              const inStockSerials = Array.isArray(inv.serials)
+                ? inv.serials
+                    .filter((s) => s.status === 'IN_STOCK')
+                    .map((s) => s.serialNumber)
+                : [];
+              const hasSerial =
+                p.isSerialManaged !== undefined
+                  ? p.isSerialManaged
+                  : matchedSku.inventoryTracking !== undefined
+                  ? matchedSku.inventoryTracking
+                  : true;
+              const optionLabel = Array.isArray(matchedSku.optionValues)
+                ? matchedSku.optionValues.map((ov) => ov.value).join(' / ')
+                : '';
+
+              return {
+                _id: p._id,
+                skuId: matchedSku._id || inv.productSkuId,
+                sku: matchedSku.sku || matchedSku.code || 'SKU-GEN',
+                barcode: matchedSku.sku || matchedSku.code || '8938500000000',
+                name: optionLabel ? `${p.name} (${optionLabel})` : p.name,
+                price: matchedSku.salePrice || matchedSku.price || p.price || 0,
+                costPrice: Math.round((matchedSku.price || 0) * 0.85),
+                stock: Number(inv.quantity ?? 0),
+                hasSerial,
+                category:
+                  typeof p.categoryId === 'object'
+                    ? p.categoryId?.name || 'Thiết bị'
+                    : p.category || 'Thiết bị',
+                brand: p.brand || '',
+                image: matchedSku.images?.[0] || p.images?.[0] || '',
+                availableSerials: inStockSerials
+              };
+            });
+
+          if (category && category !== 'TẤT CẢ') {
+            const catLower = category.toLowerCase();
+            mapped = mapped.filter((item) => item.category?.toLowerCase().includes(catLower));
+          }
+          if (keyword && keyword.trim()) {
+            const q = keyword.trim().toLowerCase();
+            mapped = mapped.filter(
+              (item) =>
+                item.name?.toLowerCase().includes(q) ||
+                item.sku?.toLowerCase().includes(q) ||
+                item.barcode?.toLowerCase().includes(q) ||
+                item.availableSerials?.some((sn) => sn.toLowerCase().includes(q))
+            );
+          }
+
+          return mapped;
+        }
+
+        // Fallback cho SUPER_ADMIN nếu chưa chọn branchId cụ thể
         const params = {};
         if (keyword) params.search = keyword;
         if (category && category !== 'TẤT CẢ') params.category = category;
@@ -195,12 +297,12 @@ export const posService = {
               name: p.name,
               price: primarySku.salePrice || primarySku.price || p.price || 0,
               costPrice: Math.round((primarySku.price || 0) * 0.85),
-              stock: 10,
+              stock: 0,
               hasSerial: p.isSerialManaged !== undefined ? p.isSerialManaged : true,
               category: typeof p.categoryId === 'object' ? p.categoryId?.name : p.category || 'Thiết bị',
               brand: p.brand || '',
               image: p.images?.[0] || '',
-              availableSerials: [],
+              availableSerials: []
             };
           });
         }
@@ -237,7 +339,13 @@ export const posService = {
         if (isDevOrTest()) {
           console.error('[posService.checkoutPos] Lỗi thanh toán POS:', err);
         }
-        throw new Error(err.response?.data?.message || err.message || 'Thanh toán POS thất bại!', { cause: err });
+        throw new Error(
+          err.response?.data?.message ||
+            err.response?.data?.error?.message ||
+            err.message ||
+            'Thanh toán POS thất bại!',
+          { cause: err }
+        );
       }
     }
 
@@ -254,9 +362,9 @@ export const posService = {
       finalAmount: payload.finalAmount || 0,
       paymentMethod: payload.paymentMethod,
       customerInfo: payload.customerInfo,
-      createdAt: new Date().toISOString(),
+      createdAt: new Date().toISOString()
     };
-  },
+  }
 };
 
 export default posService;

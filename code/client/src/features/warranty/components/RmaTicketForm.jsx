@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { ClipboardList, Camera, Calendar, CheckSquare, ShieldAlert, ArrowRight } from 'lucide-react';
+import { ClipboardList, Camera, Calendar, CheckSquare, ShieldAlert, ArrowRight, User, Phone } from 'lucide-react';
 
 const getDefaultReturnDate = () => {
   const d = new Date();
@@ -11,10 +11,22 @@ const getDefaultReturnDate = () => {
 export const RmaTicketForm = ({ warrantyData, onSubmit, isSubmitting = false }) => {
   const authUser = useSelector((state) => state.auth?.user);
   const [issueDescription, setIssueDescription] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [appearanceCondition, setAppearanceCondition] = useState('Thân máy đẹp 98%, màn hình dán cường lực, không cấn móp góc');
   const [selectedAccessories, setSelectedAccessories] = useState(['Thân máy', 'Hộp gốc (Box)']);
   const [estimatedReturnDate, setEstimatedReturnDate] = useState(getDefaultReturnDate);
-  const [photoCount, setPhotoCount] = useState(2); // Simulated photos
+  const [photoCount, setPhotoCount] = useState(2);
+
+  useEffect(() => {
+    if (warrantyData?.customer) {
+      setCustomerName(warrantyData.customer.fullName || '');
+      setCustomerPhone(warrantyData.customer.phone || '');
+    } else {
+      setCustomerName('');
+      setCustomerPhone('');
+    }
+  }, [warrantyData]);
 
   const availableAccessories = [
     'Thân máy',
@@ -39,19 +51,18 @@ export const RmaTicketForm = ({ warrantyData, onSubmit, isSubmitting = false }) 
 
     onSubmit({
       serialNumber: warrantyData.serialNumber,
-      productId: warrantyData.productId,
-      customerId: warrantyData.customer?._id,
-      customerInfo: warrantyData.customer,
       productName: warrantyData.productName,
-      branchId: authUser?.branchId || warrantyData.branchId,
-      staffId: authUser?._id,
       staffName: authUser?.fullName || 'Kỹ thuật viên',
+      customerInfo: {
+        fullName: customerName.trim() || warrantyData.customer?.fullName || 'Khách hàng bảo hành',
+        phone: customerPhone.trim() || warrantyData.customer?.phone || '',
+        address: warrantyData.customer?.address || ''
+      },
       issueDescription: issueDescription.trim(),
       appearanceCondition,
       accessories: selectedAccessories,
       estimatedReturnDate,
-      warrantyEndDate: warrantyData.warrantyEndDate,
-      isEligible: warrantyData.isEligible
+      notes: appearanceCondition
     });
   };
 
@@ -63,7 +74,41 @@ export const RmaTicketForm = ({ warrantyData, onSubmit, isSubmitting = false }) 
         </div>
         <div>
           <h3 className="font-bold text-sm text-slate-100">Biên bản tiếp nhận kỹ thuật &amp; sửa chữa</h3>
-          <p className="text-xs text-slate-400">Ghi nhận chi tiết tình trạng vật lý và lỗi phản ánh từ khách hàng</p>
+          <p className="text-xs text-slate-400">Ghi nhận chi tiết thông tin khách hàng, tình trạng vật lý và lỗi phản ánh</p>
+        </div>
+      </div>
+
+      {/* Thông tin khách hàng gửi bảo hành */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-semibold text-slate-300 block mb-1">
+            Họ tên khách hàng gửi máy:
+          </label>
+          <div className="relative">
+            <User className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              placeholder="Nhập tên khách hàng..."
+              className="w-full pl-8 pr-3 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-slate-300 block mb-1">
+            Số điện thoại liên hệ nhận máy:
+          </label>
+          <div className="relative">
+            <Phone className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              value={customerPhone}
+              onChange={(e) => setCustomerPhone(e.target.value)}
+              placeholder="Ví dụ: 0912345678"
+              className="w-full pl-8 pr-3 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs font-mono text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            />
+          </div>
         </div>
       </div>
 
@@ -164,7 +209,7 @@ export const RmaTicketForm = ({ warrantyData, onSubmit, isSubmitting = false }) 
         <div className="p-3 bg-amber-950/40 border border-amber-600/40 rounded-xl flex items-center gap-2 text-xs text-amber-300">
           <ShieldAlert className="w-4 h-4 shrink-0 text-amber-400" />
           <span>
-            Máy đã hết bảo hành chính hãng. Chi phí sửa chữa hoặc thay thế linh kiện sẽ được báo giá cho khách trước khi tiến hành.
+            Máy đã hết bảo hành chính hãng hoặc chưa đủ điều kiện miễn phí. Chi phí sửa chữa hoặc thay thế linh kiện sẽ được báo giá cho khách trước khi tiến hành.
           </span>
         </div>
       )}

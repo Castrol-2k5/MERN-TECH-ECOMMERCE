@@ -30,11 +30,29 @@ export const createWarrantyTicketSchema = z
             message: 'Số điện thoại không đúng định dạng di động Việt Nam'
           })
           .optional()
-          .default('')
+          .default(''),
+        address: z.string().trim().optional().default('')
       })
       .optional()
-      .default({ fullName: '', phone: '' }),
+      .default({ fullName: '', phone: '', address: '' }),
+    appearanceCondition: z.string().trim().optional().default(''),
+    accessories: z.array(z.string().trim()).optional().default([]),
+    estimatedReturnDate: z.string().trim().optional().default(''),
     notes: z.string().trim().optional().default('')
+  })
+  .strict();
+
+export const updateWarrantyStatusSchema = z
+  .object({
+    branchId: z
+      .string()
+      .trim()
+      .regex(OBJECT_ID_REGEX, 'Mã chi nhánh (branchId) không hợp lệ')
+      .optional(),
+    status: z.enum(Object.values(WARRANTY_STATUS), {
+      required_error: 'Trạng thái bảo hành mới (status) là bắt buộc'
+    }),
+    notes: z.string().trim().optional()
   })
   .strict();
 
