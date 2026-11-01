@@ -24,7 +24,7 @@ export const bootstrapAuth = createAsyncThunk(
         withCredentials: true,
       });
 
-      const user = meResponse.data?.data;
+      const user = meResponse.data?.data?.user || meResponse.data?.data;
       return { user, accessToken };
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || 'Phiên làm việc hết hạn');
@@ -46,7 +46,7 @@ export const authSlice = createSlice({
   reducers: {
     setCredentials: (state, action) => {
       const { user, accessToken } = action.payload;
-      state.user = user;
+      state.user = user?.user || user;
       state.accessToken = accessToken;
       state.isAuthenticated = Boolean(accessToken);
       state.isInitialized = true;

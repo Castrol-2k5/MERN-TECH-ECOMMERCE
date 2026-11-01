@@ -37,6 +37,10 @@ const branchSchema = new Schema(
         required: [true, 'Tọa độ GPS [kinh độ, vĩ độ] là bắt buộc']
       }
     },
+    isHeadquarter: {
+      type: Boolean,
+      default: false
+    },
     isActive: {
       type: Boolean,
       default: true

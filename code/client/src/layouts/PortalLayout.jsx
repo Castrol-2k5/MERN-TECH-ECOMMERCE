@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
 import { 
   Store, 
   Layers, 
@@ -15,75 +16,131 @@ import {
   Truck,
   ShieldCheck,
   BarChart3,
-  ArrowLeftRight
+  ArrowLeftRight,
+  ShieldAlert
 } from 'lucide-react';
+import { logout } from '../store/slices/authSlice.js';
+import axiosClient from '../services/axiosClient.js';
 
 export const PortalLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const authUser = useSelector((state) => state.auth?.user);
 
   // If on POS Page, POS has its own specialized fullscreen layout
   const isPosPage = location.pathname.includes('/portal/pos');
+
+  const userRole = authUser?.role || 'STAFF';
+  const displayName = authUser?.fullName || 'Nhân sự TechOne';
+  const initials = displayName
+    .split(' ')
+    .filter(Boolean)
+    .slice(-2)
+    .map((w) => w[0]?.toUpperCase())
+    .join('') || 'TO';
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await axiosClient.post('/auth/logout');
+    } catch {
+      // Kịch bản phụ 2.a: Mất kết nối mạng vẫn xóa phiên cục bộ
+    } finally {
+      dispatch(logout());
+      setLoggingOut(false);
+      navigate('/login', { replace: true });
+    }
+  };
+
+  const handleLogoutAllDevices = async () => {
+    if (loggingOut) return;
+    if (!window.confirm('Bạn có chắc chắn muốn đăng xuất khỏi TẤT CẢ thiết bị đang đăng nhập không?')) {
+      return;
+    }
+    setLoggingOut(true);
+    try {
+      await axiosClient.post('/auth/logout-all');
+    } catch {
+      // Kịch bản phụ 2.a: Mất kết nối mạng vẫn xóa phiên cục bộ
+    } finally {
+      dispatch(logout());
+      setLoggingOut(false);
+      navigate('/login', { replace: true });
+    }
+  };
 
   const operationsLinks = [
     {
       to: '/portal/pos',
       label: 'Web POS Thu Ngân',
       badge: 'F9',
-      icon: ShoppingBag
+      icon: ShoppingBag,
+      roles: ['STAFF', 'BRANCH_MANAGER', 'SUPER_ADMIN']
     },
     {
       to: '/portal/inventory',
       label: 'Kho Chi Nhánh',
       badge: 'Quầy kệ',
-      icon: Layers
+      icon: Layers,
+      roles: ['STAFF', 'BRANCH_MANAGER', 'SUPER_ADMIN']
     },
     {
       to: '/portal/warranty-reception',
       label: 'Tiếp Nhận Bảo Hành',
       badge: 'E-Warranty',
-      icon: Wrench
+      icon: Wrench,
+      roles: ['STAFF', 'BRANCH_MANAGER', 'SUPER_ADMIN']
     },
     {
       to: '/portal/branch/transfers',
       label: 'Điều Chuyển Kho',
       badge: 'P-20',
-      icon: ArrowLeftRight
+      icon: ArrowLeftRight,
+      roles: ['BRANCH_MANAGER', 'SUPER_ADMIN']
     }
-  ];
+  ].filter((item) => item.roles.includes(userRole));
 
   const hqAdminLinks = [
     {
       to: '/portal/admin/products',
       label: 'Quản Trị Sản Phẩm',
       badge: 'Dynamic',
-      icon: Box
+      icon: Box,
+      roles: ['SUPER_ADMIN']
     },
     {
       to: '/portal/admin/import-serials',
       label: 'Nhập Lô Serial / IMEI',
-      badge: 'Batch',
-      icon: Barcode
+      badge: 'Kho HQ',
+      icon: Barcode,
+      roles: ['SUPER_ADMIN']
     },
     {
       to: '/portal/admin/orders-dispatch',
-      label: 'Điều Phối Đơn B2C',
+      label: userRole === 'SUPER_ADMIN' ? 'Điều Phối Đơn B2C' : 'Xử Lý Đơn B2C Chi Nhánh',
       badge: 'SLA',
-      icon: Truck
+      icon: Truck,
+      roles: ['BRANCH_MANAGER', 'SUPER_ADMIN']
     },
     {
       to: '/portal/admin/branches-rbac',
       label: 'Chi Nhánh & RBAC',
       badge: 'Hệ thống',
-      icon: Store
+      icon: Store,
+      roles: ['SUPER_ADMIN']
     },
     {
       to: '/portal/admin/analytics',
       label: 'Báo Cáo Doanh Thu',
       badge: 'BI',
-      icon: BarChart3
+      icon: BarChart3,
+      roles: ['SUPER_ADMIN']
     }
-  ];
+  ].filter((item) => item.roles.includes(userRole));
 
   if (isPosPage) {
     return <Outlet />;
@@ -165,41 +222,43 @@ export const PortalLayout = () => {
             </div>
 
             {/* Nhóm 2: Quản trị trụ sở (HQ ADMIN) */}
-            <div>
-              <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-400/90 flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3" />
-                <span>Quản trị trụ sở (HQ Admin)</span>
+            {hqAdminLinks.length > 0 && (
+              <div>
+                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-400/90 flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3" />
+                  <span>{userRole === 'SUPER_ADMIN' ? 'Quản trị trụ sở (HQ Admin)' : 'Điều vận đơn hàng B2C'}</span>
+                </div>
+                <nav className="space-y-1 mt-1">
+                  {hqAdminLinks.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        onClick={() => setSidebarOpen(false)}
+                        className={({ isActive }) =>
+                          `flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                            isActive
+                              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25'
+                              : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                          }`
+                        }
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Icon className="w-4 h-4" />
+                          <span>{item.label}</span>
+                        </div>
+                        {item.badge && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-slate-950/60 text-cyan-300">
+                            {item.badge}
+                          </span>
+                        )}
+                      </NavLink>
+                    );
+                  })}
+                </nav>
               </div>
-              <nav className="space-y-1 mt-1">
-                {hqAdminLinks.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      onClick={() => setSidebarOpen(false)}
-                      className={({ isActive }) =>
-                        `flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                          isActive
-                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25'
-                            : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                        }`
-                      }
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <Icon className="w-4 h-4" />
-                        <span>{item.label}</span>
-                      </div>
-                      {item.badge && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-slate-950/60 text-cyan-300">
-                          {item.badge}
-                        </span>
-                      )}
-                    </NavLink>
-                  );
-                })}
-              </nav>
-            </div>
+            )}
 
             {/* Nhóm 3: Storefront B2C Link */}
             <div className="pt-2 border-t border-slate-800">
@@ -218,24 +277,39 @@ export const PortalLayout = () => {
         </div>
 
         {/* User profile footer */}
-        <div className="p-3 border-t border-slate-800 bg-slate-950/80 shrink-0">
+        <div className="p-3 border-t border-slate-800 bg-slate-950/80 shrink-0 space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-8 h-8 rounded-lg bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400 shrink-0 font-bold text-xs">
-                MA
+                {initials}
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-bold text-slate-200 truncate">Nguyễn Minh Anh</p>
-                <p className="text-[10px] text-cyan-400 font-mono font-bold">SUPER_ADMIN</p>
+                <p className="text-xs font-bold text-slate-200 truncate" title={displayName}>
+                  {displayName}
+                </p>
+                <p className="text-[10px] text-cyan-400 font-mono font-bold">{userRole}</p>
               </div>
             </div>
-            <button
-              type="button"
-              title="Đăng xuất"
-              className="p-1.5 text-slate-500 hover:text-rose-400 transition-colors cursor-pointer"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={handleLogoutAllDevices}
+                disabled={loggingOut}
+                title="Đăng xuất khỏi mọi thiết bị (Global Logout)"
+                className="p-1.5 text-slate-500 hover:text-amber-400 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <ShieldAlert className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={loggingOut}
+                title="Đăng xuất"
+                className="p-1.5 text-slate-500 hover:text-rose-400 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       </aside>

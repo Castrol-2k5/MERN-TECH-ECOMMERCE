@@ -17,9 +17,14 @@ export const AdminBranchesUsersPage = () => {
   const [showUserModal, setShowUserModal] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
 
+  const showToast = (type, message) => {
+    setToastMsg({ type, message });
+    setTimeout(() => setToastMsg(null), 3500);
+  };
+
   const fetchBranches = useCallback(async () => {
     try {
-      const list = await branchService.getBranches();
+      const list = await branchService.getBranches({ includeInactive: true });
       setBranches(list || []);
     } catch {
       setBranches([]);
@@ -31,11 +36,7 @@ export const AdminBranchesUsersPage = () => {
       const list = await userService.getUsers();
       setUsers(list || []);
     } catch {
-      if (isMockEnabled()) {
-        setUsers(fallbackUsers);
-      } else {
-        setUsers([]);
-      }
+      setUsers(isMockEnabled() ? fallbackUsers : []);
     }
   }, []);
 
@@ -54,70 +55,74 @@ export const AdminBranchesUsersPage = () => {
   }, [fetchBranches, fetchUsers]);
 
   const handleSaveBranch = async (formData) => {
-    try {
-      if (editingBranch) {
-        const saved = await branchService.updateBranch(editingBranch._id, formData);
-        setBranches((prev) => prev.map((b) => (b._id === saved._id ? saved : b)));
-        setToastMsg({ type: 'success', message: `Đã cập nhật chi nhánh ${saved.name}!` });
-      } else {
-        const saved = await branchService.createBranch(formData);
-        setBranches((prev) => [saved, ...prev]);
-        setToastMsg({ type: 'success', message: `Đã tạo mới chi nhánh ${saved.name}!` });
-      }
-      setEditingBranch(null);
-      setShowBranchModal(false);
-      await fetchBranches();
-    } catch (err) {
-      setToastMsg({
-        type: 'error',
-        message: err.response?.data?.message || err.message || 'Lỗi khi lưu chi nhánh'
-      });
+    if (editingBranch) {
+      const saved = await branchService.updateBranch(editingBranch._id, formData);
+      setBranches((prev) => prev.map((b) => (b._id === saved._id ? saved : b)));
+      showToast('success', `Đã cập nhật chi nhánh ${saved.name}!`);
+    } else {
+      const saved = await branchService.createBranch(formData);
+      setBranches((prev) => [saved, ...prev]);
+      showToast('success', `Đã tạo mới chi nhánh ${saved.name}!`);
     }
-    setTimeout(() => setToastMsg(null), 3500);
+    setEditingBranch(null);
+    setShowBranchModal(false);
+    await fetchBranches();
   };
 
   const handleCreateUser = async (userPayload) => {
-    try {
-      const created = await userService.createUser(userPayload);
-      setUsers((prev) => [created, ...prev]);
-      setToastMsg({ type: 'success', message: `Đã khởi tạo tài khoản ${created.fullName} thành công!` });
-      await fetchUsers();
-    } catch (err) {
-      throw err;
-    }
-    setTimeout(() => setToastMsg(null), 3500);
+    const created = await userService.createUser(userPayload);
+    setUsers((prev) => [created, ...prev]);
+    showToast('success', `Đã khởi tạo tài khoản ${created.fullName} thành công!`);
+    await Promise.all([fetchUsers(), fetchBranches()]);
   };
 
-  const handleUpdateUserRole = async (userId, role) => {
+  const handleUpdateUserRole = async (userId, role, currentBranchId) => {
     try {
-      const updated = await userService.updateUser(userId, { role });
+      const payload = { role };
+      if ((role === 'STAFF' || role === 'BRANCH_MANAGER') && !currentBranchId) {
+        const defaultRetailBranch =
+          branches.find((b) => !b.isHeadquarter && b.branchCode !== 'BR-HQ') || branches[0];
+        if (defaultRetailBranch?._id) {
+          payload.branchId = defaultRetailBranch._id;
+        }
+      } else if (role === 'SUPER_ADMIN' || role === 'CUSTOMER') {
+        payload.branchId = null;
+      }
+
+      const updated = await userService.updateUser(userId, payload);
       setUsers((prev) =>
-        prev.map((u) => (u._id === userId ? { ...u, role: updated.role || role } : u))
+        prev.map((u) => (u._id === userId ? { ...u, ...updated } : u))
       );
-      setToastMsg({ type: 'success', message: `Đã cập nhật quyền ${role} cho nhân sự!` });
+      showToast('success', `Đã cập nhật quyền ${role} cho nhân sự!`);
+      await fetchBranches();
     } catch (err) {
-      setToastMsg({
-        type: 'error',
-        message: err.response?.data?.message || err.message || 'Lỗi khi cập nhật vai trò'
-      });
+      showToast(
+        'error',
+        err.response?.data?.errors?.[0]?.message ||
+          err.response?.data?.message ||
+          err.message ||
+          'Lỗi khi cập nhật vai trò'
+      );
     }
-    setTimeout(() => setToastMsg(null), 3500);
   };
 
   const handleUpdateUserBranch = async (userId, branchId) => {
     try {
-      const updated = await userService.updateUser(userId, { branchId });
+      const updated = await userService.updateUser(userId, { branchId: branchId || null });
       setUsers((prev) =>
-        prev.map((u) => (u._id === userId ? { ...u, branchId: updated.branchId || branchId } : u))
+        prev.map((u) => (u._id === userId ? { ...u, ...updated } : u))
       );
-      setToastMsg({ type: 'success', message: 'Đã phân bổ lại chi nhánh công tác!' });
+      showToast('success', 'Đã phân bổ lại chi nhánh công tác!');
+      await fetchBranches();
     } catch (err) {
-      setToastMsg({
-        type: 'error',
-        message: err.response?.data?.message || err.message || 'Lỗi khi phân bổ chi nhánh'
-      });
+      showToast(
+        'error',
+        err.response?.data?.errors?.[0]?.message ||
+          err.response?.data?.message ||
+          err.message ||
+          'Lỗi khi phân bổ chi nhánh'
+      );
     }
-    setTimeout(() => setToastMsg(null), 3500);
   };
 
   const handleToggleUserActive = async (userId, isActive) => {
@@ -126,17 +131,17 @@ export const AdminBranchesUsersPage = () => {
       setUsers((prev) =>
         prev.map((u) => (u._id === userId ? { ...u, isActive } : u))
       );
-      setToastMsg({
-        type: 'success',
-        message: `Đã ${isActive ? 'kích hoạt' : 'tạm khóa'} tài khoản nhân sự!`
-      });
+      showToast(
+        'success',
+        `Đã ${isActive ? 'kích hoạt' : 'tạm khóa & thu hồi phiên đăng nhập của'} tài khoản nhân sự!`
+      );
+      await fetchBranches();
     } catch (err) {
-      setToastMsg({
-        type: 'error',
-        message: err.response?.data?.message || err.message || 'Lỗi khi cập nhật trạng thái'
-      });
+      showToast(
+        'error',
+        err.response?.data?.message || err.message || 'Lỗi khi cập nhật trạng thái'
+      );
     }
-    setTimeout(() => setToastMsg(null), 3500);
   };
 
   return (
@@ -152,7 +157,7 @@ export const AdminBranchesUsersPage = () => {
             Quản Lý Mạng Lưới Chi Nhánh &amp; Phân Quyền RBAC
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
-            Cấu hình tọa độ GeoJSON chi nhánh, quản trị nhân sự và kiểm soát vai trò SUPER_ADMIN, BRANCH_MANAGER, STAFF
+            Cấu hình Kho Trung Tâm (BR-HQ), tọa độ GeoJSON chi nhánh bán lẻ và kiểm soát vai trò SUPER_ADMIN, BRANCH_MANAGER, STAFF, CUSTOMER
           </p>
         </div>
 
@@ -209,7 +214,9 @@ export const AdminBranchesUsersPage = () => {
           }`}
         >
           <span>{toastMsg.message}</span>
-          <button onClick={() => setToastMsg(null)} className="opacity-70 hover:opacity-100">✕</button>
+          <button onClick={() => setToastMsg(null)} className="opacity-70 hover:opacity-100">
+            ✕
+          </button>
         </div>
       )}
 
@@ -242,7 +249,10 @@ export const AdminBranchesUsersPage = () => {
       {/* Branch Form Modal */}
       <BranchFormModal
         isOpen={showBranchModal}
-        onClose={() => setShowBranchModal(false)}
+        onClose={() => {
+          setShowBranchModal(false);
+          setEditingBranch(null);
+        }}
         branch={editingBranch}
         onSaveBranch={handleSaveBranch}
       />

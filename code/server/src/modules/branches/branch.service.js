@@ -1,4 +1,6 @@
 import { Branch } from './branch.model.js';
+import { User, USER_ROLES } from '../users/user.model.js';
+import { BranchInventory } from '../inventory/inventory.model.js';
 import { AppError } from '../../utils/appError.js';
 
 export class BranchService {
@@ -6,8 +8,9 @@ export class BranchService {
    * Create a new physical branch
    */
   static async createBranch(branchData) {
+    const normalizedCode = branchData.branchCode.toUpperCase();
     const existingBranch = await Branch.findOne({
-      branchCode: branchData.branchCode.toUpperCase()
+      branchCode: normalizedCode
     });
 
     if (existingBranch) {
@@ -20,17 +23,21 @@ export class BranchService {
 
     const branch = await Branch.create({
       ...branchData,
-      branchCode: branchData.branchCode.toUpperCase()
+      branchCode: normalizedCode,
+      isHeadquarter: Boolean(branchData.isHeadquarter || normalizedCode === 'BR-HQ')
     });
 
     return branch;
   }
 
   /**
-   * Get all active branches (read-only, lean)
+   * Get branches (supports includeInactive=true for Admin management)
    */
   static async getAllBranches(filter = {}) {
-    const query = { isActive: true };
+    const query = {};
+    if (filter.includeInactive !== 'true' && filter.includeInactive !== true) {
+      query.isActive = true;
+    }
 
     if (filter.search) {
       query.$or = [
@@ -40,8 +47,55 @@ export class BranchService {
       ];
     }
 
-    const branches = await Branch.find(query).sort({ createdAt: -1 }).lean();
-    return branches;
+    const branches = await Branch.find(query)
+      .sort({ isHeadquarter: -1, createdAt: 1 })
+      .lean();
+
+    if (branches.length === 0) {
+      return [];
+    }
+
+    const branchIds = branches.map((b) => b._id);
+
+    const [managers, stockAgg] = await Promise.all([
+      User.find({
+        branchId: { $in: branchIds },
+        role: USER_ROLES.BRANCH_MANAGER,
+        isActive: true
+      })
+        .select('fullName branchId')
+        .lean(),
+      BranchInventory.aggregate([
+        { $match: { branchId: { $in: branchIds } } },
+        { $group: { _id: '$branchId', totalStock: { $sum: '$quantity' } } }
+      ])
+    ]);
+
+    const managerMap = new Map();
+    for (const m of managers) {
+      if (m.branchId) {
+        managerMap.set(m.branchId.toString(), m.fullName);
+      }
+    }
+
+    const stockMap = new Map();
+    for (const s of stockAgg) {
+      if (s._id) {
+        stockMap.set(s._id.toString(), s.totalStock || 0);
+      }
+    }
+
+    return branches.map((b) => {
+      const idStr = b._id.toString();
+      const isHq = Boolean(b.isHeadquarter || b.branchCode === 'BR-HQ');
+      return {
+        ...b,
+        isHeadquarter: isHq,
+        managerName:
+          managerMap.get(idStr) || (isHq ? 'Ban Quản Trị Trụ Sở (HQ)' : 'Chưa bổ nhiệm'),
+        stockCount: stockMap.get(idStr) ?? 0
+      };
+    });
   }
 
   /**
@@ -58,7 +112,7 @@ export class BranchService {
   }
 
   /**
-   * Update an existing branch
+   * Update an existing branch (allows re-activating an inactive branch)
    */
   static async updateBranch(branchId, updateData) {
     if (updateData.branchCode) {
@@ -78,7 +132,7 @@ export class BranchService {
     }
 
     const branch = await Branch.findOneAndUpdate(
-      { _id: branchId, isActive: true },
+      { _id: branchId },
       { $set: updateData },
       { new: true, runValidators: true }
     );

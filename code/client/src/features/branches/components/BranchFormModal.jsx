@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Store, Navigation, Check } from 'lucide-react';
 
 export const BranchFormModal = ({
@@ -7,40 +7,88 @@ export const BranchFormModal = ({
   branch,
   onSaveBranch
 }) => {
-  const [name, setName] = useState(branch?.name || '');
-  const [code, setCode] = useState(branch?.code || 'BR-NEW');
-  const [address, setAddress] = useState(branch?.address || '');
-  const [phone, setPhone] = useState(branch?.phone || '028 3822 6868');
-  const [managerName, setManagerName] = useState(branch?.managerName || '');
-  const [longitude, setLongitude] = useState(
-    branch?.location?.coordinates?.[0]?.toString() || '106.6912'
-  );
-  const [latitude, setLatitude] = useState(
-    branch?.location?.coordinates?.[1]?.toString() || '10.7915'
-  );
-  const [isActive, setIsActive] = useState(branch?.isActive !== false);
+  const [name, setName] = useState('');
+  const [branchCode, setBranchCode] = useState('');
+  const [address, setAddress] = useState('');
+  const [phone, setPhone] = useState('');
+  const [longitude, setLongitude] = useState('106.6917');
+  const [latitude, setLatitude] = useState('10.7725');
+  const [isHeadquarter, setIsHeadquarter] = useState(false);
+  const [isActive, setIsActive] = useState(true);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setErrorMsg('');
+    if (branch) {
+      setName(branch.name || '');
+      setBranchCode(branch.branchCode || branch.code || '');
+      setAddress(branch.address || '');
+      setPhone(branch.phone || '');
+      setLongitude(branch.location?.coordinates?.[0]?.toString() ?? '106.6917');
+      setLatitude(branch.location?.coordinates?.[1]?.toString() ?? '10.7725');
+      setIsHeadquarter(Boolean(branch.isHeadquarter || branch.branchCode === 'BR-HQ'));
+      setIsActive(branch.isActive !== false);
+    } else {
+      setName('');
+      setBranchCode('');
+      setAddress('');
+      setPhone('02838226868');
+      setLongitude('106.6917');
+      setLatitude('10.7725');
+      setIsHeadquarter(false);
+      setIsActive(true);
+    }
+  }, [branch, isOpen]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrorMsg('');
+
+    const lngNum = parseFloat(longitude);
+    const latNum = parseFloat(latitude);
+    if (
+      Number.isNaN(lngNum) ||
+      Number.isNaN(latNum) ||
+      lngNum < -180 ||
+      lngNum > 180 ||
+      latNum < -90 ||
+      latNum > 90
+    ) {
+      setErrorMsg('Tọa độ GPS không hợp lệ (Kinh độ: -180..180, Vĩ độ: -90..90).');
+      return;
+    }
+
     const payload = {
-      name,
-      code,
-      address,
-      phone,
-      managerName,
+      branchCode: branchCode.trim().toUpperCase(),
+      name: name.trim(),
+      address: address.trim(),
+      phone: phone.trim(),
       location: {
         type: 'Point',
-        coordinates: [parseFloat(longitude) || 106.6912, parseFloat(latitude) || 10.7915]
+        coordinates: [lngNum, latNum]
       },
+      isHeadquarter,
       isActive
     };
-    if (branch?._id) {
-      payload._id = branch._id;
+
+    setSaving(true);
+    try {
+      await onSaveBranch(payload);
+      onClose();
+    } catch (err) {
+      setErrorMsg(
+        err.response?.data?.errors?.[0]?.message ||
+          err.response?.data?.message ||
+          err.message ||
+          'Lỗi khi lưu thông tin chi nhánh'
+      );
+    } finally {
+      setSaving(false);
     }
-    onSaveBranch(payload);
-    onClose();
   };
 
   return (
@@ -57,6 +105,7 @@ export const BranchFormModal = ({
             </h3>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
           >
@@ -66,34 +115,46 @@ export const BranchFormModal = ({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-5 space-y-3.5">
+          {errorMsg && (
+            <div className="p-2.5 bg-rose-950/80 border border-rose-500/40 rounded-xl text-rose-300 text-xs">
+              {errorMsg}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] font-semibold text-slate-300 block mb-1">Tên chi nhánh:</label>
+              <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                Tên chi nhánh:
+              </label>
               <input
                 type="text"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="TechOne Q1 • 138 Trần Quang Khải"
+                placeholder="Chi nhánh Quận 3 - TechOne"
                 className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-blue-500"
               />
             </div>
 
             <div>
-              <label className="text-[11px] font-semibold text-slate-300 block mb-1">Mã định danh (code):</label>
+              <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                Mã định danh (branchCode):
+              </label>
               <input
                 type="text"
                 required
-                value={code}
-                onChange={(e) => setCode(e.target.value.toUpperCase())}
-                placeholder="BR-Q1-TQK"
+                value={branchCode}
+                onChange={(e) => setBranchCode(e.target.value.toUpperCase())}
+                placeholder="BR-Q3"
                 className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono font-bold text-cyan-400 focus:outline-none focus:border-blue-500"
               />
             </div>
           </div>
 
           <div>
-            <label className="text-[11px] font-semibold text-slate-300 block mb-1">Địa chỉ chi nhánh:</label>
+            <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+              Địa chỉ chi nhánh:
+            </label>
             <input
               type="text"
               required
@@ -104,28 +165,18 @@ export const BranchFormModal = ({
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-[11px] font-semibold text-slate-300 block mb-1">Số điện thoại liên hệ:</label>
-              <input
-                type="text"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="028 3822 6868"
-                className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono text-slate-100 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="text-[11px] font-semibold text-slate-300 block mb-1">Quản lý chi nhánh phụ trách:</label>
-              <input
-                type="text"
-                value={managerName}
-                onChange={(e) => setManagerName(e.target.value)}
-                placeholder="Phạm Quốc Huy"
-                className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-blue-500"
-              />
-            </div>
+          <div>
+            <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+              Số điện thoại liên hệ (Di động hoặc Máy bàn):
+            </label>
+            <input
+              type="text"
+              required
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="02838226868 hoặc 0909123456"
+              className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono text-slate-100 focus:outline-none focus:border-blue-500"
+            />
           </div>
 
           {/* GPS Coordinates GeoJSON */}
@@ -136,39 +187,60 @@ export const BranchFormModal = ({
             </span>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-[10px] text-slate-400 block mb-0.5">Kinh độ (Longitude):</label>
+                <label className="text-[10px] text-slate-400 block mb-0.5">
+                  Kinh độ (Longitude):
+                </label>
                 <input
                   type="text"
+                  required
                   value={longitude}
                   onChange={(e) => setLongitude(e.target.value)}
-                  placeholder="106.6912"
+                  placeholder="106.6917"
                   className="w-full px-2.5 py-1 bg-slate-900 border border-slate-700 rounded text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500"
                 />
               </div>
               <div>
-                <label className="text-[10px] text-slate-400 block mb-0.5">Vĩ độ (Latitude):</label>
+                <label className="text-[10px] text-slate-400 block mb-0.5">
+                  Vĩ độ (Latitude):
+                </label>
                 <input
                   type="text"
+                  required
                   value={latitude}
                   onChange={(e) => setLatitude(e.target.value)}
-                  placeholder="10.7915"
+                  placeholder="10.7725"
                   className="w-full px-2.5 py-1 bg-slate-900 border border-slate-700 rounded text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500"
                 />
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 pt-1">
-            <input
-              type="checkbox"
-              id="branch-active"
-              checked={isActive}
-              onChange={(e) => setIsActive(e.target.checked)}
-              className="rounded border-slate-700 text-blue-600 focus:ring-0"
-            />
-            <label htmlFor="branch-active" className="text-xs text-slate-300 cursor-pointer">
-              Chi nhánh đang hoạt động mở cửa đón khách
-            </label>
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="branch-hq"
+                checked={isHeadquarter}
+                onChange={(e) => setIsHeadquarter(e.target.checked)}
+                className="rounded border-slate-700 text-cyan-600 focus:ring-0"
+              />
+              <label htmlFor="branch-hq" className="text-xs text-cyan-300 cursor-pointer font-semibold">
+                Là Kho Trung Tâm Trụ Sở Chính (HQ Warehouse)
+              </label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="branch-active"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+                className="rounded border-slate-700 text-blue-600 focus:ring-0"
+              />
+              <label htmlFor="branch-active" className="text-xs text-slate-300 cursor-pointer">
+                Chi nhánh đang hoạt động mở cửa đón khách
+              </label>
+            </div>
           </div>
 
           {/* Footer */}
@@ -182,10 +254,11 @@ export const BranchFormModal = ({
             </button>
             <button
               type="submit"
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-md shadow-blue-600/20 cursor-pointer"
+              disabled={saving}
+              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-md shadow-blue-600/20 cursor-pointer"
             >
               <Check className="w-3.5 h-3.5" />
-              <span>Lưu chi nhánh</span>
+              <span>{saving ? 'Đang lưu...' : 'Lưu chi nhánh'}</span>
             </button>
           </div>
         </form>

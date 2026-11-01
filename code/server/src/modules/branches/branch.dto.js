@@ -1,5 +1,7 @@
 import { z } from 'zod';
-import { VN_PHONE_REGEX } from '../auth/auth.dto.js';
+
+// Chấp nhận SĐT di động VN (03,05,07,08,09), số máy bàn cố định (02x) và tổng đài (1800/1900)
+export const BRANCH_PHONE_REGEX = /^((0|\+84)[235789][0-9]{8,9}|1[89]00[0-9]{4,6})$/;
 
 export const createBranchSchema = z
   .object({
@@ -22,7 +24,10 @@ export const createBranchSchema = z
     phone: z
       .string({ required_error: 'Số điện thoại chi nhánh là bắt buộc' })
       .trim()
-      .regex(VN_PHONE_REGEX, 'Số điện thoại không đúng định dạng số điện thoại Việt Nam'),
+      .transform((val) => val.replace(/[\s.-]/g, ''))
+      .refine((val) => BRANCH_PHONE_REGEX.test(val), {
+        message: 'Số điện thoại không đúng định dạng số điện thoại Việt Nam (di động hoặc máy bàn)'
+      }),
     location: z.object(
       {
         type: z.literal('Point').default('Point'),
@@ -38,6 +43,7 @@ export const createBranchSchema = z
       },
       { required_error: 'Vị trí địa lý (location) là bắt buộc' }
     ),
+    isHeadquarter: z.boolean().optional().default(false),
     isActive: z.boolean().optional().default(true)
   })
   .strict();

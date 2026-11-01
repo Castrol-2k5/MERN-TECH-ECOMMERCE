@@ -1,11 +1,14 @@
 import { User, USER_ROLES } from './user.model.js';
 import { Branch } from '../branches/branch.model.js';
+import { Session } from '../auth/session.model.js';
 import { AppError } from '../../utils/appError.js';
+
+const BRANCH_POPULATE_FIELDS = 'name branchCode address phone isHeadquarter';
 
 export class UserService {
   static async getUsers(query = {}) {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
-    const limit = Math.max(1, Math.min(100, parseInt(query.limit, 10) || 20));
+    const limit = Math.max(1, Math.min(100, parseInt(query.limit, 10) || 50));
     const skip = (page - 1) * limit;
 
     const filter = {};
@@ -34,7 +37,7 @@ export class UserService {
     const [total, users] = await Promise.all([
       User.countDocuments(filter),
       User.find(filter)
-        .populate('branchId', 'name code address phone')
+        .populate('branchId', BRANCH_POPULATE_FIELDS)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -54,7 +57,7 @@ export class UserService {
 
   static async getUserById(id) {
     const user = await User.findById(id)
-      .populate('branchId', 'name code address phone')
+      .populate('branchId', BRANCH_POPULATE_FIELDS)
       .lean();
 
     if (!user) {
@@ -70,29 +73,50 @@ export class UserService {
     // 0. Kiểm tra quyền của người thực hiện
     if (currentUser && currentUser.role === USER_ROLES.BRANCH_MANAGER) {
       if (role !== USER_ROLES.STAFF) {
-        throw new AppError('Quản lý chi nhánh chỉ được phép khởi tạo tài khoản nhân viên (STAFF)', 403, 'FORBIDDEN');
+        throw new AppError(
+          'Quản lý chi nhánh chỉ được phép khởi tạo tài khoản nhân viên (STAFF)',
+          403,
+          'FORBIDDEN'
+        );
       }
-      const managerBranchId = currentUser.branchId?._id?.toString() || currentUser.branchId?.toString();
+      const managerBranchId =
+        currentUser.branchId?._id?.toString() || currentUser.branchId?.toString();
       if (branchId && branchId.toString() !== managerBranchId) {
-        throw new AppError('Bạn chỉ có quyền tạo nhân viên cho chính chi nhánh của mình', 403, 'CROSS_BRANCH_FORBIDDEN');
+        throw new AppError(
+          'Bạn chỉ có quyền tạo nhân viên cho chính chi nhánh của mình',
+          403,
+          'CROSS_BRANCH_FORBIDDEN'
+        );
       }
     }
 
     // 1. Kiểm tra trùng lặp email và số điện thoại
     const existingEmail = await User.findOne({ email: email.toLowerCase() });
     if (existingEmail) {
-      throw new AppError('Địa chỉ email đã được đăng ký bởi tài khoản khác', 409, 'EMAIL_ALREADY_EXISTS');
+      throw new AppError(
+        'Địa chỉ email đã được đăng ký bởi tài khoản khác',
+        409,
+        'EMAIL_ALREADY_EXISTS'
+      );
     }
 
     const existingPhone = await User.findOne({ phone });
     if (existingPhone) {
-      throw new AppError('Số điện thoại đã được đăng ký bởi tài khoản khác', 409, 'PHONE_ALREADY_EXISTS');
+      throw new AppError(
+        'Số điện thoại đã được đăng ký bởi tài khoản khác',
+        409,
+        'PHONE_ALREADY_EXISTS'
+      );
     }
 
     // 2. Kiểm tra ràng buộc chi nhánh nếu là nhân sự
     if (role === USER_ROLES.STAFF || role === USER_ROLES.BRANCH_MANAGER) {
       if (!branchId) {
-        throw new AppError('Chi nhánh là bắt buộc đối với nhân viên (STAFF) và quản lý chi nhánh (BRANCH_MANAGER)', 400, 'BRANCH_REQUIRED');
+        throw new AppError(
+          'Chi nhánh là bắt buộc đối với nhân viên (STAFF) và quản lý chi nhánh (BRANCH_MANAGER)',
+          400,
+          'BRANCH_REQUIRED'
+        );
       }
 
       const branch = await Branch.findById(branchId);
@@ -108,14 +132,17 @@ export class UserService {
       phone,
       passwordHash: password,
       role: role || USER_ROLES.CUSTOMER,
-      branchId: branchId || null,
+      branchId:
+        role === USER_ROLES.SUPER_ADMIN || role === USER_ROLES.CUSTOMER
+          ? null
+          : branchId || null,
       isActive: isActive !== undefined ? isActive : true
     });
 
     await newUser.save();
 
     const createdUser = await User.findById(newUser._id)
-      .populate('branchId', 'name code address phone')
+      .populate('branchId', BRANCH_POPULATE_FIELDS)
       .lean();
 
     return createdUser;
@@ -129,9 +156,16 @@ export class UserService {
 
     // 1. Kiểm tra trùng lặp email / phone nếu có cập nhật
     if (payload.email && payload.email.toLowerCase() !== user.email) {
-      const existingEmail = await User.findOne({ email: payload.email.toLowerCase(), _id: { $ne: id } });
+      const existingEmail = await User.findOne({
+        email: payload.email.toLowerCase(),
+        _id: { $ne: id }
+      });
       if (existingEmail) {
-        throw new AppError('Địa chỉ email đã được sử dụng bởi tài khoản khác', 409, 'EMAIL_ALREADY_EXISTS');
+        throw new AppError(
+          'Địa chỉ email đã được sử dụng bởi tài khoản khác',
+          409,
+          'EMAIL_ALREADY_EXISTS'
+        );
       }
       user.email = payload.email.toLowerCase();
     }
@@ -139,7 +173,11 @@ export class UserService {
     if (payload.phone && payload.phone !== user.phone) {
       const existingPhone = await User.findOne({ phone: payload.phone, _id: { $ne: id } });
       if (existingPhone) {
-        throw new AppError('Số điện thoại đã được sử dụng bởi tài khoản khác', 409, 'PHONE_ALREADY_EXISTS');
+        throw new AppError(
+          'Số điện thoại đã được sử dụng bởi tài khoản khác',
+          409,
+          'PHONE_ALREADY_EXISTS'
+        );
       }
       user.phone = payload.phone;
     }
@@ -150,6 +188,9 @@ export class UserService {
 
     if (payload.role) {
       user.role = payload.role;
+      if (payload.role === USER_ROLES.SUPER_ADMIN || payload.role === USER_ROLES.CUSTOMER) {
+        user.branchId = null;
+      }
     }
 
     if (payload.branchId !== undefined) {
@@ -165,8 +206,15 @@ export class UserService {
     }
 
     // Kiểm tra ràng buộc chi nhánh nếu role là nhân sự
-    if ((user.role === USER_ROLES.STAFF || user.role === USER_ROLES.BRANCH_MANAGER) && !user.branchId) {
-      throw new AppError('Chi nhánh là bắt buộc đối với nhân viên (STAFF) và quản lý chi nhánh (BRANCH_MANAGER)', 400, 'BRANCH_REQUIRED');
+    if (
+      (user.role === USER_ROLES.STAFF || user.role === USER_ROLES.BRANCH_MANAGER) &&
+      !user.branchId
+    ) {
+      throw new AppError(
+        'Chi nhánh là bắt buộc đối với nhân viên (STAFF) và quản lý chi nhánh (BRANCH_MANAGER). Vui lòng chọn chi nhánh công tác trước.',
+        400,
+        'BRANCH_REQUIRED'
+      );
     }
 
     if (payload.isActive !== undefined) {
@@ -174,13 +222,17 @@ export class UserService {
     }
 
     if (payload.password) {
-      user.passwordHash = payload.password; // pre-save hook sẽ hash lại vì isModified('passwordHash') === true
+      user.passwordHash = payload.password;
     }
 
     await user.save();
 
+    if (payload.isActive === false) {
+      await Session.deleteMany({ userId: user._id });
+    }
+
     const updatedUser = await User.findById(id)
-      .populate('branchId', 'name code address phone')
+      .populate('branchId', BRANCH_POPULATE_FIELDS)
       .lean();
 
     return updatedUser;
@@ -194,6 +246,11 @@ export class UserService {
 
     user.isActive = isActive;
     await user.save();
+
+    // UC-AD06 bước 5.2: Nếu khóa tài khoản, thu hồi lập tức các phiên đăng nhập hiện hành
+    if (isActive === false) {
+      await Session.deleteMany({ userId: user._id });
+    }
 
     return {
       _id: user._id,
@@ -209,9 +266,9 @@ export class UserService {
       throw new AppError('Không tìm thấy tài khoản người dùng', 404, 'USER_NOT_FOUND');
     }
 
-    // Xóa mềm: đánh dấu isActive = false
     user.isActive = false;
     await user.save();
+    await Session.deleteMany({ userId: user._id });
 
     return { success: true, message: 'Đã vô hiệu hóa tài khoản người dùng thành công' };
   }

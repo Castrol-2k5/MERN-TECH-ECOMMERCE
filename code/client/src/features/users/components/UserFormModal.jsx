@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, UserPlus, Check, Eye, EyeOff } from 'lucide-react';
 
 export const UserFormModal = ({
@@ -12,18 +12,37 @@ export const UserFormModal = ({
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('STAFF');
-  const [branchId, setBranchId] = useState(branches[0]?._id || '');
+  const [branchId, setBranchId] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const retailBranches = branches.filter(
+    (b) => !b.isHeadquarter && b.branchCode !== 'BR-HQ'
+  );
+  const selectableBranches = retailBranches.length > 0 ? retailBranches : branches;
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setErrorMsg('');
+    if (!branchId && selectableBranches.length > 0) {
+      setBranchId(selectableBranches[0]._id);
+    }
+  }, [isOpen, selectableBranches, branchId]);
+
   if (!isOpen) return null;
+
+  const isBranchRequired = role === 'STAFF' || role === 'BRANCH_MANAGER';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
-    if (role !== 'SUPER_ADMIN' && !branchId) {
+    const targetBranchId = isBranchRequired
+      ? branchId || selectableBranches[0]?._id || ''
+      : null;
+
+    if (isBranchRequired && !targetBranchId) {
       setErrorMsg('Vui lòng chọn chi nhánh công tác cho nhân sự');
       return;
     }
@@ -36,17 +55,21 @@ export const UserFormModal = ({
         phone: phone.trim(),
         password,
         role,
-        branchId: role === 'SUPER_ADMIN' ? null : branchId
+        branchId: targetBranchId
       });
       onClose();
-      // Reset form
       setFullName('');
       setEmail('');
       setPhone('');
       setPassword('');
       setRole('STAFF');
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || err.message || 'Lỗi khi tạo tài khoản nhân sự');
+      setErrorMsg(
+        err.response?.data?.errors?.[0]?.message ||
+          err.response?.data?.message ||
+          err.message ||
+          'Lỗi khi tạo tài khoản nhân sự'
+      );
     } finally {
       setLoading(false);
     }
@@ -61,9 +84,12 @@ export const UserFormModal = ({
             <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center">
               <UserPlus className="w-4 h-4" />
             </div>
-            <h3 className="font-bold text-sm text-slate-100">Thêm mới tài khoản nhân sự (RBAC)</h3>
+            <h3 className="font-bold text-sm text-slate-100">
+              Thêm mới tài khoản nhân sự (RBAC)
+            </h3>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
           >
@@ -80,7 +106,9 @@ export const UserFormModal = ({
           )}
 
           <div>
-            <label className="text-[11px] font-semibold text-slate-300 block mb-1">Họ và tên nhân sự:</label>
+            <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+              Họ và tên nhân sự:
+            </label>
             <input
               type="text"
               required
@@ -93,18 +121,22 @@ export const UserFormModal = ({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] font-semibold text-slate-300 block mb-1">Email đăng nhập:</label>
+              <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                Email đăng nhập:
+              </label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="thungan.q1@techone.vn"
+                placeholder="thungan.q1@techstore.com"
                 className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-blue-500"
               />
             </div>
             <div>
-              <label className="text-[11px] font-semibold text-slate-300 block mb-1">Số điện thoại:</label>
+              <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                Số điện thoại di động:
+              </label>
               <input
                 type="text"
                 required
@@ -117,7 +149,9 @@ export const UserFormModal = ({
           </div>
 
           <div>
-            <label className="text-[11px] font-semibold text-slate-300 block mb-1">Mật khẩu khởi tạo:</label>
+            <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+              Mật khẩu khởi tạo:
+            </label>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
@@ -140,7 +174,9 @@ export const UserFormModal = ({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] font-semibold text-slate-300 block mb-1">Vai trò hệ thống:</label>
+              <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                Vai trò hệ thống:
+              </label>
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
@@ -153,19 +189,21 @@ export const UserFormModal = ({
             </div>
 
             <div>
-              <label className="text-[11px] font-semibold text-slate-300 block mb-1">Chi nhánh công tác:</label>
+              <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                Chi nhánh công tác:
+              </label>
               <select
-                value={branchId}
-                disabled={role === 'SUPER_ADMIN'}
+                value={isBranchRequired ? branchId : ''}
+                disabled={!isBranchRequired}
                 onChange={(e) => setBranchId(e.target.value)}
                 className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-blue-500 cursor-pointer disabled:opacity-50"
               >
-                {role === 'SUPER_ADMIN' ? (
+                {!isBranchRequired ? (
                   <option value="">-- Toàn chuỗi (HQ) --</option>
                 ) : (
-                  branches.map((b) => (
+                  selectableBranches.map((b) => (
                     <option key={b._id} value={b._id}>
-                      {b.name}
+                      {b.name} ({b.branchCode})
                     </option>
                   ))
                 )}

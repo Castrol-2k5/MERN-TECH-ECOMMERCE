@@ -57,8 +57,21 @@ async function seed() {
   ]);
 
   // ==========================================
-  // Bước 1: Khởi tạo Danh mục Cửa hàng Chi nhánh (branches)
+  // Bước 1: Khởi tạo Kho Trung Tâm (BR-HQ) & Cửa hàng Chi nhánh (branches)
   // ==========================================
+  const branchHQ = await Branch.create({
+    branchCode: 'BR-HQ',
+    name: 'Kho Trung Tâm Trụ Sở Chính (HQ)',
+    address: 'Tòa nhà TechOne Tower, 01 Lê Duẩn, Phường Bến Nghé, Quận 1, TP.HCM',
+    phone: '02838226868',
+    location: {
+      type: 'Point',
+      coordinates: [106.7009, 10.7829]
+    },
+    isHeadquarter: true,
+    isActive: true
+  });
+
   const branchQ1 = await Branch.create({
     branchCode: 'BR-Q1',
     name: 'Chi nhánh Quận 1 - Flagship Store',
@@ -68,6 +81,7 @@ async function seed() {
       type: 'Point',
       coordinates: [106.6917, 10.7725]
     },
+    isHeadquarter: false,
     isActive: true
   });
 
@@ -80,6 +94,7 @@ async function seed() {
       type: 'Point',
       coordinates: [106.7645, 10.8512]
     },
+    isHeadquarter: false,
     isActive: true
   });
 
@@ -87,7 +102,7 @@ async function seed() {
   // Bước 2: Khởi tạo Tài khoản Người dùng Mẫu (users)
   // Mật khẩu chung '123456' được hash tự động qua User pre('save') hook
   // ==========================================
-  const [, , staffQ1User, , customerUser] = await User.create([
+  const [, , , staffQ1User, , customerUser] = await User.create([
     {
       fullName: 'Nguyễn Văn Quản Trị',
       email: 'admin@techstore.com',
@@ -104,6 +119,15 @@ async function seed() {
       passwordHash: '123456',
       role: USER_ROLES.BRANCH_MANAGER,
       branchId: branchQ1._id,
+      isActive: true
+    },
+    {
+      fullName: 'Võ Minh Trưởng Shop Thủ Đức',
+      email: 'manager.tduc@techstore.com',
+      phone: '0909000006',
+      passwordHash: '123456',
+      role: USER_ROLES.BRANCH_MANAGER,
+      branchId: branchTDuc._id,
       isActive: true
     },
     {
@@ -314,10 +338,29 @@ async function seed() {
   });
 
   // ==========================================
-  // Bước 5: Nạp Tồn Kho Chi Nhánh (branch_inventories) & Serials (serials)
+  // Bước 5: Nạp Tồn Kho Trung Tâm & Chi Nhánh (branch_inventories) & Serials (serials)
   // Invariant Rule: Tổng serial IN_STOCK tại mỗi branch khớp với branch_inventories.quantity
   // ==========================================
   await BranchInventory.create([
+    // Kho Trung Tâm Trụ Sở Chính (BR-HQ)
+    {
+      branchId: branchHQ._id,
+      productId: productRog._id,
+      productSkuId: rogSku16Id,
+      quantity: 2
+    },
+    {
+      branchId: branchHQ._id,
+      productId: productIphone._id,
+      productSkuId: ip15Sku256Id,
+      quantity: 2
+    },
+    {
+      branchId: branchHQ._id,
+      productId: productLogitech._id,
+      productSkuId: logiSkuHeroId,
+      quantity: 50
+    },
     // Kho Chi nhánh Quận 1 (BR-Q1)
     {
       branchId: branchQ1._id,
@@ -364,12 +407,41 @@ async function seed() {
     }
   ]);
 
-  // Tạo 11 Serial Numbers: 8 IN_STOCK, 2 SOLD, 1 TRANSIT
+  // Tạo 15 Serial Numbers: 12 IN_STOCK (4 HQ + 6 Q1 + 2 TDUC), 2 SOLD, 1 TRANSIT
   const sixMonthsAgo = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000);
   const sixMonthsLater = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
   const eighteenMonthsAgo = new Date(Date.now() - 540 * 24 * 60 * 60 * 1000);
 
-  const [, , , , , , , , , rogSoldExpiredSerial] = await Serial.create([
+  const serialDocs = await Serial.create([
+    // HQ - IN_STOCK Serials
+    {
+      serialNumber: 'ROG16-HQ-001',
+      productId: productRog._id,
+      productSkuId: rogSku16Id,
+      branchId: branchHQ._id,
+      status: SERIAL_STATUS.IN_STOCK
+    },
+    {
+      serialNumber: 'ROG16-HQ-002',
+      productId: productRog._id,
+      productSkuId: rogSku16Id,
+      branchId: branchHQ._id,
+      status: SERIAL_STATUS.IN_STOCK
+    },
+    {
+      serialNumber: 'IP15-HQ-001',
+      productId: productIphone._id,
+      productSkuId: ip15Sku256Id,
+      branchId: branchHQ._id,
+      status: SERIAL_STATUS.IN_STOCK
+    },
+    {
+      serialNumber: 'IP15-HQ-002',
+      productId: productIphone._id,
+      productSkuId: ip15Sku256Id,
+      branchId: branchHQ._id,
+      status: SERIAL_STATUS.IN_STOCK
+    },
     // Q1 - IN_STOCK Serials
     {
       serialNumber: 'ROG16-Q1-001',
@@ -457,6 +529,8 @@ async function seed() {
       status: SERIAL_STATUS.TRANSIT
     }
   ]);
+
+  const rogSoldExpiredSerial = serialDocs.find((s) => s.serialNumber === 'ROG-SOLD-EXPIRED');
 
   // ==========================================
   // Bước 6: Khởi tạo Đơn hàng Lịch sử & Phiếu Bảo hành Mẫu (orders & warrantytickets)
@@ -546,7 +620,7 @@ async function seed() {
           productId: productIphone._id,
           productSkuId: ip15Sku256Id,
           productName: productIphone.name,
-          sku: 'IP15PM-256-NAT',
+          sku: 'IP15PM-256GB-NAT',
           quantity: 1,
           unitPrice: 29490000,
           subtotal: 29490000,
@@ -659,26 +733,22 @@ async function seed() {
   console.log(`
 🎉 SEED DATA COMPLETED SUCCESSFULLY!
 -----------------------------------------------
-✓ Branches:           ${branchCount} locations (GeoJSON Point)
-✓ Users:              ${userCount} accounts (1 Admin, 1 Manager, 2 Staffs, 1 Customer)
+✓ Branches:           ${branchCount} locations (1 HQ + 2 Retail Branches)
+✓ Users:              ${userCount} accounts (1 Admin, 2 Managers, 2 Staffs, 1 Customer)
 ✓ Categories:         ${categoryCount} items (Hierarchy trees)
 ✓ Products:           ${productCount} items (Hybrid dynamic specs)
 ✓ Branch Inventory:   ${inventoryCount} stock records
 ✓ Serial Numbers:     ${serialCount} serials (IN_STOCK, SOLD, TRANSIT)
-✓ Orders:             ${orderCount} sample orders (1 POS, 1 B2C)
+✓ Orders:             ${orderCount} sample orders (POS & B2C)
 ✓ Warranty Tickets:   ${warrantyCount} active RMA ticket
 -----------------------------------------------
 🔐 CREDENTIALS FOR TESTING:
-- Super Admin:     admin@techstore.com     / 123456
-- Branch Manager:  manager.q1@techstore.com / 123456 (Chi nhánh Q1)
-- Staff POS Q1:    staff.q1@techstore.com   / 123456
-- Customer:        customer@gmail.com      / 123456
+- Super Admin:        admin@techstore.com        / 123456
+- Manager Q1:         manager.q1@techstore.com   / 123456 (Chi nhánh Q1)
+- Manager Thủ Đức:    manager.tduc@techstore.com / 123456 (Chi nhánh Thủ Đức)
+- Staff POS Q1:       staff.q1@techstore.com     / 123456
+- Customer:           customer@gmail.com         / 123456
 -----------------------------------------------
-🎯 TEST SERIAL BARCODES FOR POS CHECKOUT:
-- 'ROG16-Q1-001' (Laptop ROG 16GB tại Q1 - Status: IN_STOCK)
-- 'IP15-Q1-001'  (iPhone 15 Pro Max tại Q1 - Status: IN_STOCK)
-- 'IP15-SOLD-VALID' (Tra cứu bảo hành e-Warranty còn hạn)
-- 'ROG-SOLD-EXPIRED' (Tra cứu bảo hành e-Warranty hết hạn)
 `);
 
   await mongoose.connection.close();

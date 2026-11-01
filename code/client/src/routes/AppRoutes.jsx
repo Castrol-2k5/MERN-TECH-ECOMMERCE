@@ -1,4 +1,5 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import StorefrontLayout from '../layouts/StorefrontLayout.jsx';
 import PortalLayout from '../layouts/PortalLayout.jsx';
 import RoleProtectedRoute from '../components/common/RoleProtectedRoute.jsx';
@@ -37,24 +38,40 @@ import OrderDispatchPage from '../pages/portal/OrderDispatchPage.jsx';
 import AdminBranchesUsersPage from '../pages/portal/AdminBranchesUsersPage.jsx';
 import AdminAnalyticsPage from '../pages/portal/AdminAnalyticsPage.jsx';
 
+const PortalIndexRedirect = () => {
+  const user = useSelector((state) => state.auth?.user);
+  if (user?.role === 'SUPER_ADMIN') {
+    return <Navigate to="/portal/admin/products" replace />;
+  }
+  return <Navigate to="/portal/pos" replace />;
+};
+
 export const AppRoutes = () => {
   return (
     <Routes>
       {/* 1. Branch Portal & Web POS Routes (Phase 2 + Phase 3 + P-20) */}
       <Route element={<RoleProtectedRoute allowedRoles={['STAFF', 'BRANCH_MANAGER', 'SUPER_ADMIN']} />}>
         <Route path="/portal" element={<PortalLayout />}>
+          <Route index element={<PortalIndexRedirect />} />
+
           {/* Operations & Counter (Phase 2) */}
           <Route path="pos" element={<PosPage />} />
           <Route path="inventory" element={<BranchInventoryPage />} />
           <Route path="warranty-reception" element={<WarrantyReceptionPage />} />
-          <Route path="branch/transfers" element={<StockTransferPage />} />
 
-          {/* HQ Administration & Operations (Phase 3) */}
-          <Route path="admin/products" element={<AdminProductsPage />} />
-          <Route path="admin/import-serials" element={<SerialImportPage />} />
-          <Route path="admin/orders-dispatch" element={<OrderDispatchPage />} />
-          <Route path="admin/branches-rbac" element={<AdminBranchesUsersPage />} />
-          <Route path="admin/analytics" element={<AdminAnalyticsPage />} />
+          {/* Branch Manager & Super Admin Operations */}
+          <Route element={<RoleProtectedRoute allowedRoles={['BRANCH_MANAGER', 'SUPER_ADMIN']} />}>
+            <Route path="branch/transfers" element={<StockTransferPage />} />
+            <Route path="admin/orders-dispatch" element={<OrderDispatchPage />} />
+          </Route>
+
+          {/* HQ Administration & Operations (SUPER_ADMIN Only) */}
+          <Route element={<RoleProtectedRoute allowedRoles={['SUPER_ADMIN']} />}>
+            <Route path="admin/products" element={<AdminProductsPage />} />
+            <Route path="admin/import-serials" element={<SerialImportPage />} />
+            <Route path="admin/branches-rbac" element={<AdminBranchesUsersPage />} />
+            <Route path="admin/analytics" element={<AdminAnalyticsPage />} />
+          </Route>
         </Route>
       </Route>
 

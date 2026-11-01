@@ -19,24 +19,6 @@ export const fallbackUsers = [
     role: 'BRANCH_MANAGER',
     branchId: '65f0a1000000000000000001',
     isActive: true
-  },
-  {
-    _id: 'user-003',
-    fullName: 'Nguyễn Văn Thu Ngân',
-    email: 'thungan.q1@techone.vn',
-    phone: '0987654321',
-    role: 'STAFF',
-    branchId: '65f0a1000000000000000001',
-    isActive: true
-  },
-  {
-    _id: 'user-004',
-    fullName: 'Trần Kỹ Thuật',
-    email: 'kythuat.q1@techone.vn',
-    phone: '0971123344',
-    role: 'STAFF',
-    branchId: '65f0a1000000000000000001',
-    isActive: true
   }
 ];
 
@@ -53,7 +35,7 @@ export const userService = {
       if (isDevOrTest()) {
         console.error('[userService.getUsers] Lỗi tải danh sách người dùng:', err);
       }
-      return fallbackUsers;
+      return [];
     }
   },
 
