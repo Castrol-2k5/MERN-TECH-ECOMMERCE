@@ -6,30 +6,61 @@ export const normalizeProductSkus = (skus, basePrice, baseOriginalPrice, product
   if (!Array.isArray(skus)) return [];
 
   return skus.map((s, idx) => {
-    // Chuyển mảng optionValues [{ optionName, value }] thành dictionary options: { [optionName]: value }
+    // Đồng bộ giữa mảng optionValues [{ optionName, value }] (DB) và dictionary options: { [optionName]: value } (UI)
     const optionsDict = {};
-    if (Array.isArray(s.optionValues)) {
+    if (Array.isArray(s.optionValues) && s.optionValues.length > 0) {
       s.optionValues.forEach((opt) => {
         if (opt && opt.optionName && opt.value) {
           optionsDict[opt.optionName] = opt.value;
         }
       });
+    } else if (s.options && typeof s.options === 'object') {
+      Object.entries(s.options).forEach(([k, v]) => {
+        if (k && v) optionsDict[k] = String(v);
+      });
     }
 
-    const price = Number(s.price || basePrice || 0);
-    const salePrice = Number(s.salePrice && s.salePrice > 0 ? s.salePrice : price);
-    const originalPrice = Number(s.originalPrice || s.price || baseOriginalPrice || price);
+    const optionValues = Object.entries(optionsDict).map(([optionName, value]) => ({
+      optionName,
+      value: String(value),
+    }));
+
+    // Xác định Giá niêm yết (listPrice -> DB sku.price) và Giá bán khuyến mãi (sellingPrice -> DB sku.salePrice)
+    let listPrice = 0;
+    let sellingPrice = 0;
+
+    if (s.originalPrice !== undefined && s.salePrice === undefined) {
+      // Dữ liệu từ Mock/UI cũ (price = giá bán, originalPrice = giá gốc)
+      listPrice = Number(s.originalPrice || s.price || baseOriginalPrice || 0);
+      sellingPrice = Number(s.price || basePrice || listPrice);
+    } else {
+      // Dữ liệu chuẩn từ Backend DB (price = giá niêm yết, salePrice = giá khuyến mãi)
+      listPrice = Number(s.price ?? baseOriginalPrice ?? basePrice ?? 0);
+      sellingPrice =
+        s.salePrice !== undefined && s.salePrice !== null && Number(s.salePrice) > 0
+          ? Number(s.salePrice)
+          : listPrice;
+    }
+
+    if (sellingPrice > listPrice) {
+      listPrice = sellingPrice;
+    }
+
+    const skuCode = String(s.sku || s.code || `SKU-${idx + 1}`).toUpperCase();
 
     return {
       ...s,
       _id: s._id || `sku-${productId || 'prod'}-${idx}`,
-      sku: s.sku || s.code || `SKU-${idx}`,
-      code: s.sku || s.code || `SKU-${idx}`,
-      price,
-      salePrice,
-      originalPrice,
-      stock: s.stock !== undefined ? s.stock : 10,
-      options: Object.keys(optionsDict).length > 0 ? optionsDict : (s.options || {}),
+      sku: skuCode,
+      code: skuCode,
+      price: listPrice,
+      salePrice: sellingPrice,
+      originalPrice: listPrice,
+      stock: s.stock !== undefined ? s.stock : 0,
+      options: optionsDict,
+      optionValues,
+      images: Array.isArray(s.images) ? s.images : [],
+      isActive: s.isActive !== undefined ? Boolean(s.isActive) : true,
     };
   });
 };
@@ -62,30 +93,42 @@ export const normalizeProduct = (p) => {
 
   // 2. Attributes normalization:
   // In DB: attributes is [{ key: 'cpu', value: '...' }]
-  // In UI: expects object { cpu: '...', ram: '...' }
+  // In UI: attributes object { cpu: '...', ram: '...' } + rawAttributes array [{ key, value }]
   const attributesObj = {};
   let attributesArr = [];
 
   if (Array.isArray(p.attributes)) {
-    attributesArr = p.attributes;
-    p.attributes.forEach((attr) => {
-      if (attr && attr.key) {
-        attributesObj[attr.key] = attr.value;
-      }
+    attributesArr = p.attributes
+      .filter((attr) => attr && attr.key)
+      .map((attr) => ({
+        key: String(attr.key).trim(),
+        value: String(attr.value ?? '').trim(),
+      }));
+    attributesArr.forEach((attr) => {
+      attributesObj[attr.key] = attr.value;
     });
   } else if (p.attributes && typeof p.attributes === 'object') {
     Object.assign(attributesObj, p.attributes);
-    attributesArr = Object.entries(p.attributes).map(([key, value]) => ({ key, value }));
+    attributesArr = Object.entries(p.attributes).map(([key, value]) => ({
+      key: String(key).trim(),
+      value: String(value ?? '').trim(),
+    }));
   }
 
   // 3. Category
   let categorySlug = 'laptop';
   let categoryName = 'Laptop';
+  let categoryId = '';
+  let categoryObj = null;
+
   if (p.categoryId) {
     if (typeof p.categoryId === 'object') {
+      categoryObj = p.categoryId;
+      categoryId = String(p.categoryId._id || p.categoryId.id || '');
       categorySlug = p.categoryId.slug || categorySlug;
       categoryName = p.categoryId.name || categoryName;
     } else {
+      categoryId = String(p.categoryId);
       categorySlug = p.category || categorySlug;
     }
   } else if (p.category) {
@@ -106,6 +149,7 @@ export const normalizeProduct = (p) => {
     p.name;
 
   const normalizedSkus = normalizeProductSkus(rawSkus, price, originalPrice, p._id || p.id);
+  const skuCode = p.skuCode || normalizedSkus[0]?.sku || normalizedSkus[0]?.code || '';
 
   return {
     ...p,
@@ -113,9 +157,15 @@ export const normalizeProduct = (p) => {
     id: p._id || p.id,
     name: p.name || 'Sản phẩm công nghệ',
     slug: p.slug || '',
+    categoryId,
+    categoryObj,
     category: categorySlug,
     categoryName,
     brand: p.brand || '',
+    description: p.description || '',
+    isSerialManaged: p.isSerialManaged !== undefined ? Boolean(p.isSerialManaged) : true,
+    isActive: p.isActive !== undefined ? Boolean(p.isActive) : true,
+    skuCode,
     price,
     originalPrice,
     discountPercentage,
@@ -129,10 +179,8 @@ export const normalizeProduct = (p) => {
     rawAttributes: attributesArr,
     options: Array.isArray(p.options) ? p.options : [],
     skus: normalizedSkus,
-    branchInventories:
-      Array.isArray(p.branchInventories) ? p.branchInventories : [],
-    promotions:
-      Array.isArray(p.promotions) ? p.promotions : [],
+    branchInventories: Array.isArray(p.branchInventories) ? p.branchInventories : [],
+    promotions: Array.isArray(p.promotions) ? p.promotions : [],
   };
 };
 

@@ -51,6 +51,15 @@ export const fallbackCategories = [
 
 const normalizeCategory = (cat) => {
   if (!cat) return null;
+  const parentId =
+    cat.parentId && typeof cat.parentId === 'object'
+      ? cat.parentId._id || cat.parentId.id || null
+      : cat.parentId || null;
+  const parentName =
+    cat.parentName ||
+    (cat.parentId && typeof cat.parentId === 'object' ? cat.parentId.name : null) ||
+    null;
+
   return {
     _id: cat._id || cat.id,
     name: cat.name,
@@ -58,10 +67,30 @@ const normalizeCategory = (cat) => {
     description: cat.description || '',
     attributeKeys: Array.isArray(cat.attributeKeys) ? cat.attributeKeys : [],
     icon: cat.icon || 'laptop',
-    productCount: cat.productCount || 0,
-    parentId: cat.parentId || null,
+    productCount: cat.productCount ?? 0,
+    parentId,
+    parentName,
     isActive: cat.isActive !== undefined ? cat.isActive : true,
   };
+};
+
+const buildCleanCategoryPayload = (payload = {}) => {
+  const clean = {
+    name: String(payload.name || '').trim(),
+  };
+  if (payload.slug !== undefined && String(payload.slug).trim()) {
+    clean.slug = String(payload.slug).trim().toLowerCase();
+  }
+  clean.parentId = payload.parentId ? String(payload.parentId).trim() : null;
+  if (Array.isArray(payload.attributeKeys)) {
+    clean.attributeKeys = payload.attributeKeys
+      .map((k) => String(k || '').trim().toLowerCase())
+      .filter(Boolean);
+  }
+  if (payload.isActive !== undefined) {
+    clean.isActive = Boolean(payload.isActive);
+  }
+  return clean;
 };
 
 export const categoryService = {
@@ -102,18 +131,20 @@ export const categoryService = {
   },
 
   createCategory: async (payload) => {
+    const cleanPayload = buildCleanCategoryPayload(payload);
     if (isMockEnabled()) {
-      return { _id: 'cat-' + Date.now(), ...payload };
+      return { _id: 'cat-' + Date.now(), ...cleanPayload };
     }
-    const response = await axiosClient.post('/categories', payload);
+    const response = await axiosClient.post('/categories', cleanPayload);
     return normalizeCategory(response?.data?.category || response?.data);
   },
 
   updateCategory: async (id, payload) => {
+    const cleanPayload = buildCleanCategoryPayload(payload);
     if (isMockEnabled()) {
-      return { _id: id, ...payload };
+      return { _id: id, ...cleanPayload };
     }
-    const response = await axiosClient.put(`/categories/${id}`, payload);
+    const response = await axiosClient.put(`/categories/${id}`, cleanPayload);
     return normalizeCategory(response?.data?.category || response?.data);
   },
 
@@ -127,4 +158,3 @@ export const categoryService = {
 };
 
 export default categoryService;
-

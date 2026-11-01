@@ -273,6 +273,121 @@ export const fallbackProducts = [
 
 export { normalizeProduct } from './productAdapter.js';
 
+/**
+ * Chuẩn hóa payload trước khi gửi lên Backend POST/PUT /products
+ * để tuân thủ tuyệt đối schema Zod (.strict()) của Backend.
+ */
+export const buildCleanProductPayload = (payload = {}) => {
+  const clean = {
+    name: String(payload.name || '').trim(),
+    brand: String(payload.brand || '').trim(),
+    categoryId: String(
+      typeof payload.categoryId === 'object' ? payload.categoryId?._id : payload.categoryId || ''
+    ).trim(),
+    description: String(payload.description ?? payload.specsSummary ?? '').trim(),
+    images: Array.isArray(payload.images)
+      ? payload.images.map((img) => String(img || '').trim()).filter(Boolean)
+      : [],
+    isSerialManaged: payload.isSerialManaged !== undefined ? Boolean(payload.isSerialManaged) : true,
+    isActive: payload.isActive !== undefined ? Boolean(payload.isActive) : true,
+  };
+
+  if (payload.slug && String(payload.slug).trim()) {
+    clean.slug = String(payload.slug).trim().toLowerCase();
+  }
+
+  // Chuẩn hóa attributes: [{ key, value }]
+  if (Array.isArray(payload.attributes)) {
+    clean.attributes = payload.attributes
+      .filter((attr) => attr && String(attr.key || '').trim() && String(attr.value || '').trim())
+      .map((attr) => ({
+        key: String(attr.key).trim(),
+        value: String(attr.value).trim(),
+      }));
+  } else if (payload.attributes && typeof payload.attributes === 'object') {
+    clean.attributes = Object.entries(payload.attributes)
+      .filter(([k, v]) => String(k || '').trim() && String(v || '').trim())
+      .map(([key, value]) => ({
+        key: String(key).trim(),
+        value: String(value).trim(),
+      }));
+  } else {
+    clean.attributes = [];
+  }
+
+  // Chuẩn hóa options: [{ name, displayType, values }]
+  if (Array.isArray(payload.options)) {
+    clean.options = payload.options
+      .filter((opt) => opt && String(opt.name || '').trim())
+      .map((opt) => ({
+        name: String(opt.name).trim(),
+        displayType: String(opt.displayType || 'button').trim(),
+        values: Array.isArray(opt.values)
+          ? opt.values.map((v) => String(v || '').trim()).filter(Boolean)
+          : String(opt.values || '')
+              .split(',')
+              .map((v) => v.trim())
+              .filter(Boolean),
+      }));
+  } else {
+    clean.options = [];
+  }
+
+  // Chuẩn hóa skus: [{ _id?, sku, price, salePrice?, images?, optionValues?, isActive? }]
+  if (Array.isArray(payload.skus)) {
+    clean.skus = payload.skus
+      .filter((s) => s && String(s.sku || s.code || '').trim())
+      .map((s) => {
+        const rawPrice = Number(s.price ?? s.originalPrice ?? 0);
+        const rawSalePrice =
+          s.salePrice !== undefined && s.salePrice !== '' && s.salePrice !== null
+            ? Number(s.salePrice)
+            : rawPrice;
+
+        const listPrice = Math.max(0, rawPrice, rawSalePrice);
+        const salePrice = Math.max(0, Math.min(listPrice, rawSalePrice));
+
+        let optionValues = [];
+        if (Array.isArray(s.optionValues) && s.optionValues.length > 0) {
+          optionValues = s.optionValues
+            .filter((ov) => ov && String(ov.optionName || '').trim() && String(ov.value || '').trim())
+            .map((ov) => ({
+              optionName: String(ov.optionName).trim(),
+              value: String(ov.value).trim(),
+            }));
+        } else if (s.options && typeof s.options === 'object') {
+          optionValues = Object.entries(s.options)
+            .filter(([k, v]) => String(k || '').trim() && String(v || '').trim())
+            .map(([optionName, value]) => ({
+              optionName: String(optionName).trim(),
+              value: String(value).trim(),
+            }));
+        }
+
+        const skuItem = {
+          sku: String(s.sku || s.code).trim().toUpperCase(),
+          price: listPrice,
+          salePrice,
+          images: Array.isArray(s.images)
+            ? s.images.map((img) => String(img || '').trim()).filter(Boolean)
+            : [],
+          optionValues,
+          isActive: s.isActive !== undefined ? Boolean(s.isActive) : true,
+        };
+
+        // Chỉ giữ _id nếu là ObjectId 24 ký tự hex hợp lệ (không gửi id tạm 'sku-...')
+        if (s._id && /^[0-9a-fA-F]{24}$/.test(String(s._id))) {
+          skuItem._id = String(s._id);
+        }
+
+        return skuItem;
+      });
+  } else {
+    clean.skus = [];
+  }
+
+  return clean;
+};
 
 export const productService = {
   getProducts: async (params = {}) => {
@@ -340,27 +455,21 @@ export const productService = {
   },
 
   createProduct: async (payload) => {
+    const cleanPayload = buildCleanProductPayload(payload);
     if (isMockEnabled()) {
-      return { _id: 'prod-' + Date.now(), ...payload };
+      return normalizeProduct({ _id: 'prod-' + Date.now(), ...cleanPayload });
     }
-    const response = await axiosClient.post('/products', payload);
-    return response?.data?.product || response?.data || payload;
-  },
-
-  createProduct: async (payload) => {
-    if (isMockEnabled()) {
-      return { _id: 'prod-' + Date.now(), ...payload };
-    }
-    const response = await axiosClient.post('/products', payload);
-    return response?.data?.product || response?.data || payload;
+    const response = await axiosClient.post('/products', cleanPayload);
+    return normalizeProduct(response?.data?.product || response?.data || cleanPayload);
   },
 
   updateProduct: async (id, payload) => {
+    const cleanPayload = buildCleanProductPayload(payload);
     if (isMockEnabled()) {
-      return { _id: id, ...payload };
+      return normalizeProduct({ _id: id, ...cleanPayload });
     }
-    const response = await axiosClient.put(`/products/${id}`, payload);
-    return response?.data?.product || response?.data || payload;
+    const response = await axiosClient.put(`/products/${id}`, cleanPayload);
+    return normalizeProduct(response?.data?.product || response?.data || cleanPayload);
   },
 
   deleteProduct: async (id) => {
@@ -390,40 +499,6 @@ export const productService = {
       return [];
     }
   },
-
-  getCategorySchemas: () => {
-    return [
-      {
-        id: 'laptop',
-        name: 'Laptop',
-        attributes: [
-          { key: 'cpu', name: 'CPU', type: 'Single-select', values: ['Apple M4', 'Intel Core Ultra 7', 'AMD Ryzen 9 8945HS'], isFilter: true },
-          { key: 'ram', name: 'RAM', type: 'Multi-select', values: ['16GB', '24GB', '32GB', '64GB'], isFilter: true },
-          { key: 'vga', name: 'VGA / GPU', type: 'Single-select', values: ['GPU 10 lõi tích hợp', 'RTX 4060 8GB', 'RTX 4070 8GB'], isFilter: true },
-          { key: 'screen_size', name: 'Màn hình', type: 'Text', values: ['13.6” Liquid Retina', '14.0” 3K OLED 120Hz', '16.0” 4K'], isFilter: true },
-          { key: 'storage', name: 'Ổ cứng SSD', type: 'Single-select', values: ['256GB', '512GB', '1TB', '2TB'], isFilter: true }
-        ]
-      },
-      {
-        id: 'smartphone',
-        name: 'Điện thoại',
-        attributes: [
-          { key: 'chip', name: 'Vi xử lý (SoC)', type: 'Single-select', values: ['Apple A18 Pro', 'Snapdragon 8 Gen 3', 'Dimensity 9300'], isFilter: true },
-          { key: 'screen', name: 'Màn hình', type: 'Text', values: ['Super Retina XDR 6.9” 120Hz', 'Dynamic AMOLED 2X 6.8”'], isFilter: true },
-          { key: 'camera', name: 'Camera chính', type: 'Text', values: ['48MP Fusion + 5x Telephoto', '200MP Quad Telephoto'], isFilter: false },
-          { key: 'battery', name: 'Dung lượng pin', type: 'Text', values: ['4685 mAh', '5000 mAh sạc nhanh 45W'], isFilter: false }
-        ]
-      },
-      {
-        id: 'phukien',
-        name: 'Phụ kiện',
-        attributes: [
-          { key: 'connection', name: 'Chuẩn kết nối', type: 'Single-select', values: ['Bluetooth 5.3 + Wireless 2.4G', 'USB-C', 'MagSafe'], isFilter: true },
-          { key: 'power', name: 'Công suất sạc', type: 'Single-select', values: ['30W', '65W GaN', '100W GaNPrime'], isFilter: true }
-        ]
-      }
-    ];
-  }
 };
 
 export default productService;

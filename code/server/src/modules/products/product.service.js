@@ -30,7 +30,11 @@ export class ProductService {
     // Kiểm tra Category tồn tại
     const category = await Category.findOne({ _id: productData.categoryId, isActive: true });
     if (!category) {
-      throw new AppError('Danh mục sản phẩm không tồn tại hoặc đã bị vô hiệu hóa.', 404, 'CATEGORY_NOT_FOUND');
+      throw new AppError(
+        'Danh mục sản phẩm không tồn tại hoặc đã bị vô hiệu hóa.',
+        404,
+        'CATEGORY_NOT_FOUND'
+      );
     }
 
     // Chuẩn hóa và đối soát attributes với category.attributeKeys
@@ -49,7 +53,7 @@ export class ProductService {
 
       if (invalidKeys.length > 0) {
         throw new AppError(
-          `Thuộc tính '${invalidKeys.join(', ')}' không hợp lệ đối với danh mục '${category.name}'.`,
+          `Thuộc tính '${invalidKeys.join(', ')}' không hợp lệ đối với danh mục '${category.name}'. Các khóa cho phép: ${category.attributeKeys.join(', ')}`,
           400,
           'INVALID_ATTRIBUTE_KEY'
         );
@@ -60,7 +64,8 @@ export class ProductService {
     const normalizedSkus = productData.skus.map((sku) => {
       const skuCode = sku.sku.trim().toUpperCase();
       const price = Number(sku.price);
-      const salePrice = sku.salePrice !== undefined && sku.salePrice !== null ? Number(sku.salePrice) : price;
+      const salePrice =
+        sku.salePrice !== undefined && sku.salePrice !== null ? Number(sku.salePrice) : price;
 
       return {
         ...sku,
@@ -72,19 +77,28 @@ export class ProductService {
 
     const skuCodes = normalizedSkus.map((s) => s.sku);
     if (new Set(skuCodes).size !== skuCodes.length) {
-      throw new AppError('Mã SKU không được trùng lặp trong cùng một sản phẩm.', 400, 'DUPLICATE_SKU_CODE');
+      throw new AppError(
+        'Mã SKU không được trùng lặp trong cùng một sản phẩm.',
+        400,
+        'DUPLICATE_SKU_CODE'
+      );
     }
 
-    const product = await Product.create({
+    const created = await Product.create({
       ...productData,
       slug,
       attributes: normalizedAttributes,
       skus: normalizedSkus,
-      isSerialManaged: productData.isSerialManaged !== undefined ? productData.isSerialManaged : true,
+      isSerialManaged:
+        productData.isSerialManaged !== undefined ? productData.isSerialManaged : true,
       isActive: productData.isActive !== undefined ? productData.isActive : true
     });
 
-    return product;
+    const populated = await Product.findById(created._id)
+      .populate('categoryId', 'name slug parentId attributeKeys')
+      .lean();
+
+    return populated || created;
   }
 
   /**
@@ -99,7 +113,8 @@ export class ProductService {
       'minPrice',
       'maxPrice',
       'search',
-      'sortBy'
+      'sortBy',
+      'includeInactive'
     ]);
 
     const {
@@ -110,12 +125,16 @@ export class ProductService {
       minPrice,
       maxPrice,
       search,
-      sortBy = 'newest'
+      sortBy = 'newest',
+      includeInactive
     } = queryParams;
 
     const pageNum = Math.max(1, Number(page));
     const limitNum = Math.max(1, Number(limit));
-    const filterConditions = { isActive: true };
+    const filterConditions = {};
+    if (includeInactive !== 'true' && includeInactive !== true) {
+      filterConditions.isActive = true;
+    }
 
     // 1. Lọc theo Category (hỗ trợ cả slug lẫn ObjectId, bao gồm toàn bộ danh mục con trong cây phân cấp)
     if (category) {
@@ -148,9 +167,8 @@ export class ProductService {
 
       const descendantIds = await getDescendantCategoryIds(targetCategory._id);
       const matchedCategoryIds = [targetCategory._id, ...descendantIds];
-      filterConditions.categoryId = matchedCategoryIds.length > 1
-        ? { $in: matchedCategoryIds }
-        : targetCategory._id;
+      filterConditions.categoryId =
+        matchedCategoryIds.length > 1 ? { $in: matchedCategoryIds } : targetCategory._id;
     }
 
     // 2. Lọc theo Brand (case-insensitive)
@@ -161,10 +179,7 @@ export class ProductService {
     // 3. Tìm kiếm từ khóa trên name hoặc brand
     if (search && search.trim()) {
       const searchRegex = new RegExp(search.trim(), 'i');
-      filterConditions.$or = [
-        { name: searchRegex },
-        { brand: searchRegex }
-      ];
+      filterConditions.$or = [{ name: searchRegex }, { brand: searchRegex }];
     }
 
     // 4. Lọc theo khoảng giá biến thể SKU (skus.salePrice)
@@ -212,15 +227,16 @@ export class ProductService {
     } else if (sortBy === 'oldest') {
       sortOptions = { createdAt: 1 };
     } else if (sortBy === 'popular') {
-      // Sắp xếp theo số lượng đã bán (hoặc fallback về { createdAt: -1 } nếu chưa có trường thống kê lượt mua)
       sortOptions = { createdAt: -1 };
     }
 
     // 7. Thực thi truy vấn với .lean() tối ưu độ trễ T_avg < 200ms
     const skip = (pageNum - 1) * limitNum;
 
-    // Lấy danh sách thương hiệu thực tế đang có sản phẩm active (theo danh mục nếu có lọc theo danh mục)
-    const brandMatch = { isActive: true };
+    const brandMatch = {};
+    if (filterConditions.isActive !== undefined) {
+      brandMatch.isActive = filterConditions.isActive;
+    }
     if (filterConditions.categoryId) {
       if (filterConditions.categoryId.$in) {
         brandMatch.categoryId = {
@@ -286,10 +302,10 @@ export class ProductService {
   }
 
   /**
-   * Cập nhật thông tin sản phẩm
+   * Cập nhật thông tin sản phẩm (cho phép Admin cập nhật và bật lại cả sản phẩm đang ẩn isActive: false)
    */
   static async updateProduct(productId, updateData) {
-    const existingProduct = await Product.findOne({ _id: productId, isActive: true });
+    const existingProduct = await Product.findById(productId);
     if (!existingProduct) {
       throw new AppError('Không tìm thấy sản phẩm cần cập nhật.', 404, 'PRODUCT_NOT_FOUND');
     }
@@ -303,7 +319,11 @@ export class ProductService {
           _id: { $ne: productId }
         });
         if (duplicate) {
-          throw new AppError(`Slug '${newSlug}' đã được sử dụng bởi sản phẩm khác.`, 400, 'PRODUCT_EXISTS');
+          throw new AppError(
+            `Slug '${newSlug}' đã được sử dụng bởi sản phẩm khác.`,
+            400,
+            'PRODUCT_EXISTS'
+          );
         }
         updateData.slug = newSlug;
       }
@@ -314,7 +334,11 @@ export class ProductService {
     if (updateData.categoryId) {
       const cat = await Category.findOne({ _id: targetCategoryId, isActive: true });
       if (!cat) {
-        throw new AppError('Danh mục sản phẩm không tồn tại hoặc đã bị vô hiệu hóa.', 404, 'CATEGORY_NOT_FOUND');
+        throw new AppError(
+          'Danh mục sản phẩm không tồn tại hoặc đã bị vô hiệu hóa.',
+          404,
+          'CATEGORY_NOT_FOUND'
+        );
       }
     }
 
@@ -333,7 +357,7 @@ export class ProductService {
 
         if (invalidKeys.length > 0) {
           throw new AppError(
-            `Thuộc tính '${invalidKeys.join(', ')}' không hợp lệ đối với danh mục '${cat.name}'.`,
+            `Thuộc tính '${invalidKeys.join(', ')}' không hợp lệ đối với danh mục '${cat.name}'. Các khóa cho phép: ${cat.attributeKeys.join(', ')}`,
             400,
             'INVALID_ATTRIBUTE_KEY'
           );
@@ -345,7 +369,8 @@ export class ProductService {
     if (updateData.skus) {
       updateData.skus = updateData.skus.map((sku) => {
         const price = Number(sku.price);
-        const salePrice = sku.salePrice !== undefined && sku.salePrice !== null ? Number(sku.salePrice) : price;
+        const salePrice =
+          sku.salePrice !== undefined && sku.salePrice !== null ? Number(sku.salePrice) : price;
 
         return {
           ...sku,
@@ -357,15 +382,21 @@ export class ProductService {
 
       const skuCodes = updateData.skus.map((s) => s.sku);
       if (new Set(skuCodes).size !== skuCodes.length) {
-        throw new AppError('Mã SKU không được trùng lặp trong cùng một sản phẩm.', 400, 'DUPLICATE_SKU_CODE');
+        throw new AppError(
+          'Mã SKU không được trùng lặp trong cùng một sản phẩm.',
+          400,
+          'DUPLICATE_SKU_CODE'
+        );
       }
     }
 
     const product = await Product.findOneAndUpdate(
-      { _id: productId, isActive: true },
+      { _id: productId },
       { $set: updateData },
       { new: true, runValidators: true }
-    ).populate('categoryId', 'name slug');
+    )
+      .populate('categoryId', 'name slug parentId attributeKeys')
+      .lean();
 
     return product;
   }
