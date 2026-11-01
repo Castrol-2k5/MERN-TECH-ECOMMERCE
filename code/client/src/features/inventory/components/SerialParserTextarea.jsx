@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { Hash, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 
 export const SerialParserTextarea = ({
@@ -53,17 +53,18 @@ export const SerialParserTextarea = ({
       });
     });
 
-    const report = {
+    return {
       total: lines.length,
       valid: validCount,
       duplicate: duplicateCount,
       malformed: malformedCount,
       items
     };
+  }, [rawText, existingSerials]);
 
-    onParsedResult?.(report);
-    return report;
-  }, [rawText, existingSerials, onParsedResult]);
+  useEffect(() => {
+    onParsedResult?.(parseReport);
+  }, [parseReport, onParsedResult]);
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl text-slate-100">

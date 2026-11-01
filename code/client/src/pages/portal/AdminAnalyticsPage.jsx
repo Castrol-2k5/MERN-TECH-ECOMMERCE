@@ -11,33 +11,62 @@ import BranchSalesBreakdown from '../../features/analytics/components/BranchSale
 import ChannelBreakdownPie from '../../features/analytics/components/ChannelBreakdownPie';
 import TopProductsTable from '../../features/analytics/components/TopProductsTable';
 import { branchService } from '../../features/branches/services/branchService.js';
-import { analyticsService, fallbackAnalyticsOverview } from '../../features/analytics/services/analyticsService.js';
+import {
+  analyticsService,
+  fallbackAnalyticsOverview,
+  emptyAnalyticsOverview
+} from '../../features/analytics/services/analyticsService.js';
 import { isMockEnabled } from '../../config/dataMode.js';
-
-const BRANCH_PERFORMANCE = [
-  { rank: '01', branch: 'TechOne Q1 • Nguyễn Thị Minh Khai', revenue: '4,28 tỷ', orders: '1.042', aov: '4,11 triệu', returnRate: '1,8%', growth: '+22,4%' },
-  { rank: '02', branch: 'TechOne Thủ Đức • Võ Văn Ngân', revenue: '3,62 tỷ', orders: '968', aov: '3,74 triệu', returnRate: '2,1%', growth: '+18,2%' },
-  { rank: '03', branch: 'TechOne Q5 • Trần Hưng Đạo', revenue: '2,94 tỷ', orders: '842', aov: '3,49 triệu', returnRate: '2,4%', growth: '+15,7%' },
-  { rank: '04', branch: 'TechOne Q3 • CMT8', revenue: '2,36 tỷ', orders: '710', aov: '3,32 triệu', returnRate: '2,6%', growth: '+12,0%' }
-];
 
 export const AdminAnalyticsPage = () => {
   const [selectedBranch, setSelectedBranch] = useState('ALL');
-  const [dateRange, setDateRange] = useState('01/09/2026 — 30/09/2026');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [branches, setBranches] = useState([]);
-  const [analyticsData, setAnalyticsData] = useState(fallbackAnalyticsOverview);
+  const [analyticsData, setAnalyticsData] = useState(() =>
+    isMockEnabled() ? fallbackAnalyticsOverview : emptyAnalyticsOverview
+  );
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
-  const fetchOverview = async (branchId) => {
+  const fetchOverview = async (branchId, start = startDate, end = endDate) => {
     setIsLoading(true);
+    setErrorMsg('');
     try {
-      const data = await analyticsService.getOverview({ branchId });
+      const data = await analyticsService.getOverview({
+        branchId,
+        startDate: start || undefined,
+        endDate: end || undefined
+      });
       setAnalyticsData(data);
-    } catch {
-      setAnalyticsData(fallbackAnalyticsOverview);
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || err.message || 'Không thể tải dữ liệu phân tích.');
+      setAnalyticsData(isMockEnabled() ? fallbackAnalyticsOverview : emptyAnalyticsOverview);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleExportReport = () => {
+    const perfRows = analyticsData.branchPerformance || [];
+    const headers = ['Xếp hạng', 'Chi nhánh', 'Doanh thu thuần', 'Đơn hàng', 'AOV', 'Tỷ lệ hoàn', 'Tăng trưởng'];
+    const rows = perfRows.map((r) => [
+      `"${r.rank}"`,
+      `"${String(r.branch || '').replace(/"/g, '""')}"`,
+      `"${r.revenue}"`,
+      `"${r.orders}"`,
+      `"${r.aov}"`,
+      `"${r.returnRate}"`,
+      `"${r.growth}"`
+    ]);
+    const csv = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `bao-cao-doanh-thu-chuoi-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   useEffect(() => {
@@ -68,9 +97,15 @@ export const AdminAnalyticsPage = () => {
             <h1 className="text-xl font-black text-slate-100 tracking-tight">
               Báo Cáo Doanh Thu Đa Kênh &amp; Hiệu Quả Chuỗi
             </h1>
-            <span className="px-2.5 py-0.5 bg-amber-500/15 text-amber-300 border border-amber-500/30 rounded-full text-[11px] font-bold">
-              Dữ liệu thử nghiệm / Demo Preview
-            </span>
+            {isMockEnabled() ? (
+              <span className="px-2.5 py-0.5 bg-amber-500/15 text-amber-300 border border-amber-500/30 rounded-full text-[11px] font-bold">
+                Dữ liệu thử nghiệm / Demo Preview
+              </span>
+            ) : (
+              <span className="px-2.5 py-0.5 bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-full text-[11px] font-bold">
+                Dữ liệu trực tiếp / Live Database
+              </span>
+            )}
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
             Dữ liệu cập nhật thời gian thực • Đối soát doanh thu Web POS quầy và Storefront B2C trực tuyến
@@ -80,24 +115,39 @@ export const AdminAnalyticsPage = () => {
         {/* Export action */}
         <button
           type="button"
-          disabled
-          className="px-3.5 py-2 bg-slate-800 text-slate-400 border border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-not-allowed opacity-75 w-fit"
-          title="Tính năng xuất báo cáo doanh thu tài chính đang được hoàn thiện"
+          onClick={handleExportReport}
+          className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-lg shadow-blue-600/20 cursor-pointer w-fit"
+          title="Xuất báo cáo hiệu quả chuỗi dạng CSV"
         >
           <Download className="w-3.5 h-3.5" />
-          <span>Xuất Báo Cáo (Sắp ra mắt)</span>
+          <span>Xuất Báo Cáo CSV</span>
         </button>
       </div>
 
+      {errorMsg && (
+        <div className="p-3 rounded-xl bg-rose-950/80 border border-rose-500/50 text-rose-300 text-xs font-semibold">
+          {errorMsg}
+        </div>
+      )}
+
       {/* Filter Bar */}
       <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl flex flex-wrap items-center gap-2.5 text-xs">
-        <div className="flex items-center gap-1.5 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-700">
+        <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-700">
           <Calendar className="w-3.5 h-3.5 text-slate-400" />
+          <span className="text-slate-400">Từ:</span>
           <input
-            type="text"
-            value={dateRange}
-            onChange={(e) => setDateRange(e.target.value)}
-            className="bg-transparent text-slate-200 text-xs focus:outline-none w-48 font-medium"
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="bg-transparent text-slate-200 text-xs focus:outline-none font-medium"
+          />
+          <span className="text-slate-500">—</span>
+          <span className="text-slate-400">Đến:</span>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="bg-transparent text-slate-200 text-xs focus:outline-none font-medium"
           />
         </div>
 
@@ -119,7 +169,7 @@ export const AdminAnalyticsPage = () => {
 
         <button
           type="button"
-          onClick={() => fetchOverview(selectedBranch)}
+          onClick={() => fetchOverview(selectedBranch, startDate, endDate)}
           className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
         >
           {isLoading ? 'Đang tải...' : 'Áp dụng'}
@@ -170,31 +220,39 @@ export const AdminAnalyticsPage = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 font-medium">
-              {(analyticsData.branchPerformance?.length > 0 ? analyticsData.branchPerformance : BRANCH_PERFORMANCE).map((row) => (
-                <tr key={row.rank} className="hover:bg-slate-850/60 transition-colors">
-                  <td className="py-3 px-4 text-center font-mono font-bold text-cyan-400">
-                    {row.rank}
-                  </td>
-                  <td className="py-3 px-4 font-semibold text-slate-200">
-                    {row.branch}
-                  </td>
-                  <td className="py-3 px-4 text-right font-mono font-bold text-slate-100">
-                    {row.revenue}
-                  </td>
-                  <td className="py-3 px-4 text-center font-mono text-slate-300">
-                    {row.orders}
-                  </td>
-                  <td className="py-3 px-4 text-right font-mono text-cyan-400">
-                    {row.aov}
-                  </td>
-                  <td className="py-3 px-4 text-center font-mono text-slate-400">
-                    {row.returnRate}
-                  </td>
-                  <td className="py-3 px-4 text-right font-mono font-bold text-emerald-400">
-                    {row.growth}
+              {(analyticsData.branchPerformance || []).length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="py-10 text-center text-slate-500">
+                    Chưa có dữ liệu đơn hàng phát sinh trong khoảng thời gian đã chọn.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                (analyticsData.branchPerformance || []).map((row) => (
+                  <tr key={row.rank} className="hover:bg-slate-850/60 transition-colors">
+                    <td className="py-3 px-4 text-center font-mono font-bold text-cyan-400">
+                      {row.rank}
+                    </td>
+                    <td className="py-3 px-4 font-semibold text-slate-200">
+                      {row.branch}
+                    </td>
+                    <td className="py-3 px-4 text-right font-mono font-bold text-slate-100">
+                      {row.revenue}
+                    </td>
+                    <td className="py-3 px-4 text-center font-mono text-slate-300">
+                      {row.orders}
+                    </td>
+                    <td className="py-3 px-4 text-right font-mono text-cyan-400">
+                      {row.aov}
+                    </td>
+                    <td className="py-3 px-4 text-center font-mono text-slate-400">
+                      {row.returnRate}
+                    </td>
+                    <td className="py-3 px-4 text-right font-mono font-bold text-emerald-400">
+                      {row.growth}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

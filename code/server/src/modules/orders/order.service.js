@@ -442,6 +442,7 @@ export class OrderService {
   /**
    * Điều phối / Phân bổ đơn hàng B2C sang chi nhánh xử lý
    * Quyền: SUPER_ADMIN, BRANCH_MANAGER
+   * Thực thi: Nếu đổi chi nhánh xử lý, kiểm tra & chuyển giữ tồn kho từ chi nhánh cũ sang chi nhánh mới
    */
   static async allocateOrder(orderId, branchId, currentUser) {
     const order = await Order.findById(orderId);
@@ -452,6 +453,57 @@ export class OrderService {
     const branch = await Branch.findById(branchId).lean();
     if (!branch || !branch.isActive) {
       throw new AppError('Chi nhánh điều phối không tồn tại hoặc đã tạm dừng hoạt động.', 404, 'BRANCH_NOT_FOUND');
+    }
+
+    const oldBranchId = order.branchId?.toString();
+    const newBranchId = branchId.toString();
+
+    if (oldBranchId && oldBranchId !== newBranchId && Array.isArray(order.items) && order.items.length > 0) {
+      const deductedNew = [];
+      try {
+        for (const item of order.items) {
+          const targetInv = await BranchInventory.findOne({
+            branchId: newBranchId,
+            productSkuId: item.productSkuId
+          }).lean();
+
+          if (targetInv) {
+            const updateRes = await BranchInventory.updateOne(
+              {
+                branchId: newBranchId,
+                productSkuId: item.productSkuId,
+                quantity: { $gte: item.quantity }
+              },
+              { $inc: { quantity: -item.quantity } }
+            );
+
+            if (updateRes.modifiedCount === 0) {
+              throw new AppError(
+                `Sản phẩm '${item.productName}' (${item.sku}) không đủ tồn kho tại chi nhánh điều phối mới.`,
+                409,
+                'PRODUCT_OUT_OF_STOCK'
+              );
+            }
+            deductedNew.push({ branchId: newBranchId, productSkuId: item.productSkuId, quantity: item.quantity });
+          }
+        }
+
+        // Hoàn trả tồn kho cho chi nhánh cũ (nếu có bản ghi BranchInventory tại chi nhánh cũ)
+        for (const item of order.items) {
+          await BranchInventory.updateOne(
+            { branchId: oldBranchId, productSkuId: item.productSkuId },
+            { $inc: { quantity: item.quantity } }
+          );
+        }
+      } catch (err) {
+        for (const d of deductedNew) {
+          await BranchInventory.updateOne(
+            { branchId: d.branchId, productSkuId: d.productSkuId },
+            { $inc: { quantity: d.quantity } }
+          );
+        }
+        throw err;
+      }
     }
 
     order.branchId = branchId;
@@ -481,9 +533,38 @@ export class OrderService {
     }
 
     if (Array.isArray(serials) && serials.length > 0) {
+      const cleanSerials = serials.map((s) => String(s).trim().toUpperCase()).filter(Boolean);
+
+      if (new Set(cleanSerials).size !== cleanSerials.length) {
+        throw new AppError('Danh sách Serial gán vào đơn chứa mã trùng lặp.', 400, 'VALIDATION_ERROR');
+      }
+
+      const foundSerials = await Serial.find({ serialNumber: { $in: cleanSerials } }).lean();
+      if (foundSerials.length !== cleanSerials.length) {
+        throw new AppError('Một số mã Serial/IMEI không tồn tại trong hệ thống kho.', 400, 'SERIAL_NOT_FOUND');
+      }
+
+      const orderBranchId = order.branchId?.toString();
+      for (const s of foundSerials) {
+        if (s.status !== SERIAL_STATUS.IN_STOCK) {
+          throw new AppError(
+            `Mã Serial '${s.serialNumber}' không ở trạng thái khả dụng trong kho (Trạng thái: ${s.status}).`,
+            400,
+            'INVALID_SERIAL_STATUS'
+          );
+        }
+        if (orderBranchId && s.branchId?.toString() !== orderBranchId) {
+          throw new AppError(
+            `Mã Serial '${s.serialNumber}' không thuộc kho của chi nhánh được giao xử lý đơn hàng này.`,
+            400,
+            'CROSS_BRANCH_ACCESS_DENIED'
+          );
+        }
+      }
+
       // Gán serials vào item đầu tiên hoặc các items
       if (order.items && order.items.length > 0) {
-        order.items[0].serialsAssigned = serials;
+        order.items[0].serialsAssigned = cleanSerials;
       }
 
       // Cập nhật trạng thái Serial sang SOLD và kích hoạt bảo hành
@@ -492,7 +573,7 @@ export class OrderService {
       warrantyEndDate.setFullYear(warrantyEndDate.getFullYear() + 1);
 
       await Serial.updateMany(
-        { serialNumber: { $in: serials } },
+        { serialNumber: { $in: cleanSerials } },
         {
           $set: {
             status: SERIAL_STATUS.SOLD,

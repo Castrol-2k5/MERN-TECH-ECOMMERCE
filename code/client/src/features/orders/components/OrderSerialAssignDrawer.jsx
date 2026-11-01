@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, ScanBarcode, CheckCircle2, PackageCheck, AlertCircle } from 'lucide-react';
+import inventoryService from '../../inventory/services/inventoryService.js';
+import { isMockEnabled } from '../../../config/dataMode.js';
 
 export const OrderSerialAssignDrawer = ({
   isOpen,
@@ -9,7 +11,37 @@ export const OrderSerialAssignDrawer = ({
 }) => {
   const [scannedSerial, setScannedSerial] = useState('');
   const [assignedSerials, setAssignedSerials] = useState(order?.serials || []);
+  const [availableSerials, setAvailableSerials] = useState([]);
   const [errorMsg, setErrorMsg] = useState('');
+
+  useEffect(() => {
+    setAssignedSerials(order?.serials || []);
+    setErrorMsg('');
+    setScannedSerial('');
+
+    if (!isOpen || !order || isMockEnabled()) {
+      setAvailableSerials([]);
+      return;
+    }
+
+    let ignore = false;
+    inventoryService
+      .getSerials({
+        branchId: order.branchId,
+        productSkuId: order.productSkuId,
+        status: 'IN_STOCK'
+      })
+      .then((list) => {
+        if (!ignore) setAvailableSerials(list || []);
+      })
+      .catch(() => {
+        if (!ignore) setAvailableSerials([]);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [isOpen, order]);
 
   if (!isOpen || !order) return null;
 
@@ -121,6 +153,43 @@ export const OrderSerialAssignDrawer = ({
                 </p>
               )}
             </form>
+
+            {/* Quick Pick Available Serials at Branch */}
+            {availableSerials.length > 0 && (
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400">
+                  <span>Serial khả dụng trong kho chi nhánh ({availableSerials.length}):</span>
+                  <span className="text-cyan-400">Bấm để chọn nhanh</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
+                  {availableSerials.map((s) => {
+                    const sn = s.serialNumber;
+                    const isPicked = assignedSerials.includes(sn);
+                    return (
+                      <button
+                        key={sn}
+                        type="button"
+                        onClick={() => {
+                          if (isPicked) {
+                            handleRemoveSerial(sn);
+                          } else if (assignedSerials.length < requiredCount) {
+                            setAssignedSerials((prev) => [...prev, sn]);
+                            setErrorMsg('');
+                          }
+                        }}
+                        className={`px-2 py-1 rounded-lg font-mono text-[11px] border transition-colors cursor-pointer ${
+                          isPicked
+                            ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300 font-bold'
+                            : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                        }`}
+                      >
+                        {sn}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* List of assigned serials */}
             <div>

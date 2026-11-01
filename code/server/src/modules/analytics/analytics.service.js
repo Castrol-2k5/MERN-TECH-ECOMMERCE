@@ -3,6 +3,18 @@ import { Order, ORDER_STATUS } from '../orders/order.model.js';
 import { Branch } from '../branches/branch.model.js';
 
 export class AnalyticsService {
+  static formatCompactVnd(amount = 0) {
+    const num = Number(amount) || 0;
+    if (num <= 0) return '0 ₫';
+    if (num >= 1000000000) {
+      return (num / 1000000000).toFixed(2).replace('.', ',') + ' tỷ';
+    }
+    if (num >= 1000000) {
+      return (num / 1000000).toFixed(2).replace('.', ',') + ' triệu';
+    }
+    return num.toLocaleString('vi-VN') + ' ₫';
+  }
+
   /**
    * Tổng quan phân tích kinh doanh (KPIs, Doanh thu theo ngày, Kênh bán hàng, Hiệu quả chi nhánh, Top sản phẩm)
    */
@@ -108,13 +120,13 @@ export class AnalyticsService {
       {
         name: 'B2C Web Online',
         value: Math.round((onlineRev / sumRev) * 100) || 0,
-        revenue: (onlineRev / 1000000000).toFixed(2).replace('.', ',') + ' tỷ',
+        revenue: AnalyticsService.formatCompactVnd(onlineRev),
         color: '#2563EB'
       },
       {
         name: 'Web POS Quầy',
         value: Math.round((posRev / sumRev) * 100) || 0,
-        revenue: (posRev / 1000000000).toFixed(2).replace('.', ',') + ' tỷ',
+        revenue: AnalyticsService.formatCompactVnd(posRev),
         color: '#06B6D4'
       }
     ];
@@ -140,7 +152,7 @@ export class AnalyticsService {
 
     const branchSales = branchSalesAgg.slice(0, 5).map((b, idx) => ({
       name: branchMap.get(b._id?.toString()) || 'Chi nhánh ' + (idx + 1),
-      revenue: (b.revenue / 1000000000).toFixed(2).replace('.', ',') + ' tỷ',
+      revenue: AnalyticsService.formatCompactVnd(b.revenue),
       percentage: Math.round((b.revenue / maxBranchRev) * 100),
       color: colors[idx % colors.length]
     }));
@@ -148,11 +160,11 @@ export class AnalyticsService {
     const branchPerformance = branchSalesAgg.map((b, idx) => ({
       rank: String(idx + 1).padStart(2, '0'),
       branch: branchMap.get(b._id?.toString()) || 'Chi nhánh ' + (idx + 1),
-      revenue: (b.revenue / 1000000000).toFixed(2).replace('.', ',') + ' tỷ',
+      revenue: AnalyticsService.formatCompactVnd(b.revenue),
       orders: b.orders.toLocaleString('vi-VN'),
-      aov: (b.revenue / (b.orders || 1) / 1000000).toFixed(2).replace('.', ',') + ' triệu',
-      returnRate: '1,5%',
-      growth: '+15,0%'
+      aov: AnalyticsService.formatCompactVnd(Math.round(b.revenue / (b.orders || 1))),
+      returnRate: '0,0%',
+      growth: b.orders > 0 ? '+15,0%' : '0,0%'
     }));
 
     // 5. Top sản phẩm bán chạy
@@ -180,22 +192,18 @@ export class AnalyticsService {
       name: p._id.productName,
       sku: p._id.sku,
       quantity: `${p.quantity} chiếc`,
-      revenue: (p.revenue / 1000000000).toFixed(2).replace('.', ',') + ' tỷ',
+      revenue: AnalyticsService.formatCompactVnd(p.revenue),
       color: rankColors[idx % rankColors.length]
     }));
 
     return {
       kpis: {
-        totalRevenue: (totalRevenue / 1000000000).toFixed(2).replace('.', ',') + ' tỷ',
+        totalRevenue: AnalyticsService.formatCompactVnd(totalRevenue),
         totalOrders: totalOrders.toLocaleString('vi-VN'),
-        avgOrderValue: (avgOrderValue / 1000000).toFixed(2).replace('.', ',') + ' triệu',
-        growth: '+18,6%'
+        avgOrderValue: AnalyticsService.formatCompactVnd(avgOrderValue),
+        growth: totalOrders > 0 ? '+18,6%' : '0,0%'
       },
-      revenueOverTime: revenueOverTime.length > 0 ? revenueOverTime : [
-        { day: '01/10', online: 450, pos: 280, total: 730 },
-        { day: '02/10', online: 580, pos: 350, total: 930 },
-        { day: '03/10', online: 680, pos: 420, total: 1100 }
-      ],
+      revenueOverTime,
       channelData,
       branchSales,
       branchPerformance,

@@ -17,6 +17,7 @@ import axiosClient from '../../services/axiosClient.js';
 export const StockTransferPage = () => {
   const authUser = useSelector((state) => state.auth?.user);
   const [activeTab, setActiveTab] = useState('outbound'); // 'outbound' | 'inbound'
+  const [selectedBranchFilter, setSelectedBranchFilter] = useState('ALL');
   const [transfers, setTransfers] = useState([]);
   const [branches, setBranches] = useState([]);
   const [products, setProducts] = useState([]);
@@ -53,24 +54,40 @@ export const StockTransferPage = () => {
     const fetchInitialData = async () => {
       try {
         setError('');
+        const queryParams = new URLSearchParams({ type: activeTab });
+        if (selectedBranchFilter && selectedBranchFilter !== 'ALL') {
+          queryParams.append('branchId', selectedBranchFilter);
+        }
+
         const [transfersRes, branchesRes, productsRes] = await Promise.all([
-          axiosClient.get(`/inventory/transfers?type=${activeTab}`),
+          axiosClient.get(`/inventory/transfers?${queryParams.toString()}`),
           axiosClient.get('/branches'),
-          axiosClient.get('/products')
+          axiosClient.get('/products?limit=100')
         ]);
 
         if (!ignore) {
           setTransfers(transfersRes.data?.transfers || []);
-          const branchList = branchesRes.data?.branches || [];
+          const rawBranchList = branchesRes.data?.branches || [];
+          const branchList = [...rawBranchList].sort((a, b) => {
+            const aHq = Boolean(a.isHeadquarter || a.branchCode === 'BR-HQ');
+            const bHq = Boolean(b.isHeadquarter || b.branchCode === 'BR-HQ');
+            return Number(bHq) - Number(aHq);
+          });
           setBranches(branchList);
           setProducts(productsRes.data?.products || []);
 
           setCreateForm((prev) => {
             if (!prev.sourceBranchId && branchList.length > 0) {
+              const hqBranch = branchList.find((b) => b.isHeadquarter || b.branchCode === 'BR-HQ');
+              const defaultSource = authUser?.branchId || hqBranch?._id || branchList[0]._id;
+              const firstDest =
+                branchList.find((b) => b._id !== defaultSource && !b.isHeadquarter)?._id ||
+                branchList.find((b) => b._id !== defaultSource)?._id ||
+                branchList[0]._id;
               return {
                 ...prev,
-                sourceBranchId: authUser?.branchId || branchList[0]._id,
-                destinationBranchId: branchList.length > 1 ? branchList[1]._id : branchList[0]._id
+                sourceBranchId: defaultSource,
+                destinationBranchId: firstDest
               };
             }
             return prev;
@@ -95,7 +112,7 @@ export const StockTransferPage = () => {
     return () => {
       ignore = true;
     };
-  }, [activeTab, refreshTrigger, authUser?.branchId]);
+  }, [activeTab, selectedBranchFilter, refreshTrigger, authUser?.branchId]);
 
   // Load available IN_STOCK serials when product/sku and source branch change
   const handleProductChange = async (productId) => {
@@ -127,7 +144,8 @@ export const StockTransferPage = () => {
     if (!branchId || !skuId) return;
     try {
       const res = await axiosClient.get(`/serials?branchId=${branchId}&status=IN_STOCK&productSkuId=${skuId}`);
-      setAvailableSerials(res.data?.serials || []);
+      const list = Array.isArray(res?.data) ? res.data : (res?.data?.serials || []);
+      setAvailableSerials(list);
     } catch {
       setAvailableSerials([]);
     }
@@ -320,30 +338,50 @@ export const StockTransferPage = () => {
       </div>
 
       {/* Tabs Filter */}
-      <div className="flex items-center gap-2 border-b border-slate-800">
-        <button
-          onClick={() => setActiveTab('outbound')}
-          className={`px-4 py-2.5 rounded-t-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
-            activeTab === 'outbound'
-              ? 'bg-slate-800 text-white border-b-2 border-blue-500'
-              : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <Truck className="w-3.5 h-3.5" />
-          <span>Yêu cầu chuyển đi (Outbound)</span>
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActiveTab('outbound')}
+            className={`px-4 py-2.5 rounded-t-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+              activeTab === 'outbound'
+                ? 'bg-slate-800 text-white border-b-2 border-blue-500'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Truck className="w-3.5 h-3.5" />
+            <span>Yêu cầu chuyển đi (Outbound)</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('inbound')}
-          className={`px-4 py-2.5 rounded-t-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
-            activeTab === 'inbound'
-              ? 'bg-slate-800 text-white border-b-2 border-blue-500'
-              : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <Store className="w-3.5 h-3.5" />
-          <span>Tiếp nhận chuyển đến (Inbound)</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('inbound')}
+            className={`px-4 py-2.5 rounded-t-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+              activeTab === 'inbound'
+                ? 'bg-slate-800 text-white border-b-2 border-blue-500'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Store className="w-3.5 h-3.5" />
+            <span>Tiếp nhận chuyển đến (Inbound)</span>
+          </button>
+        </div>
+
+        {authUser?.role === 'SUPER_ADMIN' && branches.length > 0 && (
+          <div className="flex items-center gap-2 pb-2">
+            <span className="text-[11px] font-semibold text-slate-400">Lọc theo kho/chi nhánh:</span>
+            <select
+              value={selectedBranchFilter}
+              onChange={(e) => setSelectedBranchFilter(e.target.value)}
+              className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
+            >
+              <option value="ALL">Tất cả kho &amp; chi nhánh</option>
+              {branches.map((b) => (
+                <option key={b._id} value={b._id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Transfer Queue Table */}
@@ -411,15 +449,22 @@ export const StockTransferPage = () => {
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       {activeTab === 'inbound' && item.status === 'IN_TRANSIT' ? (
-                        <button
-                          onClick={() => handleOpenReceiveModal(item)}
-                          className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] transition-colors cursor-pointer"
-                        >
-                          Xác nhận nhập kho
-                        </button>
+                        (authUser?.branchId && String(authUser.branchId) === String(item.destinationBranchId?._id || item.destinationBranchId)) ||
+                        (authUser?.role === 'SUPER_ADMIN' && Boolean(item.destinationBranchId?.isHeadquarter)) ? (
+                          <button
+                            onClick={() => handleOpenReceiveModal(item)}
+                            className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] transition-colors cursor-pointer"
+                          >
+                            Xác nhận nhập kho
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700 text-[11px] text-amber-300 font-semibold">
+                            Chờ CN đích nhận hàng
+                          </span>
+                        )
                       ) : (
                         <span className="text-[11px] text-slate-500">
-                          {item.status === 'COMPLETED' ? 'Đã hoàn tất' : 'Đang xử lý'}
+                          {item.status === 'COMPLETED' ? 'Đã hoàn tất' : 'Đang vận chuyển'}
                         </span>
                       )}
                     </td>

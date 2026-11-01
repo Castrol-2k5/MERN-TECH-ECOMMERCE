@@ -20,6 +20,7 @@ export const SerialImportPage = () => {
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
+  const [existingSerials, setExistingSerials] = useState([]);
 
   // Load branches & products on mount
   useEffect(() => {
@@ -30,19 +31,34 @@ export const SerialImportPage = () => {
     ]).then(([branchList, productRes]) => {
       if (!ignore) {
         if (branchList && branchList.length > 0) {
-          setBranches(branchList);
+          // Sort HQ first for Super Admin
+          const sortedBranches = [...branchList].sort((a, b) => {
+            const aHq = Boolean(a.isHeadquarter || a.branchCode === 'BR-HQ');
+            const bHq = Boolean(b.isHeadquarter || b.branchCode === 'BR-HQ');
+            return Number(bHq) - Number(aHq);
+          });
+          setBranches(sortedBranches);
+
+          const hqBranch = sortedBranches.find((b) => b.isHeadquarter || b.branchCode === 'BR-HQ');
           const initialBranchId =
-            authUser?.branchId && branchList.some((b) => b._id === authUser.branchId)
+            authUser?.branchId && sortedBranches.some((b) => b._id === authUser.branchId)
               ? authUser.branchId
-              : branchList[0]._id;
+              : hqBranch?._id || sortedBranches[0]._id;
           setSelectedBranchId(initialBranchId);
         }
 
         const prodList = productRes?.products || [];
         if (prodList.length > 0) {
           setProducts(prodList);
-          if (prodList[0].skus && prodList[0].skus.length > 0) {
-            setSelectedSku(prodList[0].skus[0]);
+          const firstSerialProd = prodList.find((p) => p.isSerialManaged !== false && p.skus?.length > 0) || prodList[0];
+          if (firstSerialProd?.skus && firstSerialProd.skus.length > 0) {
+            const firstSku = firstSerialProd.skus[0];
+            setSelectedSku({
+              ...firstSku,
+              code: firstSku.code || firstSku.sku,
+              productName: firstSerialProd.name,
+              productId: firstSerialProd._id
+            });
           }
         }
       }
@@ -52,6 +68,33 @@ export const SerialImportPage = () => {
       ignore = true;
     };
   }, [authUser?.branchId]);
+
+  // Load existing serials in DB for real-time duplicate detection
+  useEffect(() => {
+    if (isMockEnabled()) {
+      setExistingSerials(['C02ZQ0ABQ9P2']);
+      return;
+    }
+    const skuId = selectedSku?._id || selectedSku?.productSkuId;
+    if (!skuId) return;
+
+    let ignore = false;
+    apiClient
+      .get(`/serials?productSkuId=${skuId}`)
+      .then((res) => {
+        if (!ignore) {
+          const list = Array.isArray(res?.data) ? res.data : (res?.data?.serials || []);
+          setExistingSerials(list.map((s) => String(s.serialNumber || '').toUpperCase()).filter(Boolean));
+        }
+      })
+      .catch(() => {
+        if (!ignore) setExistingSerials([]);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [selectedSku?._id, selectedSku?.productSkuId]);
 
   const selectedBranch =
     branches.find((b) => b._id === selectedBranchId) || branches[0] || null;
@@ -94,6 +137,7 @@ export const SerialImportPage = () => {
         await apiClient.post('/serials/import', payload);
       }
 
+      setExistingSerials((prev) => Array.from(new Set([...prev, ...validSerials])));
       setShowSummaryModal(false);
       setToastMsg({
         type: 'success',
@@ -176,7 +220,7 @@ export const SerialImportPage = () => {
       <SerialParserTextarea
         rawText={rawText}
         onChangeText={setRawText}
-        existingSerials={['C02ZQ0ABQ9P2']}
+        existingSerials={existingSerials}
         onParsedResult={handleParsedResult}
       />
 
@@ -185,7 +229,7 @@ export const SerialImportPage = () => {
         isOpen={showSummaryModal}
         onClose={() => setShowSummaryModal(false)}
         skuCode={selectedSku?.code || selectedSku?.sku}
-        branchName={selectedBranch.name || selectedBranch.branchName}
+        branchName={selectedBranch?.name || selectedBranch?.branchName || ''}
         validationReport={validationReport}
         onConfirmImport={handleConfirmImport}
         isImporting={isImporting}

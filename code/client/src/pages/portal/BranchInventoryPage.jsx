@@ -28,11 +28,17 @@ export const BranchInventoryPage = () => {
     let ignore = false;
     branchService.getBranches().then((list) => {
       if (!ignore && list && list.length > 0) {
-        setBranches(list);
+        const sortedList = [...list].sort((a, b) => {
+          const aHq = Boolean(a.isHeadquarter || a.branchCode === 'BR-HQ');
+          const bHq = Boolean(b.isHeadquarter || b.branchCode === 'BR-HQ');
+          return Number(bHq) - Number(aHq);
+        });
+        setBranches(sortedList);
+        const hqBranch = sortedList.find((b) => b.isHeadquarter || b.branchCode === 'BR-HQ');
         const defaultBranchId =
-          authUser?.branchId && list.some((b) => b._id === authUser.branchId)
+          authUser?.branchId && sortedList.some((b) => b._id === authUser.branchId)
             ? authUser.branchId
-            : list[0]._id;
+            : hqBranch?._id || sortedList[0]._id;
         setSelectedBranchId(defaultBranchId);
       }
     });
@@ -40,6 +46,33 @@ export const BranchInventoryPage = () => {
       ignore = true;
     };
   }, [authUser?.branchId]);
+
+  const selectedBranch = branches.find((b) => b._id === selectedBranchId) || null;
+  const canAdjustSelectedBranch =
+    authUser?.role === 'BRANCH_MANAGER' ||
+    Boolean(selectedBranch?.isHeadquarter || selectedBranch?.branchCode === 'BR-HQ');
+
+  const handleExportCsv = () => {
+    if (!items || items.length === 0) return;
+    const headers = ['SKU', 'Tên sản phẩm', 'Danh mục', 'Vị trí kệ', 'Tồn thực tế', 'Tồn khả dụng', 'Số Serial'];
+    const rows = items.map((it) => [
+      `"${it.sku || ''}"`,
+      `"${String(it.productName || '').replace(/"/g, '""')}"`,
+      `"${it.category || ''}"`,
+      `"${it.shelfLocation || ''}"`,
+      it.quantityPhysical || 0,
+      it.quantityAvailable || 0,
+      it.serials?.length || 0
+    ]);
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `kiem-ke-kho-${selectedBranch?.branchCode || 'branch'}-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const fetchInventory = useCallback(async () => {
     if (!selectedBranchId) return;
@@ -143,11 +176,12 @@ export const BranchInventoryPage = () => {
 
           <button
             type="button"
-            onClick={() => alert('Đang xuất báo cáo kiểm kê kho định dạng Excel (XLSX)...')}
-            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-lg shadow-blue-600/20 cursor-pointer"
+            onClick={handleExportCsv}
+            disabled={items.length === 0}
+            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-lg shadow-blue-600/20 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Xuất Excel Kiểm Kê</span>
+            <span>Xuất CSV Kiểm Kê</span>
           </button>
         </div>
       </div>
@@ -167,6 +201,7 @@ export const BranchInventoryPage = () => {
       <BranchStockTable
         items={items}
         loading={loading}
+        canAdjust={canAdjustSelectedBranch}
         onOpenSerials={(item) => setActiveSerialItem(item)}
         onOpenAdjust={(item) => setActiveAdjustItem(item)}
         onSearch={setSearch}
@@ -181,6 +216,7 @@ export const BranchInventoryPage = () => {
         isOpen={Boolean(activeSerialItem)}
         onClose={() => setActiveSerialItem(null)}
         item={activeSerialItem}
+        branchId={selectedBranchId}
       />
 
       {/* Stock Adjust Modal */}

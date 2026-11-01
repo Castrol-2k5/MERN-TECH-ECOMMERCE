@@ -20,7 +20,8 @@ export const BranchStockTable = ({
   onFilterStatus,
   selectedCategory = 'TẤT CẢ',
   selectedStatus = 'ALL',
-  loading = false
+  loading = false,
+  canAdjust = true
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -202,15 +203,24 @@ export const BranchStockTable = ({
 
                   {/* Actions */}
                   <td className="py-3 px-4 text-right">
-                    <button
-                      type="button"
-                      onClick={() => onOpenAdjust(item)}
-                      className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer border border-slate-700/60"
-                      title="Kiểm kê / Điều chỉnh số lượng tồn"
-                    >
-                      <SlidersHorizontal className="w-3 h-3 text-blue-400" />
-                      <span>Điều chỉnh</span>
-                    </button>
+                    {canAdjust ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpenAdjust(item)}
+                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer border border-slate-700/60"
+                        title="Kiểm kê / Điều chỉnh số lượng tồn"
+                      >
+                        <SlidersHorizontal className="w-3 h-3 text-blue-400" />
+                        <span>Điều chỉnh</span>
+                      </button>
+                    ) : (
+                      <span
+                        className="px-2.5 py-1 bg-slate-900 text-slate-400 rounded-lg text-[11px] font-semibold inline-flex items-center gap-1 border border-slate-800"
+                        title="Tồn kho chi nhánh bán lẻ do Quản lý chi nhánh trực tiếp kiểm kê; Trụ sở thực hiện giám sát"
+                      >
+                        Giám sát (Chỉ xem)
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))

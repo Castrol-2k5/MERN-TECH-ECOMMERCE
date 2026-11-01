@@ -11,7 +11,8 @@ import { USER_ROLES } from '../users/user.model.js';
 export class InventoryService {
   /**
    * Get inventory list by branch
-   * Applies lean() and populates product details (name, images, skus)
+   * Applies lean() and populates product details (name, images, skus, categoryId, isSerialManaged)
+   * and attaches serials belonging to that branch + SKU.
    */
   static async getInventoryByBranch(branchId) {
     if (!mongoose.Types.ObjectId.isValid(branchId)) {
@@ -23,11 +24,34 @@ export class InventoryService {
       throw new AppError('Không tìm thấy chi nhánh yêu cầu.', 404, 'BRANCH_NOT_FOUND');
     }
 
-    const inventories = await BranchInventory.find({ branchId })
-      .populate('productId', 'name slug images brand categoryId skus isActive')
-      .lean();
+    const [inventories, branchSerials] = await Promise.all([
+      BranchInventory.find({ branchId })
+        .populate({
+          path: 'productId',
+          select: 'name slug images brand categoryId skus isActive isSerialManaged',
+          populate: { path: 'categoryId', select: 'name slug' }
+        })
+        .lean(),
+      Serial.find({ branchId })
+        .select('serialNumber productSkuId status soldAt warrantyEndDate createdAt')
+        .sort({ createdAt: -1 })
+        .lean()
+    ]);
 
-    return inventories;
+    const serialsBySkuMap = new Map();
+    for (const s of branchSerials) {
+      const key = s.productSkuId?.toString();
+      if (!key) continue;
+      if (!serialsBySkuMap.has(key)) {
+        serialsBySkuMap.set(key, []);
+      }
+      serialsBySkuMap.get(key).push(s);
+    }
+
+    return inventories.map((inv) => ({
+      ...inv,
+      serials: serialsBySkuMap.get(inv.productSkuId?.toString()) || []
+    }));
   }
 
   /**
@@ -42,7 +66,7 @@ export class InventoryService {
       productSkuId,
       quantity: { $gt: 0 }
     })
-      .populate('branchId', 'branchCode name address phone location isActive')
+      .populate('branchId', 'branchCode name address phone location isActive isHeadquarter')
       .lean();
 
     const availableBranches = inventories
@@ -259,7 +283,7 @@ export class InventoryService {
       } else {
         filter.$or = [{ sourceBranchId: userBranchId }, { destinationBranchId: userBranchId }];
       }
-    } else if (query.branchId) {
+    } else if (query.branchId && query.branchId !== 'ALL') {
       if (query.type === 'inbound') {
         filter.destinationBranchId = query.branchId;
       } else if (query.type === 'outbound') {
@@ -274,8 +298,8 @@ export class InventoryService {
     }
 
     const transfers = await StockTransfer.find(filter)
-      .populate('sourceBranchId', 'name branchCode address')
-      .populate('destinationBranchId', 'name branchCode address')
+      .populate('sourceBranchId', 'name branchCode address isHeadquarter')
+      .populate('destinationBranchId', 'name branchCode address isHeadquarter')
       .populate('createdById', 'fullName email')
       .populate('receivedById', 'fullName email')
       .sort({ createdAt: -1 })

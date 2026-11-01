@@ -210,6 +210,7 @@ const normalizeBranchStock = (item) => {
   return {
     branchId: b._id || b.id || item.branchId,
     branchName: b.name || b.branchName || 'TechOne Chi nhánh',
+    isHeadquarter: Boolean(b.isHeadquarter || b.branchCode === 'BR-HQ'),
     address: b.address || '',
     phone: b.phone || '',
     quantity: qty,
@@ -226,8 +227,16 @@ const normalizeBranchInventoryItem = (inv) => {
   const sku = skus.find((s) => String(s._id) === String(inv.productSkuId)) || skus[0] || {};
   const qty = Number(inv.quantity || 0);
 
+  const rawSerials = Array.isArray(inv.serials)
+    ? inv.serials.map((s) => ({
+        ...s,
+        importDate: s.importDate || (s.createdAt ? new Date(s.createdAt).toLocaleDateString('vi-VN') : '—')
+      }))
+    : [];
+
   return {
     _id: inv._id,
+    branchId: inv.branchId?._id || inv.branchId,
     productId: prod._id || inv.productId,
     productSkuId: inv.productSkuId,
     sku: sku.sku || sku.code || 'SKU-GEN',
@@ -237,14 +246,14 @@ const normalizeBranchInventoryItem = (inv) => {
       typeof prod.categoryId === 'object'
         ? prod.categoryId?.name || 'Thiết bị'
         : prod.category || 'Thiết bị',
-    shelfLocation: 'Kệ A-01',
+    shelfLocation: inv.shelfLocation || 'Kệ A-01',
     quantityPhysical: qty,
     quantityReserved: 0,
     quantityAvailable: qty,
     lowStockThreshold: 3,
     unitPrice: sku.salePrice || sku.price || 0,
     hasSerial: prod.isSerialManaged !== undefined ? prod.isSerialManaged : true,
-    serials: [],
+    serials: rawSerials,
   };
 };
 
@@ -256,7 +265,7 @@ export const inventoryService = {
 
     // Nếu skuId rỗng hoặc chưa phải là ObjectId hợp lệ của Mongo (24 hex chars)
     if (!skuId || !/^[0-9a-fA-F]{24}$/.test(String(skuId))) {
-      return fallbackSkuInventory;
+      return [];
     }
 
     try {
@@ -343,7 +352,7 @@ export const inventoryService = {
       if (isDevOrTest()) {
         console.error(`[inventoryService.getBranchInventory] Lỗi tải tồn kho chi nhánh ${branchId}:`, err);
       }
-      return DEMO_BRANCH_INVENTORY;
+      throw err;
     }
   },
 
@@ -356,19 +365,8 @@ export const inventoryService = {
       };
     }
 
-    try {
-      const res = await apiClient.post('/inventory/adjust', payload);
-      return res?.data || res;
-    } catch (err) {
-      if (isDevOrTest()) {
-        console.error('[inventoryService.adjustStock] Lỗi điều chỉnh tồn kho:', err);
-        throw err;
-      }
-      return {
-        success: false,
-        message: err.message,
-      };
-    }
+    const res = await apiClient.post('/inventory/adjust', payload);
+    return res?.data || res;
   },
 
   getSerials: async (params = {}) => {
@@ -383,7 +381,15 @@ export const inventoryService = {
       if (params.search) query.append('search', params.search);
 
       const res = await apiClient.get(`/serials?${query.toString()}`);
-      return res?.data?.serials || res?.serials || [];
+      const list = Array.isArray(res?.data)
+        ? res.data
+        : Array.isArray(res)
+        ? res
+        : res?.data?.serials || res?.serials || [];
+      return list.map((s) => ({
+        ...s,
+        importDate: s.importDate || (s.createdAt ? new Date(s.createdAt).toLocaleDateString('vi-VN') : '—')
+      }));
     } catch (err) {
       if (isDevOrTest()) {
         console.error('[inventoryService.getSerials] Lỗi tải serials:', err);

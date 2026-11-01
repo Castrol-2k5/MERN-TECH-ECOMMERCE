@@ -47,6 +47,23 @@ export const fallbackAnalyticsOverview = {
   ]
 };
 
+export const emptyAnalyticsOverview = {
+  kpis: {
+    totalRevenue: '0 ₫',
+    totalOrders: '0',
+    avgOrderValue: '0 ₫',
+    growth: '0,0%'
+  },
+  revenueOverTime: [],
+  channelData: [
+    { name: 'B2C Web Online', value: 0, revenue: '0 ₫', color: '#2563EB' },
+    { name: 'Web POS Quầy', value: 0, revenue: '0 ₫', color: '#06B6D4' }
+  ],
+  branchSales: [],
+  branchPerformance: [],
+  topProducts: []
+};
+
 export const analyticsService = {
   getOverview: async (params = {}) => {
     if (isMockEnabled()) {
@@ -61,12 +78,12 @@ export const analyticsService = {
 
       const endpoint = `/analytics/overview${query.toString() ? `?${query.toString()}` : ''}`;
       const res = await axiosClient.get(endpoint);
-      return res?.data?.data || res?.data || fallbackAnalyticsOverview;
+      return res?.data?.data || res?.data || emptyAnalyticsOverview;
     } catch (err) {
       if (isDevOrTest()) {
         console.warn('[analyticsService.getOverview] Failed fetching live analytics overview:', err?.message);
       }
-      return fallbackAnalyticsOverview;
+      throw err;
     }
   }
 };

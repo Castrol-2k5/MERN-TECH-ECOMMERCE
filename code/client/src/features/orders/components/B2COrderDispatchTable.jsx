@@ -11,6 +11,7 @@ import {
 
 export const B2COrderDispatchTable = ({
   orders = [],
+  userRole = 'SUPER_ADMIN',
   onSelectOrder,
   onOpenAllocationModal,
   onOpenSerialDrawer
@@ -231,7 +232,7 @@ export const B2COrderDispatchTable = ({
 
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {order.status === 'PENDING' ? (
+                          {userRole === 'SUPER_ADMIN' && (order.status === 'PENDING' || order.status === 'PROCESSING') && (
                             <button
                               type="button"
                               onClick={(e) => {
@@ -239,11 +240,14 @@ export const B2COrderDispatchTable = ({
                                 onOpenAllocationModal(order);
                               }}
                               className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                              title="Phân bổ hoặc chuyển đơn sang chi nhánh khác xử lý"
                             >
                               <Send className="w-3 h-3" />
-                              <span>Phân bổ</span>
+                              <span>{order.status === 'PENDING' ? 'Phân bổ' : 'Đổi CN'}</span>
                             </button>
-                          ) : (
+                          )}
+
+                          {userRole !== 'SUPER_ADMIN' && (order.status === 'PENDING' || order.status === 'PROCESSING' || order.status === 'PACKING') && (
                             <button
                               type="button"
                               onClick={(e) => {
@@ -253,8 +257,12 @@ export const B2COrderDispatchTable = ({
                               className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-800/60 rounded-lg text-[11px] font-mono font-bold flex items-center gap-1 transition-colors cursor-pointer"
                             >
                               <QrCode className="w-3 h-3" />
-                              <span>Quét Serial</span>
+                              <span>Quét Serial &amp; Đóng gói</span>
                             </button>
+                          )}
+
+                          {order.status === 'READY_FOR_SHIPPING' && (
+                            <span className="text-[11px] text-emerald-400 font-semibold">Đã đóng gói</span>
                           )}
                         </div>
                       </td>

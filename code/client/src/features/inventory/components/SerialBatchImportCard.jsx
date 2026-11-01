@@ -18,21 +18,23 @@ export const SerialBatchImportCard = ({
     const file = e.target.files?.[0];
     if (file) {
       setFileName(file.name);
-      setFileDetails(`${(file.size / 1024).toFixed(1)} KB • Sẵn sàng parse`);
-      // Giả lập đọc nội dung file serials
-      const sampleSerials = [
-        'C02ZQ0ABQ6L7',
-        'C02ZQ0ABQ8T4',
-        'C02ZQ0ABQ9P2',
-        'C02ZQ0ABR1K8',
-        'C02ZQ0ABR3V6',
-        'C02ZQ0ABR4N1',
-        'C02ZQ0ABR5X9',
-        'C02ZQ0ABR6W2',
-        'C02ZQ0ABR7Y8',
-        'C02ZQ0ABR8Z3'
-      ];
-      onFileUploaded?.(sampleSerials.join('\n'));
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      if (ext === 'csv' || ext === 'txt') {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const content = String(evt.target?.result || '');
+          setFileDetails(`${(file.size / 1024).toFixed(1)} KB • Đã tải nội dung file`);
+          onFileUploaded?.(content);
+        };
+        reader.onerror = () => {
+          setFileDetails('Lỗi đọc tệp tin. Vui lòng thử lại hoặc dán trực tiếp.');
+        };
+        reader.readAsText(file, 'utf-8');
+      } else {
+        setFileDetails(
+          `${(file.size / 1024).toFixed(1)} KB • Vui lòng lưu dưới dạng .csv / .txt hoặc copy cột Serial dán vào ô bên dưới`
+        );
+      }
     }
   };
 
@@ -76,14 +78,14 @@ export const SerialBatchImportCard = ({
             <span>Sản phẩm &amp; Biến thể SKU:</span>
           </label>
           <select
-            value={selectedSku?.code || ''}
+            value={selectedSku?._id || selectedSku?.code || selectedSku?.sku || ''}
             onChange={(e) => {
-              const code = e.target.value;
+              const val = e.target.value;
               let foundSku = null;
               for (const p of products) {
-                const s = p.skus?.find((sk) => sk.code === code);
+                const s = p.skus?.find((sk) => String(sk._id || sk.code || sk.sku) === String(val));
                 if (s) {
-                  foundSku = { ...s, productName: p.name, productId: p._id };
+                  foundSku = { ...s, code: s.code || s.sku, productName: p.name, productId: p._id };
                   break;
                 }
               }
@@ -92,11 +94,15 @@ export const SerialBatchImportCard = ({
             className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-blue-500 font-mono"
           >
             {products.flatMap((p) =>
-              (p.skus || []).map((s) => (
-                <option key={s.code} value={s.code}>
-                  {s.code} • {p.name} ({Object.values(s.options || {}).join(' / ') || 'Chuẩn'})
-                </option>
-              ))
+              (p.skus || []).map((s) => {
+                const skuKey = s._id || s.code || s.sku;
+                const skuLabel = s.code || s.sku;
+                return (
+                  <option key={skuKey} value={skuKey}>
+                    {skuLabel} • {p.name} ({Object.values(s.options || s.attributes || {}).join(' / ') || 'Chuẩn'})
+                  </option>
+                );
+              })
             )}
           </select>
         </div>

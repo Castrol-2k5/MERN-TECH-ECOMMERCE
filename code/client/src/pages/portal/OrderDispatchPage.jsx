@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSelector } from 'react-redux';
 import { Truck, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
 import B2COrderDispatchTable from '../../features/orders/components/B2COrderDispatchTable';
 import BranchAllocationModal from '../../features/orders/components/BranchAllocationModal';
 import OrderSerialAssignDrawer from '../../features/orders/components/OrderSerialAssignDrawer';
 import { orderService } from '../../features/orders/services/orderService.js';
+import branchService from '../../features/branches/services/branchService.js';
+import inventoryService from '../../features/inventory/services/inventoryService.js';
 import { isMockEnabled } from '../../config/dataMode.js';
 
 const DEMO_B2C_ORDERS = [
@@ -70,7 +73,10 @@ const DEMO_B2C_ORDERS = [
 ];
 
 export const OrderDispatchPage = () => {
-  const [orders, setOrders] = useState(DEMO_B2C_ORDERS);
+  const authUser = useSelector((state) => state.auth?.user);
+  const [orders, setOrders] = useState(() => (isMockEnabled() ? DEMO_B2C_ORDERS : []));
+  const [branches, setBranches] = useState([]);
+  const [candidateBranches, setCandidateBranches] = useState([]);
   const [allocationOrder, setAllocationOrder] = useState(null);
   const [serialAssignOrder, setSerialAssignOrder] = useState(null);
   const [toastMsg, setToastMsg] = useState(null);
@@ -81,33 +87,74 @@ export const OrderDispatchPage = () => {
       return;
     }
     try {
-      const liveList = await orderService.getBranchOrders();
-      if (liveList && liveList.length > 0) {
-        const mapped = liveList.map((o) => ({
-          _id: o._id,
-          orderCode: o.orderCode || o._id,
-          customerName: o.shippingAddress?.fullName || o.customerInfo?.fullName || 'Khách Hàng',
-          phone: o.shippingAddress?.phone || o.customerInfo?.phone || '',
-          shippingAddress: o.shippingAddress?.address || o.customerInfo?.address || 'Tại chi nhánh',
-          slaRemaining: '01:30:00',
-          fulfillmentType: o.orderType === 'POS_STORE' ? 'Tại quầy' : 'Giao tiêu chuẩn',
-          totalAmount: o.totalAmount || 0,
-          status: o.orderStatus || 'PENDING',
-          assignedBranchName: o.branchId?.name || o.branchId?.branchName || 'TechOne Q1 Flagship',
-          productName: o.items?.[0]?.productName || 'Thiết bị công nghệ',
-          sku: o.items?.[0]?.sku || '',
-          quantity: o.items?.[0]?.quantity || 1,
-          serials: o.items?.[0]?.serialsAssigned || []
-        }));
-        setOrders(mapped);
-      } else {
-        setOrders(DEMO_B2C_ORDERS);
-      }
-    } catch {
-      // In case user doesn't have BRANCH_MANAGER role or live list is empty, keep demo list
-      setOrders(DEMO_B2C_ORDERS);
+      const [liveList, branchList] = await Promise.all([
+        orderService.getBranchOrders({ orderType: 'B2C_ONLINE', limit: 100 }),
+        branchService.getBranches()
+      ]);
+
+      const retailBranches = (branchList || []).filter((b) => !b.isHeadquarter && b.branchCode !== 'BR-HQ');
+      setBranches(retailBranches.length > 0 ? retailBranches : branchList || []);
+
+      const mapped = (liveList || []).map((o) => ({
+        _id: o._id,
+        orderCode: o.orderCode || o._id,
+        customerName: o.shippingAddress?.fullName || o.customerInfo?.fullName || 'Khách Hàng',
+        phone: o.shippingAddress?.phone || o.customerInfo?.phone || '',
+        shippingAddress: o.shippingAddress?.address || o.customerInfo?.address || 'Tại chi nhánh',
+        slaRemaining: '01:30:00',
+        fulfillmentType: o.orderType === 'POS_STORE' ? 'Tại quầy' : 'Giao tiêu chuẩn',
+        totalAmount: o.totalAmount || 0,
+        status: o.orderStatus || 'PENDING',
+        branchId: o.branchId?._id || o.branchId || '',
+        assignedBranchName: o.branchId?.name || o.branchId?.branchName || 'Chưa phân bổ',
+        productId: o.items?.[0]?.productId || '',
+        productSkuId: o.items?.[0]?.productSkuId || '',
+        productName: o.items?.[0]?.productName || 'Thiết bị công nghệ',
+        sku: o.items?.[0]?.sku || '',
+        quantity: o.items?.[0]?.quantity || 1,
+        serials: o.items?.[0]?.serialsAssigned || []
+      }));
+      setOrders(mapped);
+    } catch (err) {
+      setOrders([]);
+      setToastMsg({
+        type: 'error',
+        message: 'Không thể tải danh sách đơn hàng B2C: ' + (err.response?.data?.message || err.message)
+      });
     }
   }, []);
+
+  // Enrich candidate branches with real SKU stock when opening allocation modal
+  useEffect(() => {
+    if (!allocationOrder) return;
+    let ignore = false;
+
+    const loadStockForOrder = async () => {
+      const skuId = allocationOrder.productSkuId;
+      if (!skuId || isMockEnabled()) {
+        setCandidateBranches(branches);
+        return;
+      }
+      try {
+        const stockList = await inventoryService.getBranchesWithSkuStock(skuId);
+        if (!ignore) {
+          const stockMap = new Map(stockList.map((s) => [String(s.branchId), s.quantity]));
+          const enriched = branches.map((b) => ({
+            ...b,
+            stockAvailable: stockMap.has(String(b._id)) ? stockMap.get(String(b._id)) : 0
+          }));
+          setCandidateBranches(enriched);
+        }
+      } catch {
+        if (!ignore) setCandidateBranches(branches);
+      }
+    };
+
+    loadStockForOrder();
+    return () => {
+      ignore = true;
+    };
+  }, [allocationOrder, branches]);
 
   useEffect(() => {
     let isMounted = true;
@@ -235,6 +282,7 @@ export const OrderDispatchPage = () => {
       {/* Main Table */}
       <B2COrderDispatchTable
         orders={orders}
+        userRole={authUser?.role}
         onOpenAllocationModal={(order) => setAllocationOrder(order)}
         onOpenSerialDrawer={(order) => setSerialAssignOrder(order)}
       />
@@ -244,6 +292,7 @@ export const OrderDispatchPage = () => {
         isOpen={Boolean(allocationOrder)}
         onClose={() => setAllocationOrder(null)}
         order={allocationOrder}
+        branches={candidateBranches.length > 0 ? candidateBranches : branches}
         onConfirmAllocation={handleConfirmAllocation}
       />
 

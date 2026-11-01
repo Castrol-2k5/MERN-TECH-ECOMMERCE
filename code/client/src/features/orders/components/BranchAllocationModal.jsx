@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, MapPin, CheckCircle2, Navigation, Send } from 'lucide-react';
 
 export const BranchAllocationModal = ({
@@ -14,14 +14,21 @@ export const BranchAllocationModal = ({
         _id: b._id,
         name: b.name || b.branchName || 'Chi nhánh TechOne',
         distanceKm: b.distanceKm || (idx === 0 ? 1.2 : 3.5),
-        stockAvailable: b.stockAvailable ?? 10,
-        isRecommended: idx === 0
+        stockAvailable: b.stockAvailable ?? 0,
+        isRecommended: (b.stockAvailable ?? 0) > 0 && idx === 0
       }))
     : [];
 
   const [selectedBranchId, setSelectedBranchId] = useState(
     displayBranches[0]?._id || ''
   );
+
+  useEffect(() => {
+    if (displayBranches.length > 0) {
+      const withStock = displayBranches.find((b) => b.stockAvailable > 0);
+      setSelectedBranchId(withStock?._id || displayBranches[0]._id);
+    }
+  }, [order?.orderCode, branches.length]);
 
   if (!isOpen || !order) return null;
 
