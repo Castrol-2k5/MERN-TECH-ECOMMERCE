@@ -18,6 +18,7 @@ import {
 import usePosAudio from '../../features/pos/hooks/usePosAudio';
 import useBarcodeScanner from '../../features/pos/hooks/useBarcodeScanner';
 import posService from '../../features/pos/services/posService';
+import { branchService } from '../../features/branches/services/branchService';
 
 import PosHeader from '../../features/pos/components/PosHeader';
 import PosBarcodeBar from '../../features/pos/components/PosBarcodeBar';
@@ -31,10 +32,18 @@ import { toPosCheckoutPayload } from '../../features/orders/services/orderAdapte
 export const PosPage = () => {
   const dispatch = useDispatch();
   const authUser = useSelector((state) => state.auth?.user);
+  const isSuperAdmin = authUser?.role === 'SUPER_ADMIN';
+
   const userBranchId =
     typeof authUser?.branchId === 'object'
       ? authUser?.branchId?._id || ''
       : authUser?.branchId || '';
+
+  const [branches, setBranches] = useState([]);
+  const [selectedBranchId, setSelectedBranchId] = useState(() => {
+    if (!isSuperAdmin && userBranchId) return userBranchId;
+    return localStorage.getItem('techone_selected_branch') || userBranchId || '';
+  });
 
   const cart = useSelector(selectPosCart);
   const totals = useSelector(selectPosCartTotals);
@@ -50,14 +59,56 @@ export const PosPage = () => {
   const [isScanning, setIsScanning] = useState(false);
   const [scanNotification, setScanNotification] = useState(null);
 
+  // Fetch branches on mount
+  useEffect(() => {
+    let ignore = false;
+    branchService.getAllBranches().then((list) => {
+      if (!ignore && Array.isArray(list) && list.length > 0) {
+        setBranches(list);
+        if (isSuperAdmin) {
+          const savedBranch = localStorage.getItem('techone_selected_branch');
+          const validBranch = list.some((b) => String(b._id) === String(savedBranch));
+          if (!validBranch) {
+            // Default to Flagship Q1 or HQ
+            const q1Branch = list.find((b) => b.branchCode === 'BR-Q1');
+            const hqBranch = list.find((b) => b.branchCode === 'BR-HQ' || b.isHeadquarter);
+            const defaultId = q1Branch?._id || hqBranch?._id || list[0]._id;
+            setSelectedBranchId(String(defaultId));
+            localStorage.setItem('techone_selected_branch', String(defaultId));
+          }
+        }
+      }
+    }).catch(() => {});
+
+    return () => {
+      ignore = true;
+    };
+  }, [isSuperAdmin]);
+
+  const activeBranchId = isSuperAdmin ? selectedBranchId : userBranchId;
+
+  // Handle branch switch for Super Admin
+  const handleSelectBranch = (newBranchId) => {
+    if (cart.items.length > 0) {
+      const confirmChange = window.confirm(
+        'Đổi chi nhánh quầy thu ngân sẽ làm mới giỏ hàng hiện tại. Bạn có chắc chắn muốn tiếp tục?'
+      );
+      if (!confirmChange) return;
+    }
+    dispatch(clearCart());
+    setSelectedBranchId(newBranchId);
+    localStorage.setItem('techone_selected_branch', newBranchId);
+  };
+
   const loadPosCatalog = useCallback(
     async (opts = {}) => {
+      const branchIdToLoad = opts.branchId !== undefined ? opts.branchId : activeBranchId;
       setIsSearching(true);
       try {
         const data = await posService.searchProducts({
           keyword: opts.keyword !== undefined ? opts.keyword : searchKeyword,
           category: opts.category !== undefined ? opts.category : selectedCategory,
-          branchId: userBranchId
+          branchId: branchIdToLoad
         });
         setProducts(Array.isArray(data) ? data : []);
       } catch {
@@ -66,12 +117,14 @@ export const PosPage = () => {
         setIsSearching(false);
       }
     },
-    [userBranchId, searchKeyword, selectedCategory]
+    [activeBranchId, searchKeyword, selectedCategory]
   );
 
   useEffect(() => {
-    loadPosCatalog({ keyword: '', category: 'TẤT CẢ' });
-  }, [userBranchId]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (activeBranchId) {
+      loadPosCatalog({ keyword: '', category: 'TẤT CẢ' });
+    }
+  }, [activeBranchId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Modals state
   const [activeSerialModalItem, setActiveSerialModalItem] = useState(null);
@@ -98,7 +151,7 @@ export const PosPage = () => {
   const handleBarcodeScan = useCallback(async (barcode) => {
     setIsScanning(true);
     try {
-      const result = await posService.scanBarcode(barcode, userBranchId);
+      const result = await posService.scanBarcode(barcode, activeBranchId);
       playSuccessBeep();
 
       if (result.type === 'SERIAL') {
@@ -131,19 +184,22 @@ export const PosPage = () => {
       setTimeout(() => setScanNotification(null), 4000);
       barcodeInputRef.current?.focus();
     }
-  }, [dispatch, playErrorBeep, playSuccessBeep, userBranchId]);
+  }, [dispatch, playErrorBeep, playSuccessBeep, activeBranchId]);
 
   // Handle clicking product in catalog
   const handleSelectProduct = (product) => {
+    const skuId = String(product.skuId || product._id);
+    const prodId = String(product._id);
     dispatch(addItem({
-      _id: product._id,
-      productSkuId: product.skuId,
+      _id: prodId,
+      productId: prodId,
+      productSkuId: skuId,
       sku: product.sku,
       barcode: product.barcode,
       name: product.name,
       price: product.price,
       hasSerial: product.hasSerial,
-      availableSerials: product.availableSerials || []
+      availableSerials: Array.isArray(product.availableSerials) ? product.availableSerials : []
     }));
     playSuccessBeep();
   };
@@ -152,9 +208,18 @@ export const PosPage = () => {
   const handleCheckout = async () => {
     if (cart.items.length === 0 || missingSerialCount > 0) return;
 
+    if (!activeBranchId) {
+      playErrorBeep();
+      setScanNotification({
+        type: 'error',
+        message: 'Vui lòng chọn chi nhánh thực hiện đơn hàng POS trước khi thanh toán!'
+      });
+      return;
+    }
+
     setIsCheckingOut(true);
     try {
-      const payload = toPosCheckoutPayload(cart, userBranchId);
+      const payload = toPosCheckoutPayload(cart, activeBranchId);
 
       const res = await posService.checkoutPos(payload);
       playSuccessBeep();
@@ -209,7 +274,13 @@ export const PosPage = () => {
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-950 overflow-hidden font-sans select-none text-slate-100">
       {/* Top POS Header */}
-      <PosHeader activeCartCount={cart.items.reduce((s, i) => s + i.quantity, 0)} />
+      <PosHeader
+        activeCartCount={cart.items.reduce((s, i) => s + i.quantity, 0)}
+        branches={branches}
+        selectedBranchId={activeBranchId}
+        onSelectBranch={handleSelectBranch}
+        isSuperAdmin={isSuperAdmin}
+      />
 
       {/* Main Split Screen Workspace: Left (Catalog/Scan 60%) + Right (Cart/Checkout 40%) */}
       <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
@@ -236,7 +307,7 @@ export const PosPage = () => {
               <span>{scanNotification.message}</span>
               <button
                 onClick={() => setScanNotification(null)}
-                className="opacity-70 hover:opacity-100 ml-2"
+                className="opacity-70 hover:opacity-100 ml-2 cursor-pointer"
               >
                 ✕
               </button>
@@ -296,8 +367,15 @@ export const PosPage = () => {
         isOpen={Boolean(activeSerialModalItem)}
         onClose={() => setActiveSerialModalItem(null)}
         item={activeSerialModalItem}
+        branchId={activeBranchId}
         onSaveSerials={(skuId, serials) => {
           dispatch(assignSerials({ productSkuId: skuId, serials }));
+          playSuccessBeep();
+          setScanNotification({
+            type: 'success',
+            message: `Đã gán thành công ${serials.length} mã Serial cho sản phẩm ${activeSerialModalItem?.name || ''}`
+          });
+          setTimeout(() => setScanNotification(null), 3500);
         }}
       />
 

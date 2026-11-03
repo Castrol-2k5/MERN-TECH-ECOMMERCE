@@ -1,5 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 
+const getCleanSkuId = (id) => String(id?._id || id || '');
+
 const initialState = {
   items: [],
   customerInfo: {
@@ -19,8 +21,8 @@ export const posCartSlice = createSlice({
   reducers: {
     addItem: (state, action) => {
       const p = action.payload;
-      const skuId = p.productSkuId || p.skuId || p._id;
-      const existing = state.items.find((i) => i.productSkuId === skuId);
+      const skuId = getCleanSkuId(p.productSkuId || p.skuId || p._id);
+      const existing = state.items.find((i) => getCleanSkuId(i.productSkuId) === skuId);
 
       if (existing) {
         existing.quantity += 1;
@@ -38,7 +40,7 @@ export const posCartSlice = createSlice({
           hasSerial: Boolean(p.hasSerial),
           serialsAssigned: p.serialsAssigned || (p.serialNumber ? [p.serialNumber] : []),
           image: p.image || '',
-          availableSerials: p.availableSerials || []
+          availableSerials: Array.isArray(p.availableSerials) ? p.availableSerials : []
         });
       }
     },
@@ -47,10 +49,11 @@ export const posCartSlice = createSlice({
     },
     updateQuantity: (state, action) => {
       const { productSkuId, quantity } = action.payload;
-      const item = state.items.find((i) => i.productSkuId === productSkuId);
+      const targetSkuId = getCleanSkuId(productSkuId);
+      const item = state.items.find((i) => getCleanSkuId(i.productSkuId) === targetSkuId);
       if (item) {
         if (quantity <= 0) {
-          state.items = state.items.filter((i) => i.productSkuId !== productSkuId);
+          state.items = state.items.filter((i) => getCleanSkuId(i.productSkuId) !== targetSkuId);
         } else {
           item.quantity = quantity;
           if (item.serialsAssigned.length > quantity) {
@@ -63,22 +66,24 @@ export const posCartSlice = createSlice({
       posCartSlice.caseReducers.updateQuantity(state, action);
     },
     removeItem: (state, action) => {
-      const productSkuId = action.payload;
-      state.items = state.items.filter((i) => i.productSkuId !== productSkuId);
+      const targetSkuId = getCleanSkuId(action.payload);
+      state.items = state.items.filter((i) => getCleanSkuId(i.productSkuId) !== targetSkuId);
     },
     removePosItem: (state, action) => {
       posCartSlice.caseReducers.removeItem(state, action);
     },
     assignSerials: (state, action) => {
       const { productSkuId, serials } = action.payload;
-      const item = state.items.find((i) => i.productSkuId === productSkuId);
+      const targetSkuId = getCleanSkuId(productSkuId);
+      const item = state.items.find((i) => getCleanSkuId(i.productSkuId) === targetSkuId);
       if (item && Array.isArray(serials)) {
         item.serialsAssigned = serials;
       }
     },
     assignSerialToItem: (state, action) => {
       const { productSkuId, serialNumber } = action.payload;
-      const item = state.items.find((i) => i.productSkuId === productSkuId);
+      const targetSkuId = getCleanSkuId(productSkuId);
+      const item = state.items.find((i) => getCleanSkuId(i.productSkuId) === targetSkuId);
       if (item && serialNumber && !item.serialsAssigned.includes(serialNumber)) {
         if (item.serialsAssigned.length < item.quantity) {
           item.serialsAssigned.push(serialNumber);
@@ -87,7 +92,8 @@ export const posCartSlice = createSlice({
     },
     removeSerial: (state, action) => {
       const { productSkuId, serialNumber } = action.payload;
-      const item = state.items.find((i) => i.productSkuId === productSkuId);
+      const targetSkuId = getCleanSkuId(productSkuId);
+      const item = state.items.find((i) => getCleanSkuId(i.productSkuId) === targetSkuId);
       if (item) {
         item.serialsAssigned = item.serialsAssigned.filter((s) => s !== serialNumber);
       }

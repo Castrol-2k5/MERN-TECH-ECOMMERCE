@@ -8,6 +8,7 @@ export const SerialAssignmentModal = ({
   isOpen,
   onClose,
   item,
+  branchId = '',
   onSaveSerials
 }) => {
   const [inputSerial, setInputSerial] = useState('');
@@ -28,7 +29,7 @@ export const SerialAssignmentModal = ({
   if (!isOpen || !item) return null;
 
   const requiredCount = item.quantity || 1;
-  const availableDemoSerials = item.availableSerials || [];
+  const availableDemoSerials = Array.isArray(item.availableSerials) ? item.availableSerials : [];
 
   const handleAddSerial = async (sn) => {
     const cleanSn = String(sn || inputSerial).trim().toUpperCase();
@@ -46,18 +47,30 @@ export const SerialAssignmentModal = ({
       return;
     }
 
-    // Kiểm tra 3 lớp qua Backend API nếu đang ở Live Mode
+    // Nếu Serial nằm trong danh sách tồn khả dụng đã pre-load trực tiếp từ chi nhánh
+    const isPreloadedFromBranch = availableDemoSerials.includes(cleanSn);
+
+    if (isPreloadedFromBranch) {
+      // Serial đã được xác thực nằm trong kho chi nhánh cho SKU này
+      playSuccessBeep();
+      setSerials((prev) => [...prev, cleanSn]);
+      setInputSerial('');
+      setErrorMsg('');
+      return;
+    }
+
+    // Kiểm tra qua Backend API nếu nhập tay hoặc quét barcode bên ngoài
     if (!isMockEnabled()) {
       setIsVerifying(true);
       try {
-        const res = await apiClient.get(`/serials/scan/${encodeURIComponent(cleanSn)}`);
+        const queryParam = branchId ? `?branchId=${encodeURIComponent(branchId)}` : '';
+        const res = await apiClient.get(`/serials/scan/${encodeURIComponent(cleanSn)}${queryParam}`);
         const data = res?.data || res;
 
-        if (
-          data?.sku?._id &&
-          item.productSkuId &&
-          String(data.sku._id) !== String(item.productSkuId)
-        ) {
+        const targetSkuId = String(item.productSkuId?._id || item.productSkuId || '');
+        const scannedSkuId = String(data?.sku?._id || data?.productSkuId || '');
+
+        if (scannedSkuId && targetSkuId && scannedSkuId !== targetSkuId) {
           playErrorBeep();
           setErrorMsg(
             `Mã Serial [${cleanSn}] thuộc biến thể "${data.product?.name || ''} (${data.sku?.sku || ''})", không khớp với sản phẩm đang chọn!`
@@ -94,7 +107,8 @@ export const SerialAssignmentModal = ({
       setErrorMsg(`Cần gán chính xác ${requiredCount} Serial (hiện có ${serials.length})!`);
       return;
     }
-    onSaveSerials(item.productSkuId, serials);
+    const targetSkuId = String(item.productSkuId?._id || item.productSkuId || '');
+    onSaveSerials(targetSkuId, serials);
     onClose();
   };
 
@@ -108,13 +122,13 @@ export const SerialAssignmentModal = ({
               <Hash className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-bold text-slate-100 text-sm">Gán Serial / IMEI cho sản phẩm (Xác thực 3 lớp)</h3>
+              <h3 className="font-bold text-slate-100 text-sm">Gán Serial / IMEI cho sản phẩm</h3>
               <p className="text-xs text-slate-400 truncate max-w-sm">{item.name}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -208,7 +222,7 @@ export const SerialAssignmentModal = ({
                     <button
                       type="button"
                       onClick={() => handleRemove(sn)}
-                      className="text-slate-500 hover:text-rose-400 text-xs font-semibold transition-colors"
+                      className="text-slate-500 hover:text-rose-400 text-xs font-semibold transition-colors cursor-pointer"
                     >
                       Gỡ bỏ
                     </button>

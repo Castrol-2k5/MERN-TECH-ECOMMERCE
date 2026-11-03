@@ -15,7 +15,8 @@ export class SerialController {
 
   static scanSerial = catchAsync(async (req, res) => {
     const { serialNumber } = req.params;
-    const result = await SerialService.scanSerial(serialNumber, req.user);
+    const branchId = req.query?.branchId || req.headers?.['x-branch-id'] || null;
+    const result = await SerialService.scanSerial(serialNumber, req.user, branchId);
 
     return sendSuccess(res, {
       statusCode: 200,
@@ -46,4 +47,3 @@ export class SerialController {
     });
   });
 }
-

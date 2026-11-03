@@ -84,7 +84,7 @@ export class SerialService {
    * Barcode/QR scan at POS counter
    * Verifies existence, IN_STOCK state, and branch assignment
    */
-  static async scanSerial(serialNumber, currentUser) {
+  static async scanSerial(serialNumber, currentUser, targetBranchId = null) {
     if (!serialNumber || !serialNumber.trim()) {
       throw new AppError('Mã Serial/IMEI không được để trống.', 400, 'VALIDATION_ERROR');
     }
@@ -117,9 +117,18 @@ export class SerialService {
 
     // 3. Does serial belong to the POS personnel's branch?
     if (currentUser && currentUser.role !== USER_ROLES.SUPER_ADMIN) {
-      if (!currentUser.branchId || serial.branchId.toString() !== currentUser.branchId.toString()) {
+      const activeBranchId = targetBranchId || currentUser.branchId;
+      if (!activeBranchId || serial.branchId.toString() !== activeBranchId.toString()) {
         throw new AppError(
           'Thiết bị thuộc chi nhánh khác, không được phép thao tác tại quầy này.',
+          403,
+          'CROSS_BRANCH_ACCESS_DENIED'
+        );
+      }
+    } else if (currentUser && currentUser.role === USER_ROLES.SUPER_ADMIN && targetBranchId) {
+      if (serial.branchId.toString() !== targetBranchId.toString()) {
+        throw new AppError(
+          'Thiết bị thuộc chi nhánh khác so với chi nhánh đang thao tác tại quầy POS.',
           403,
           'CROSS_BRANCH_ACCESS_DENIED'
         );

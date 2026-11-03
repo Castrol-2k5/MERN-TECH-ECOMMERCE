@@ -17,7 +17,13 @@ import { logout } from '../../../store/slices/authSlice.js';
 import { clearCart } from '../../../store/slices/posCartSlice.js';
 import axiosClient from '../../../services/axiosClient.js';
 
-export const PosHeader = ({ activeCartCount = 0 }) => {
+export const PosHeader = ({
+  activeCartCount = 0,
+  branches = [],
+  selectedBranchId = '',
+  onSelectBranch,
+  isSuperAdmin = false
+}) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const authUser = useSelector((state) => state.auth?.user);
@@ -25,11 +31,15 @@ export const PosHeader = ({ activeCartCount = 0 }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [loggingOut, setLoggingOut] = useState(false);
 
+  const activeBranch = branches.find((b) => String(b._id) === String(selectedBranchId));
+
   const branchName =
+    activeBranch?.name ||
     authUser?.branch?.name ||
     (typeof authUser?.branchId === 'object' ? authUser?.branchId?.name : '') ||
     'Chi nhánh TechOne';
   const branchCode =
+    activeBranch?.branchCode ||
     authUser?.branch?.branchCode ||
     (typeof authUser?.branchId === 'object' ? authUser?.branchId?.branchCode : '') ||
     'POS #01';
@@ -105,12 +115,32 @@ export const PosHeader = ({ activeCartCount = 0 }) => {
                 ONLINE
               </span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-400">
-              <Store className="w-3.5 h-3.5 text-blue-400" />
-              <span className="font-medium text-slate-300">{branchName}</span>
-              <span className="text-slate-600">•</span>
-              <span className="font-mono text-slate-400">{branchCode}</span>
-            </div>
+            
+            {/* Branch selector or static badge */}
+            {isSuperAdmin && branches.length > 0 ? (
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <Store className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                <select
+                  value={selectedBranchId}
+                  onChange={(e) => onSelectBranch && onSelectBranch(e.target.value)}
+                  className="bg-slate-800/90 text-xs font-medium text-slate-200 border border-slate-700/80 rounded px-2 py-0.5 focus:outline-none focus:border-blue-500 cursor-pointer"
+                  title="Chọn chi nhánh hoạt động của quầy POS"
+                >
+                  {branches.map((b) => (
+                    <option key={b._id} value={b._id} className="bg-slate-900 text-slate-100">
+                      {b.name} ({b.branchCode})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                <Store className="w-3.5 h-3.5 text-blue-400" />
+                <span className="font-medium text-slate-300">{branchName}</span>
+                <span className="text-slate-600">•</span>
+                <span className="font-mono text-slate-400">{branchCode}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -164,7 +194,7 @@ export const PosHeader = ({ activeCartCount = 0 }) => {
         <button
           onClick={toggleFullscreen}
           title="Toàn màn hình quầy thu ngân"
-          className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+          className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
         >
           {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
         </button>
