@@ -347,14 +347,6 @@ export const productService = {
     return response?.data?.product || response?.data || payload;
   },
 
-  createProduct: async (payload) => {
-    if (isMockEnabled()) {
-      return { _id: 'prod-' + Date.now(), ...payload };
-    }
-    const response = await axiosClient.post('/products', payload);
-    return response?.data?.product || response?.data || payload;
-  },
-
   updateProduct: async (id, payload) => {
     if (isMockEnabled()) {
       return { _id: id, ...payload };
