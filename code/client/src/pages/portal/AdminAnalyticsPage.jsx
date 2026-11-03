@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   BarChart3, 
   Calendar, 
@@ -12,7 +12,6 @@ import ChannelBreakdownPie from '../../features/analytics/components/ChannelBrea
 import TopProductsTable from '../../features/analytics/components/TopProductsTable';
 import { branchService } from '../../features/branches/services/branchService.js';
 import { analyticsService, fallbackAnalyticsOverview } from '../../features/analytics/services/analyticsService.js';
-import { isMockEnabled } from '../../config/dataMode.js';
 
 const BRANCH_PERFORMANCE = [
   { rank: '01', branch: 'TechOne Q1 • Nguyễn Thị Minh Khai', revenue: '4,28 tỷ', orders: '1.042', aov: '4,11 triệu', returnRate: '1,8%', growth: '+22,4%' },
@@ -28,7 +27,7 @@ export const AdminAnalyticsPage = () => {
   const [analyticsData, setAnalyticsData] = useState(fallbackAnalyticsOverview);
   const [isLoading, setIsLoading] = useState(false);
 
-  const fetchOverview = async (branchId) => {
+  const fetchOverview = useCallback(async (branchId) => {
     setIsLoading(true);
     try {
       const data = await analyticsService.getOverview({ branchId });
@@ -38,7 +37,7 @@ export const AdminAnalyticsPage = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     let ignore = false;
@@ -47,13 +46,37 @@ export const AdminAnalyticsPage = () => {
         setBranches(list);
       }
     }).catch(() => {});
-
-    fetchOverview(selectedBranch);
-
     return () => {
       ignore = true;
     };
   }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        const data = await analyticsService.getOverview({ branchId: selectedBranch });
+        if (!ignore) {
+          setAnalyticsData(data);
+        }
+      } catch {
+        if (!ignore) {
+          setAnalyticsData(fallbackAnalyticsOverview);
+        }
+      } finally {
+        if (!ignore) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadData();
+
+    return () => {
+      ignore = true;
+    };
+  }, [selectedBranch]);
 
   return (
     <div className="space-y-5 select-none font-sans text-slate-100">
