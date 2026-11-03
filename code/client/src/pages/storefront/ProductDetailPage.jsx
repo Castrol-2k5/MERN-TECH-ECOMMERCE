@@ -9,7 +9,8 @@ import {
   Star,
   CheckCircle2,
   Scale,
-  ShoppingCart
+  ShoppingCart,
+  AlertCircle
 } from 'lucide-react';
 import useProductDetail from '../../features/products/hooks/useProductDetail.js';
 import ProductImageGallery from '../../features/products/components/ProductImageGallery.jsx';
@@ -54,11 +55,19 @@ export const ProductDetailPage = () => {
     return { ...defaultOptions, ...userSelectedOptions };
   }, [defaultOptions, userSelectedOptions]);
 
-  const activeSku =
-    product?.skus?.find((s) => {
-      if (!s.options || Object.keys(s.options).length === 0) return false;
-      return Object.entries(selectedOptions).every(([k, v]) => s.options[k] === v);
-    }) || product?.skus?.[0];
+  const matchedSku = useMemo(() => {
+    if (!product?.skus || product.skus.length === 0) return null;
+    if (!product?.options || product.options.length === 0) return product.skus[0];
+    return (
+      product.skus.find((s) => {
+        if (!s.options || Object.keys(s.options).length === 0) return false;
+        return Object.entries(selectedOptions).every(([k, v]) => s.options[k] === v);
+      }) || null
+    );
+  }, [product, selectedOptions]);
+
+  const isVariantAvailable = Boolean(matchedSku);
+  const activeSku = matchedSku || product?.skus?.[0];
 
   const currentPrice =
     activeSku?.salePrice && activeSku.salePrice > 0
@@ -101,7 +110,7 @@ export const ProductDetailPage = () => {
   };
 
   const handleAddToCartOnly = () => {
-    if (!product || isOutOfStockAllBranches) return;
+    if (!product || !isVariantAvailable || isOutOfStockAllBranches) return;
     const item = createCartItem({
       product,
       activeSku,
@@ -116,7 +125,7 @@ export const ProductDetailPage = () => {
   };
 
   const handleBuyNow = () => {
-    if (!product || isOutOfStockAllBranches) return;
+    if (!product || !isVariantAvailable || isOutOfStockAllBranches) return;
     const item = createCartItem({
       product,
       activeSku,
@@ -129,7 +138,7 @@ export const ProductDetailPage = () => {
   };
 
   const handleReserveClickCollect = () => {
-    if (!product || isOutOfStockAllBranches) return;
+    if (!product || !isVariantAvailable || isOutOfStockAllBranches) return;
     const branchId = selectedBranch?.branchId || selectedBranch?._id || '';
     const branchName = selectedBranch?.branchName || selectedBranch?.name || 'TechOne Q1 Flagship';
     const item = createCartItem({
@@ -283,8 +292,18 @@ export const ProductDetailPage = () => {
           <SkuVariantSelector
             options={product.options || []}
             selectedOptions={selectedOptions}
+            skus={product.skus || []}
             onSelectOption={handleSelectOption}
           />
+
+          {!isVariantAvailable && (
+            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 text-xs flex items-center gap-2 animate-in fade-in">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                Tổ hợp tùy chọn này ({Object.entries(selectedOptions).map(([k, v]) => `${k}: ${v}`).join(', ')}) hiện <strong>không khả dụng</strong> hoặc cửa hàng không kinh doanh. Vui lòng chọn phiên bản khác.
+              </span>
+            </div>
+          )}
 
           <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200/80 space-y-2 text-xs">
             <div className="flex items-center gap-1.5 font-bold text-blue-800 text-sm">
@@ -310,23 +329,35 @@ export const ProductDetailPage = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
             <button
               onClick={handleBuyNow}
-              disabled={isOutOfStockAllBranches}
+              disabled={!isVariantAvailable || isOutOfStockAllBranches}
               className="py-3.5 px-6 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-sm flex flex-col items-center justify-center transition-all cursor-pointer shadow-lg shadow-blue-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <span>{isOutOfStockAllBranches ? 'TẠM HẾT HÀNG' : 'MUA NGAY'}</span>
+              <span>
+                {!isVariantAvailable
+                  ? 'PHIÊN BẢN KHÔNG KHẢ DỤNG'
+                  : isOutOfStockAllBranches
+                  ? 'TẠM HẾT HÀNG'
+                  : 'MUA NGAY'}
+              </span>
               <span className="text-[11px] font-normal text-blue-100">
-                {isOutOfStockAllBranches ? 'Đang chờ nhập thêm kho' : 'Giao hàng tận nơi'}
+                {!isVariantAvailable
+                  ? 'Vui lòng chọn kết hợp tùy chọn khác'
+                  : isOutOfStockAllBranches
+                  ? 'Đang chờ nhập thêm kho'
+                  : 'Giao hàng tận nơi'}
               </span>
             </button>
 
             <button
               onClick={handleReserveClickCollect}
-              disabled={isOutOfStockAllBranches}
+              disabled={!isVariantAvailable || isOutOfStockAllBranches}
               className="py-3.5 px-6 rounded-2xl bg-white hover:bg-blue-50 text-blue-600 border-2 border-blue-600 font-black text-sm flex flex-col items-center justify-center transition-all cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span>ĐẶT GIỮ HÀNG (CLICK & COLLECT)</span>
               <span className="text-[11px] font-normal text-slate-500">
-                {selectedBranch?.branchName
+                {!isVariantAvailable
+                  ? 'Không khả dụng cho phiên bản này'
+                  : selectedBranch?.branchName
                   ? `Nhận tại: ${selectedBranch.branchName}`
                   : 'Nhận tại showroom sau 30 phút'}
               </span>
@@ -336,7 +367,7 @@ export const ProductDetailPage = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
             <button
               onClick={handleAddToCartOnly}
-              disabled={isOutOfStockAllBranches}
+              disabled={!isVariantAvailable || isOutOfStockAllBranches}
               className="py-2.5 px-4 rounded-xl border border-blue-200 bg-blue-50/60 hover:bg-blue-100/70 text-blue-700 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ShoppingCart className="w-4 h-4" />
