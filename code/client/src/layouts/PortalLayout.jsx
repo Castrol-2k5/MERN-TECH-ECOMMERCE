@@ -112,6 +112,13 @@ export const PortalLayout = () => {
       roles: ['STAFF', 'BRANCH_MANAGER', 'SUPER_ADMIN']
     },
     {
+      to: '/portal/admin/orders-dispatch',
+      label: userRole === 'SUPER_ADMIN' ? 'Điều Phối Đơn B2C' : userRole === 'STAFF' ? 'Đóng Gói & Quét Serial' : 'Xử Lý Đơn B2C Chi Nhánh',
+      badge: userRole === 'STAFF' ? 'Kho CN' : 'SLA',
+      icon: Truck,
+      roles: ['STAFF', 'BRANCH_MANAGER', 'SUPER_ADMIN']
+    },
+    {
       to: '/portal/branch/transfers',
       label: userRole === 'STAFF' ? 'Kiểm Nhận Điều Chuyển' : 'Điều Chuyển Kho',
       badge: 'P-20',
@@ -133,13 +140,6 @@ export const PortalLayout = () => {
       label: 'Nhập Lô Serial / IMEI',
       badge: userRole === 'SUPER_ADMIN' ? 'Kho HQ' : 'Kho CN',
       icon: Barcode,
-      roles: ['BRANCH_MANAGER', 'SUPER_ADMIN']
-    },
-    {
-      to: '/portal/admin/orders-dispatch',
-      label: userRole === 'SUPER_ADMIN' ? 'Điều Phối Đơn B2C' : 'Xử Lý Đơn B2C Chi Nhánh',
-      badge: 'SLA',
-      icon: Truck,
       roles: ['BRANCH_MANAGER', 'SUPER_ADMIN']
     },
     {

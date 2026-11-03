@@ -514,8 +514,10 @@ export class OrderService {
         sku: it.sku,
         quantity: it.quantity,
         unitPrice: it.unitPrice,
-        subtotal: it.subtotal
+        subtotal: it.subtotal,
+        serialsAssigned: Array.isArray(it.serialsAssigned) ? it.serialsAssigned : []
       })),
+      completedAt: order.completedAt || null,
       createdAt: order.createdAt,
       updatedAt: order.updatedAt
     };

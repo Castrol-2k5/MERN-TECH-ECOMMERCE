@@ -62,11 +62,11 @@ export const AppRoutes = () => {
           <Route path="warranty-reception" element={<WarrantyReceptionPage />} />
           <Route path="branch/orders" element={<BranchOrdersPage />} />
           <Route path="branch/transfers" element={<StockTransferPage />} />
+          <Route path="admin/orders-dispatch" element={<OrderDispatchPage />} />
 
           {/* Branch Manager & Super Admin Operations */}
           <Route element={<RoleProtectedRoute allowedRoles={['BRANCH_MANAGER', 'SUPER_ADMIN']} />}>
             <Route path="admin/import-serials" element={<SerialImportPage />} />
-            <Route path="admin/orders-dispatch" element={<OrderDispatchPage />} />
           </Route>
 
           {/* HQ Administration & Operations (SUPER_ADMIN Only) */}

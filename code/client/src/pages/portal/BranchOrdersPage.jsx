@@ -21,7 +21,8 @@ import {
   Clock,
   Truck,
   XCircle,
-  ArrowUpRight
+  ArrowUpRight,
+  Barcode
 } from 'lucide-react';
 import { orderService } from '../../features/orders/services/orderService.js';
 import { branchService } from '../../features/branches/services/branchService.js';
@@ -829,6 +830,17 @@ export const BranchOrdersPage = () => {
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                {/* Pack & Assign Serials for Processing orders */}
+                {selectedOrder.orderStatus === 'PROCESSING' && selectedOrder.orderType === 'B2C_ONLINE' && (
+                  <Link
+                    to="/portal/admin/orders-dispatch"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-blue-500/40 bg-blue-500/10 hover:bg-blue-500/20 px-3.5 py-2 text-xs font-semibold text-blue-300 transition-colors"
+                  >
+                    <Barcode className="h-4 w-4 text-blue-400" />
+                    Quét Serial &amp; Đóng gói
+                  </Link>
+                )}
+
                 {/* Handover button for Click & Collect or Ready online orders */}
                 {['PROCESSING', 'READY_FOR_SHIPPING'].includes(selectedOrder.orderStatus) && canComplete && (
                   <button

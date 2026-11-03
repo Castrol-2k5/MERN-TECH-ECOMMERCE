@@ -384,20 +384,52 @@ export const OrderTrackingPage = () => {
               Chi tiết sản phẩm ({order.items?.length || 0})
             </h4>
             <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100">
-              {(order.items || []).map((it, idx) => (
-                <div key={idx} className="p-4 flex items-center justify-between gap-4 text-xs">
-                  <div className="space-y-1">
-                    <p className="font-bold text-slate-900 text-sm">{it.productName}</p>
-                    <p className="text-slate-400 font-mono text-[11px]">SKU: {it.sku}</p>
+              {(order.items || []).map((it, idx) => {
+                const serials = Array.isArray(it.serialsAssigned) ? it.serialsAssigned : [];
+                return (
+                  <div key={idx} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
+                    <div className="space-y-1.5 flex-1">
+                      <p className="font-bold text-slate-900 text-sm">{it.productName}</p>
+                      <p className="text-slate-400 font-mono text-[11px]">SKU: {it.sku}</p>
+
+                      {/* Display Assigned Serial / IMEI for Guest & Logged-in Customer */}
+                      {serials.length > 0 ? (
+                        <div className="pt-1 flex flex-wrap items-center gap-2">
+                          <span className="text-[11px] font-semibold text-slate-600">
+                            Mã Serial / IMEI máy của bạn:
+                          </span>
+                          {serials.map((sn) => (
+                            <Link
+                              key={sn}
+                              to={`/warranty-check?serial=${sn}`}
+                              title="Bấm để kiểm tra bảo hành điện tử chính hãng"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 font-mono font-bold text-emerald-700 text-xs transition-colors shadow-2xs"
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>{sn}</span>
+                              <span className="text-[10px] text-emerald-600 font-sans font-normal ml-0.5 underline">
+                                Tra cứu bảo hành ➔
+                              </span>
+                            </Link>
+                          ))}
+                        </div>
+                      ) : (
+                        order.orderStatus === 'PROCESSING' && (
+                          <p className="text-[11px] text-amber-600 italic">
+                            * Nhân viên chi nhánh đang kiểm tra máy và đóng gói xuất Serial.
+                          </p>
+                        )
+                      )}
+                    </div>
+                    <div className="text-left sm:text-right shrink-0">
+                      <p className="font-bold text-slate-900">
+                        {it.quantity} x {formatPrice(it.unitPrice)}
+                      </p>
+                      <p className="text-blue-600 font-black">{formatPrice(it.subtotal)}</p>
+                    </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <p className="font-bold text-slate-900">
-                      {it.quantity} x {formatPrice(it.unitPrice)}
-                    </p>
-                    <p className="text-blue-600 font-black">{formatPrice(it.subtotal)}</p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
