@@ -1,5 +1,4 @@
 import request from 'supertest';
-import mongoose from 'mongoose';
 
 import app from '../../src/app.js';
 import { setupTestDB } from '../setup.js';
