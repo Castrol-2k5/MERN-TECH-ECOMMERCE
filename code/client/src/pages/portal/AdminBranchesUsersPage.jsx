@@ -77,14 +77,10 @@ export const AdminBranchesUsersPage = () => {
   };
 
   const handleCreateUser = async (userPayload) => {
-    try {
-      const created = await userService.createUser(userPayload);
-      setUsers((prev) => [created, ...prev]);
-      setToastMsg({ type: 'success', message: `Đã khởi tạo tài khoản ${created.fullName} thành công!` });
-      await fetchUsers();
-    } catch (err) {
-      throw err;
-    }
+    const created = await userService.createUser(userPayload);
+    setUsers((prev) => [created, ...prev]);
+    setToastMsg({ type: 'success', message: `Đã khởi tạo tài khoản ${created.fullName} thành công!` });
+    await fetchUsers();
     setTimeout(() => setToastMsg(null), 3500);
   };
 
