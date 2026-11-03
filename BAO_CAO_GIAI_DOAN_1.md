@@ -17,15 +17,15 @@ Trong Giai đoạn 1, nhóm đã giải quyết triệt để 2 "điểm nghẽn
      - 🚚 **Giao tận nơi:** Nhập địa chỉ chi tiết, tự động phân bổ về chi nhánh xử lý.
      - 🏬 **Nhận tại cửa hàng (Click & Collect):** Tải danh sách chi nhánh thời gian thực từ database qua API `branchService.getBranches()`, hiển thị địa chỉ, hotline và trạng thái sẵn sàng nhận máy sau 15–30 phút.
    - Tích hợp lựa chọn phương thức thanh toán: Tiền mặt (COD / Tại quầy) hoặc Cổng điện tử VNPay QR.
-   - Tinh gọn [CartPage.jsx](file:///d:/TLCN_develop/MERN-TECH-ECOMMERCE/code/client/src/pages/storefront/CartPage.jsx) và đăng ký route `/checkout` vào [AppRoutes.jsx](file:///d:/TLCN_develop/MERN-TECH-ECOMMERCE/code/client/src/routes/AppRoutes.jsx).
+   - Tinh gọn [CartPage.jsx](code/client/src/pages/storefront/CartPage.jsx) và đăng ký route `/checkout` vào [AppRoutes.jsx](code/client/src/routes/AppRoutes.jsx).
 
 2. **Tích Hợp Cổng Thanh Toán VNPay Sandbox (HMAC-SHA512):**
-   - **Backend Service ([vnpay.service.js](file:///d:/TLCN_develop/MERN-TECH-ECOMMERCE/code/server/src/modules/orders/vnpay.service.js)):** Xây dựng thuật toán sắp xếp tham số URL theo thứ tự từ điển A-Z, mã hóa và tạo mã băm SHA-512 chuẩn đặc tả kỹ thuật VNPay V2.1.0; xây dựng cơ chế kiểm tra và xác thực tính toàn vẹn chữ ký `vnp_SecureHash` khi cổng thanh toán trả về.
+   - **Backend Service ([vnpay.service.js](code/server/src/modules/orders/vnpay.service.js)):** Xây dựng thuật toán sắp xếp tham số URL theo thứ tự từ điển A-Z, mã hóa và tạo mã băm SHA-512 chuẩn đặc tả kỹ thuật VNPay V2.1.0; xây dựng cơ chế kiểm tra và xác thực tính toàn vẹn chữ ký `vnp_SecureHash` khi cổng thanh toán trả về.
    - **Backend Endpoints:**
      - `POST /api/v1/orders/:id/vnpay-url`: Sinh URL thanh toán trực tiếp sang cổng VNPay Sandbox.
      - `GET /api/v1/orders/vnpay-return`: Nhận redirect từ VNPay, kiểm tra checksum, cập nhật trạng thái đơn hàng sang `paymentStatus = 'PAID'` khi thành công và redirect người dùng về trang thông báo của Frontend.
-   - **Frontend Success ([CheckoutSuccessPage.jsx](file:///d:/TLCN_develop/MERN-TECH-ECOMMERCE/code/client/src/pages/storefront/CheckoutSuccessPage.jsx)):** Hiển thị chi tiết mã giao dịch VNPay, ngân hàng thanh toán, số tiền và thông báo xác nhận đơn hàng thành công hoặc cảnh báo giao dịch bị gián đoạn.
-   - **Kiểm thử tự động:** Bổ sung bộ Unit Test [vnpay.test.js](file:///d:/TLCN_develop/MERN-TECH-ECOMMERCE/code/server/tests/unit/vnpay.test.js) (3 test cases đạt 100%).
+   - **Frontend Success ([CheckoutSuccessPage.jsx](code/client/src/pages/storefront/CheckoutSuccessPage.jsx)):** Hiển thị chi tiết mã giao dịch VNPay, ngân hàng thanh toán, số tiền và thông báo xác nhận đơn hàng thành công hoặc cảnh báo giao dịch bị gián đoạn.
+   - **Kiểm thử tự động:** Bổ sung bộ Unit Test [vnpay.test.js](code/server/tests/unit/vnpay.test.js) (3 test cases đạt 100%).
 
 ---
 

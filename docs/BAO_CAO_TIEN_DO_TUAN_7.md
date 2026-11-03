@@ -68,7 +68,7 @@ Mục tiêu cốt lõi:
   - Cho phép nhân viên tại quầy tra cứu nhanh số lượng tồn kho của một mã SKU trên toàn bộ các showroom TechOne khác trong hệ thống để kịp thời tư vấn hoặc hỗ trợ bán hộ cho khách hàng.
 - **Quy trình Tiếp nhận & Xử lý Bảo hành Điện tử (`UC-ST09`, `UC-ST10`, `UC-ST11`, `UC-ST12`, `UC-ST13`):**
   - Kiểm tra điều kiện bảo hành bằng cách quét Serial/IMEI, tự động đối soát ngày hết hạn bảo hành.
-  - Lập phiếu tiếp nhận bảo hành điện tử ([WarrantyTicket](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/server/src/modules/warranty/warranty.model.js)) lưu tình trạng ngoại quan, phụ kiện kèm theo và ngày hẹn trả máy.
+  - Lập phiếu tiếp nhận bảo hành điện tử ([WarrantyTicket](../code/server/src/modules/warranty/warranty.model.js)) lưu tình trạng ngoại quan, phụ kiện kèm theo và ngày hẹn trả máy.
   - Cập nhật quy trình xử lý kỹ thuật và bàn giao máy lại cho khách hàng.
 
 #### D. Phân hệ 4: Khách hàng / Storefront B2C (Customer - 14 Use Cases `UC-CU01` -> `UC-CU14`):
@@ -80,21 +80,21 @@ Mục tiêu cốt lõi:
   - Thanh tìm kiếm debounced (220ms) hiển thị dropdown thông minh kèm ảnh thumbnail, giá bán tốt nhất, thông số kỹ thuật và chuyển hướng sang `/category/all?search=...`.
   - Dropdown chọn chi nhánh gần nhất tại Header lưu vào `localStorage ('techone_selected_branch')`.
 - **Bộ lọc Thuộc tính Động theo Ngành hàng (Dynamic Attribute Facets - `UC-CU05`):**
-  - Bộ lọc Sidebar ([DynamicFilterSidebar.jsx](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/client/src/features/products/components/DynamicFilterSidebar.jsx)) trích xuất động các nhóm thuộc tính từ MongoDB qua `$unwind` và `$group`, tự động sinh các nhóm lọc tiếng Việt (CPU, RAM, Ổ cứng, VGA, Màn hình...).
+  - Bộ lọc Sidebar ([DynamicFilterSidebar.jsx](../code/client/src/features/products/components/DynamicFilterSidebar.jsx)) trích xuất động các nhóm thuộc tính từ MongoDB qua `$unwind` và `$group`, tự động sinh các nhóm lọc tiếng Việt (CPU, RAM, Ổ cứng, VGA, Màn hình...).
   - Lọc khoảng giá theo VNĐ thực tế (`minPrice`, `maxPrice`) và lọc theo nhiều thương hiệu cùng lúc.
 - **Trang Chi tiết Sản phẩm (PDP) & Hộp Tồn kho Đa Chi nhánh (`UC-CU06`):**
   - Giá bán, giá niêm yết, tỷ lệ giảm giá và mã SKU cập nhật phản ứng tức thì (reactive) theo lựa chọn biến thể cấu hình.
-  - Hộp tồn kho đa điểm ([MultiBranchStockBox.jsx](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/client/src/features/inventory/components/MultiBranchStockBox.jsx)): Hiển thị chi tiết số lượng từng showroom; cảnh báo "Tạm thời hết hàng trên toàn hệ thống" và vô hiệu hóa các nút mua hàng khi tồn kho bằng 0.
+  - Hộp tồn kho đa điểm ([MultiBranchStockBox.jsx](../code/client/src/features/inventory/components/MultiBranchStockBox.jsx)): Hiển thị chi tiết số lượng từng showroom; cảnh báo "Tạm thời hết hàng trên toàn hệ thống" và vô hiệu hóa các nút mua hàng khi tồn kho bằng 0.
   - Phân tách 3 nút hành động rõ rệt: "Thêm vào giỏ hàng", "Mua ngay", và "Đặt giữ hàng (Click & Collect)".
 - **So sánh Cấu hình Đa chiều (`UC-CU07`):**
-  - Bảng so sánh ([CompareMatrixTable.jsx](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/client/src/features/products/components/CompareMatrixTable.jsx)) với công tắc "Chỉ xem điểm khác biệt"; nút thêm giỏ hàng tạo `CartItem` chuẩn qua `productAdapter.js`.
+  - Bảng so sánh ([CompareMatrixTable.jsx](../code/client/src/features/products/components/CompareMatrixTable.jsx)) với công tắc "Chỉ xem điểm khác biệt"; nút thêm giỏ hàng tạo `CartItem` chuẩn qua `productAdapter.js`.
 - **Tra cứu e-Warranty Công khai & Lịch sử Tiếp nhận (`UC-CU08`):**
   - Tự động đọc tham số URL `?serial=...` để tự động điền và kích hoạt tra cứu.
   - Trích xuất dòng thời gian các sự kiện bảo hành từ bảng `warranty_tickets` hiển thị trên timeline tiếp nhận.
 - **Giỏ hàng Chọn Chi nhánh & Checkout Click & Collect (`UC-CU09`, `UC-CU10`, `UC-CU11`):**
-  - Giỏ hàng ([CartPage.jsx](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/client/src/pages/storefront/CartPage.jsx)) cho phép chọn chi nhánh nhận/xử lý hàng, lưu vào `localStorage` và truyền sang trang Checkout.
-  - Trang Checkout ([CheckoutPage.jsx](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/client/src/pages/storefront/CheckoutPage.jsx)) tự động nhận `?mode=CLICK_COLLECT&branchId=...` để chọn đúng tab và showroom.
-  - Trang Biên nhận ([CheckoutSuccessPage.jsx](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/client/src/pages/storefront/CheckoutSuccessPage.jsx)) hiển thị đúng thông tin nhận máy tại showroom hoặc giao tận nơi.
+  - Giỏ hàng ([CartPage.jsx](../code/client/src/pages/storefront/CartPage.jsx)) cho phép chọn chi nhánh nhận/xử lý hàng, lưu vào `localStorage` và truyền sang trang Checkout.
+  - Trang Checkout ([CheckoutPage.jsx](../code/client/src/pages/storefront/CheckoutPage.jsx)) tự động nhận `?mode=CLICK_COLLECT&branchId=...` để chọn đúng tab và showroom.
+  - Trang Biên nhận ([CheckoutSuccessPage.jsx](../code/client/src/pages/storefront/CheckoutSuccessPage.jsx)) hiển thị đúng thông tin nhận máy tại showroom hoặc giao tận nơi.
 - **Theo dõi Đơn hàng Cá nhân & Stepper 4 bước (`UC-CU12`, `UC-CU13`, `UC-CU14`):**
   - Bổ sung xử lý hiển thị badge màu chàm và bước 3 trong progress stepper cho trạng thái `READY_FOR_SHIPPING` ("Đang vận chuyển").
   - Danh sách sản phẩm hiển thị mã Serial/IMEI kèm nút bấm chuyển nhanh sang tra cứu bảo hành điện tử.
@@ -137,14 +137,14 @@ Time:        80.683 s
 Ran all test suites.
 ```
 
-- **Category Module Integration Tests ([category.test.js](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/server/tests/integration/category.test.js)):** 11/11 tests passed (Tạo danh mục cha-con, dynamic attributeKeys, chống slug trùng, soft delete).
-- **Branch Module Integration Tests ([branch.test.js](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/server/tests/integration/branch.test.js)):** 11/11 tests passed (Tạo chi nhánh, tọa độ GPS 2dsphere $near, RBAC chặn Staff/Customer tạo chi nhánh).
-- **Product Module Integration Tests ([product.test.js](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/server/tests/integration/product.test.js)):** 20/20 tests passed (CRUD sản phẩm, SKU biến thể, lọc đa tiêu chí dynamic attributes, kiểm tra tồn kho).
-- **Serial/IMEI Module Integration Tests ([serial.test.js](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/server/tests/integration/serial.test.js)):** 16/16 tests passed (Nhập lô, POS barcode scan, chặn chéo chi nhánh, tra cứu e-Warranty).
-- **Inventory Concurrency Tests ([inventory-concurrency.test.js](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/server/tests/integration/inventory-concurrency.test.js)):** 3/3 tests passed (Mô phỏng 2 giao dịch tranh chấp sản phẩm cuối cùng, triệt tiêu bán âm Zero Overselling).
-- **Warranty Module Tests ([warranty.test.js](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/server/tests/integration/warranty.test.js)):** 7/7 tests passed (Tạo phiếu bảo hành, kiểm tra serial, chuyển trạng thái).
-- **Auth & Session Tests ([auth.test.js](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/server/tests/integration/auth.test.js)):** 14/14 tests passed (Đăng ký, Đăng nhập, Silent Refresh HttpOnly Cookie, Quên mật khẩu).
-- **Unit Tests DTO & RBAC Middleware ([order-dto.test.js](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/server/tests/unit/order-dto.test.js), [zod-dto.test.js](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/server/tests/unit/zod-dto.test.js), [vnpay.test.js](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/server/tests/unit/vnpay.test.js)...):** 90/90 tests passed.
+- **Category Module Integration Tests ([category.test.js](../code/server/tests/integration/category.test.js)):** 11/11 tests passed (Tạo danh mục cha-con, dynamic attributeKeys, chống slug trùng, soft delete).
+- **Branch Module Integration Tests ([branch.test.js](../code/server/tests/integration/branch.test.js)):** 11/11 tests passed (Tạo chi nhánh, tọa độ GPS 2dsphere $near, RBAC chặn Staff/Customer tạo chi nhánh).
+- **Product Module Integration Tests ([product.test.js](../code/server/tests/integration/product.test.js)):** 20/20 tests passed (CRUD sản phẩm, SKU biến thể, lọc đa tiêu chí dynamic attributes, kiểm tra tồn kho).
+- **Serial/IMEI Module Integration Tests ([serial.test.js](../code/server/tests/integration/serial.test.js)):** 16/16 tests passed (Nhập lô, POS barcode scan, chặn chéo chi nhánh, tra cứu e-Warranty).
+- **Inventory Concurrency Tests ([inventory-concurrency.test.js](../code/server/tests/integration/inventory-concurrency.test.js)):** 3/3 tests passed (Mô phỏng 2 giao dịch tranh chấp sản phẩm cuối cùng, triệt tiêu bán âm Zero Overselling).
+- **Warranty Module Tests ([warranty.test.js](../code/server/tests/integration/warranty.test.js)):** 7/7 tests passed (Tạo phiếu bảo hành, kiểm tra serial, chuyển trạng thái).
+- **Auth & Session Tests ([auth.test.js](../code/server/tests/integration/auth.test.js)):** 14/14 tests passed (Đăng ký, Đăng nhập, Silent Refresh HttpOnly Cookie, Quên mật khẩu).
+- **Unit Tests DTO & RBAC Middleware ([order-dto.test.js](../code/server/tests/unit/order-dto.test.js), [zod-dto.test.js](../code/server/tests/unit/zod-dto.test.js), [vnpay.test.js](../code/server/tests/unit/vnpay.test.js)...):** 90/90 tests passed.
 
 ---
 
@@ -172,10 +172,10 @@ dist/assets/index-DxKgx2K2.js   1,274.47 kB │ gzip: 334.99 kB
 
 ### 4. Chuẩn hóa 4 Bộ Tài liệu Đặc tả Use Case
 Nhóm đã đối soát và cập nhật đồng bộ toàn bộ 4 file tài liệu đặc tả trong thư mục `docs/use_cases/`:
-1. [`01_QUAN_LY_CAP_CAO_SUPER_ADMIN.md`](file:///f:/TLCN/MERN-TECH-ECOMMERCE/docs/use_cases/01_QUAN_LY_CAP_CAO_SUPER_ADMIN.md): Đặc tả chi tiết 11 Use Cases (`UC-AD01` đến `UC-AD11`).
-2. [`02_QUAN_LY_NHANH_BRANCH_MANAGER.md`](file:///f:/TLCN/MERN-TECH-ECOMMERCE/docs/use_cases/02_QUAN_LY_NHANH_BRANCH_MANAGER.md): Đặc tả chi tiết 11 Use Cases (`UC-BM01` đến `UC-BM11`).
-3. [`03_NHAN_VIEN_QUAY_STAFF.md`](file:///f:/TLCN/MERN-TECH-ECOMMERCE/docs/use_cases/03_NHAN_VIEN_QUAY_STAFF.md): Đặc tả chi tiết 13 Use Cases (`UC-ST01` đến `UC-ST13`).
-4. [`04_NGUOI_DUNG_CUSTOMER.md`](file:///f:/TLCN/MERN-TECH-ECOMMERCE/docs/use_cases/04_NGUOI_DUNG_CUSTOMER.md): Đặc tả chi tiết 14 Use Cases (`UC-CU01` đến `UC-CU14`).
+1. [`01_QUAN_LY_CAP_CAO_SUPER_ADMIN.md`](use_cases/01_QUAN_LY_CAP_CAO_SUPER_ADMIN.md): Đặc tả chi tiết 11 Use Cases (`UC-AD01` đến `UC-AD11`).
+2. [`02_QUAN_LY_NHANH_BRANCH_MANAGER.md`](use_cases/02_QUAN_LY_NHANH_BRANCH_MANAGER.md): Đặc tả chi tiết 11 Use Cases (`UC-BM01` đến `UC-BM11`).
+3. [`03_NHAN_VIEN_QUAY_STAFF.md`](use_cases/03_NHAN_VIEN_QUAY_STAFF.md): Đặc tả chi tiết 13 Use Cases (`UC-ST01` đến `UC-ST13`).
+4. [`04_NGUOI_DUNG_CUSTOMER.md`](use_cases/04_NGUOI_DUNG_CUSTOMER.md): Đặc tả chi tiết 14 Use Cases (`UC-CU01` đến `UC-CU14`).
 
 ---
 
@@ -192,21 +192,21 @@ Nhóm đã đối soát và cập nhật đồng bộ toàn bộ 4 file tài li�
 ---
 
 ### 📌 Trường hợp 2: Thiếu `branchId` trong Dữ liệu Giả lập (Fixtures) của Bộ Test
-- **Bối cảnh:** Sau khi siết chặt quy tắc bảo mật Branch Scoping ở tầng Backend (yêu cầu mọi tài khoản `STAFF` hoặc `BRANCH_MANAGER` khi đăng nhập bắt buộc phải có `branchId` hợp lệ, nếu không sẽ bị từ chối với lỗi `403 FORBIDDEN`), ba bộ test tích hợp cũ ([product.test.js](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/server/tests/integration/product.test.js), [category.test.js](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/server/tests/integration/category.test.js), [branch.test.js](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/server/tests/integration/branch.test.js)) bất ngờ bị fail 1 test case.
+- **Bối cảnh:** Sau khi siết chặt quy tắc bảo mật Branch Scoping ở tầng Backend (yêu cầu mọi tài khoản `STAFF` hoặc `BRANCH_MANAGER` khi đăng nhập bắt buộc phải có `branchId` hợp lệ, nếu không sẽ bị từ chối với lỗi `403 FORBIDDEN`), ba bộ test tích hợp cũ ([product.test.js](../code/server/tests/integration/product.test.js), [category.test.js](../code/server/tests/integration/category.test.js), [branch.test.js](../code/server/tests/integration/branch.test.js)) bất ngờ bị fail 1 test case.
 - **Ảo giác của AI:** AI đề xuất nới lỏng kiểm tra bảo mật trong `auth.service.js` để test case cũ vượt qua.
 - **Tư duy phản biện của sinh viên:** Không được hạ thấp chuẩn bảo mật của hệ thống để thỏa hiệp với test case sai. Sinh viên chỉ ra rằng test case cũ tạo tài khoản `STAFF` mà quên gán `branchId`. Sinh viên trực tiếp bổ sung `branchId: new mongoose.Types.ObjectId()` vào fixture tạo tài khoản Staff trong cả 3 file test. Kết quả: Toàn bộ 172 test cases đều pass mà cơ chế bảo mật phân quyền vẫn được giữ vững 100%.
 
 ---
 
 ### 📌 Trường hợp 3: Sai lệch Cấu trúc Dữ liệu Cart Item giữa So sánh Cấu hình và Giỏ hàng
-- **Bối cảnh:** Khi người dùng bấm nút "Chọn mua" từ bảng so sánh thông số kỹ thuật ([CompareMatrixTable.jsx](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/client/src/features/products/components/CompareMatrixTable.jsx)), sản phẩm được đưa vào Redux Cart nhưng khi sang trang Giỏ hàng lại bị mất thông tin biến thể SKU và giá bán hiển thị `0 ₫`.
+- **Bối cảnh:** Khi người dùng bấm nút "Chọn mua" từ bảng so sánh thông số kỹ thuật ([CompareMatrixTable.jsx](../code/client/src/features/products/components/CompareMatrixTable.jsx)), sản phẩm được đưa vào Redux Cart nhưng khi sang trang Giỏ hàng lại bị mất thông tin biến thể SKU và giá bán hiển thị `0 ₫`.
 - **Phân tích nguyên nhân:** AI viết hàm `handleAddToCart` trong `CompareMatrixTable.jsx` và `ProductCard.jsx` truyền thẳng object sản phẩm thô vào `dispatch(addToCart(product))` thay vì sử dụng adapter chuẩn hóa `createCartItem` từ `productAdapter.js`.
 - **Refactoring của sinh viên:** Thay thế toàn bộ bằng lời gọi `createCartItem(product, selectedSku, 1)` bảo đảm mọi item trong giỏ hàng luôn có đủ các trường: `productId`, `productSkuId`, `sku`, `price`, `image`, `options`.
 
 ---
 
 ### 📌 Trường hợp 4: Lỗi Tiến trình Đơn hàng Stepper 4 bước bị rơi về Mặc định
-- **Bối cảnh:** Khi đơn hàng chuyển sang trạng thái `READY_FOR_SHIPPING` ("Đang vận chuyển"), trang chi tiết đơn hàng ([OrderDetailPage.jsx](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/client/src/pages/account/OrderDetailPage.jsx)) lại hiển thị Stepper ở Bước 1 ("Đã đặt hàng") và huy hiệu trạng thái màu vàng ("CHỜ THANH TOÁN").
+- **Bối cảnh:** Khi đơn hàng chuyển sang trạng thái `READY_FOR_SHIPPING` ("Đang vận chuyển"), trang chi tiết đơn hàng ([OrderDetailPage.jsx](../code/client/src/pages/account/OrderDetailPage.jsx)) lại hiển thị Stepper ở Bước 1 ("Đã đặt hàng") và huy hiệu trạng thái màu vàng ("CHỜ THANH TOÁN").
 - **Phân tích nguyên nhân:** Hàm `getStepProgress` ban đầu do AI sinh ra chỉ có 3 nhánh `switch-case` (`PENDING`, `PROCESSING`, `COMPLETED`), thiếu trạng thái `READY_FOR_SHIPPING` và `CONFIRMED` nên rơi vào nhánh `default: return 1`.
 - **Refactoring của sinh viên:** Cập nhật hàm `getStepProgress`:
   ```javascript

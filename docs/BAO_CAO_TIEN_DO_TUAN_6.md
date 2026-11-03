@@ -22,28 +22,28 @@ Trong tuần 6, nhóm tập trung giải quyết triệt để 2 vấn đề the
 ### 2. Những việc ĐÃ HOÀN THÀNH trong Tuần 6
 
 #### A. Kiến trúc Giao diện & Trải nghiệm Đặt hàng B2C (`feature/b2c-checkout-page`):
-- **Trang Thanh toán Độc lập ([CheckoutPage.jsx](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/client/src/pages/storefront/CheckoutPage.jsx)):**
+- **Trang Thanh toán Độc lập ([CheckoutPage.jsx](../code/client/src/pages/storefront/CheckoutPage.jsx)):**
   - Bố cục 2 cột chuyên nghiệp: Cột trái gồm 3 khối thông tin (Phương thức nhận hàng, Thông tin khách hàng, Phương thức thanh toán); Cột phải là tóm tắt đơn hàng cố định (Sticky Order Summary).
   - Tích hợp 2 hình thức nhận hàng:
     - 🚚 **Giao tận nơi (Delivery):** Nhập địa chỉ chi tiết, tự động liên kết với chi nhánh xuất kho gần nhất.
-    - 🏬 **Nhận tại cửa hàng (Click & Collect):** Gọi API [`branchService.getBranches()`](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/client/src/features/branches/services/branchService.js) nạp danh sách showroom theo thời gian thực từ cơ sở dữ liệu MongoDB, hiển thị địa chỉ chi tiết, hotline và trạng thái sẵn sàng bàn giao máy sau 15–30 phút.
+    - 🏬 **Nhận tại cửa hàng (Click & Collect):** Gọi API [`branchService.getBranches()`](../code/client/src/features/branches/services/branchService.js) nạp danh sách showroom theo thời gian thực từ cơ sở dữ liệu MongoDB, hiển thị địa chỉ chi tiết, hotline và trạng thái sẵn sàng bàn giao máy sau 15–30 phút.
   - Tích hợp kiểm tra tính hợp lệ dữ liệu (Validation): Kiểm tra định dạng số điện thoại di động Việt Nam qua biểu thức chính quy (Regex: `/^(0|\+84)(3|5|7|8|9)[0-9]{8}$/`), kiểm tra bắt buộc họ tên và địa chỉ nhận hàng.
-  - Tinh gọn luồng điều hướng: Cập nhật [`CartPage.jsx`](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/client/src/pages/storefront/CartPage.jsx) điều hướng mượt mà sang `/checkout` và đăng ký route trong [`AppRoutes.jsx`](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/client/src/routes/AppRoutes.jsx).
+  - Tinh gọn luồng điều hướng: Cập nhật [`CartPage.jsx`](../code/client/src/pages/storefront/CartPage.jsx) điều hướng mượt mà sang `/checkout` và đăng ký route trong [`AppRoutes.jsx`](../code/client/src/routes/AppRoutes.jsx).
 
 #### B. Tích hợp Cổng Thanh toán Điện tử VNPay Sandbox (`feature/vnpay-payment-gateway`):
-- **Backend Service ([vnpay.service.js](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/server/src/modules/orders/vnpay.service.js)):**
+- **Backend Service ([vnpay.service.js](../code/server/src/modules/orders/vnpay.service.js)):**
   - Xây dựng thuật toán sắp xếp tham số URL theo thứ tự từ điển A-Z (`sortObject`), chuẩn hóa chuỗi dữ liệu truy vấn và mã hóa ký tự theo chuẩn VNPay (thay thế `%20` bằng dấu `+`).
   - Ký số bảo mật an toàn sử dụng thuật toán HMAC-SHA512 với khóa bí mật `VNPAY_HASH_SECRET`.
   - Khắc phục lỗi trùng lặp mã giao dịch (`vnp_TxnRef`) khi khách hàng bấm thanh toán nhiều lần trên cùng 1 đơn hàng bằng cách sinh mã có gắn tiền tố thời gian: `${order.orderCode}_${Date.now()}`.
   - Xây dựng hàm `verifyReturnUrl` kiểm tra tính toàn vẹn và hợp lệ của chữ ký phản hồi từ VNPay, chống tấn công giả mạo dữ liệu (Tampering Attack).
-- **Backend Endpoints & Routing ([order.routes.js](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/server/src/modules/orders/order.routes.js)):**
+- **Backend Endpoints & Routing ([order.routes.js](../code/server/src/modules/orders/order.routes.js)):**
   - `POST /api/v1/orders/:id/vnpay-url`: Sinh URL thanh toán trực tiếp chuyển hướng sang cổng VNPay Sandbox.
   - `GET /api/v1/orders/vnpay-return`: Nhận callback redirect từ VNPay, kiểm tra mã phản hồi `vnp_ResponseCode === '00'`, cập nhật trạng thái thanh toán `paymentStatus = 'PAID'` trong MongoDB và chuyển hướng người dùng về trang thông báo hoàn tất của Frontend.
   - Khắc phục triệt để lỗi xung đột định tuyến (Route Shadowing) của Express: Đưa route cụ thể `/vnpay-return` lên trước route tham số động `/:orderCode`.
-- **Frontend Success & Verification ([CheckoutSuccessPage.jsx](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/client/src/pages/storefront/CheckoutSuccessPage.jsx)):**
+- **Frontend Success & Verification ([CheckoutSuccessPage.jsx](../code/client/src/pages/storefront/CheckoutSuccessPage.jsx)):**
   - Nhận và phân tích các tham số giao dịch từ URL (`vnp_TransactionNo`, `vnp_BankCode`, `vnp_ResponseCode`).
   - Hiển thị giao diện biên nhận trực quan: Mã giao dịch VNPay, trạng thái "Đã thanh toán" (Huy hiệu màu xanh ngọc), số tiền thanh toán, và hướng dẫn nhận hàng cụ thể cho đơn Click & Collect hoặc đơn Giao tận nơi.
-- **Kiểm thử tự động Unit Test ([vnpay.test.js](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/server/tests/unit/vnpay.test.js)):**
+- **Kiểm thử tự động Unit Test ([vnpay.test.js](../code/server/tests/unit/vnpay.test.js)):**
   - Bổ sung 3 test cases độc lập: Kiểm thử tạo URL thanh toán VNPay chuẩn SHA-512, kiểm thử xác thực chữ ký phản hồi hợp lệ, và kiểm thử từ chối khi tham số hoặc chữ ký bị can thiệp trái phép. 100% test cases pass.
 
 ---
@@ -138,7 +138,7 @@ Hệ thống tuân thủ nghiêm ngặt quy chuẩn phân nhánh **Git Flow** v�
 
 ### 3. Kết quả Kiểm thử tự động (Unit & Integration Tests)
 - **Bộ kiểm thử Backend:** Chạy 17 Test Suites, đạt **169/169 Tests Passed (100%)**.
-- **Riêng Module Thanh toán ([tests/unit/vnpay.test.js](file:///f:/TLCN/MERN-TECH-ECOMMERCE/code/server/tests/unit/vnpay.test.js)):**
+- **Riêng Module Thanh toán ([tests/unit/vnpay.test.js](../code/server/tests/unit/vnpay.test.js)):**
   - `√ Happy Path: should generate a valid VNPay sandbox URL with required query params and SHA512 hash`: Đạt chuẩn 100%.
   - `√ Happy Path: should verify authentic return params with valid checksum`: Xác thực thành công dữ liệu hợp lệ trả về từ cổng.
   - `√ Security / Negative: should reject return callback when parameters or hash have been tampered with`: Chặn đứng khi tham số bị can thiệp giả mạo.
