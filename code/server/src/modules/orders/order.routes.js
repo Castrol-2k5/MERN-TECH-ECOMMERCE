@@ -7,7 +7,8 @@ import {
   dispatchOrderSchema,
   trackOrderSchema,
   completeOrderSchema,
-  cancelOrderSchema
+  cancelOrderSchema,
+  exchangeOrderSkuSchema
 } from './order.dto.js';
 import { validateDto } from '../../middlewares/validate.middleware.js';
 import { protect, optionalProtect } from '../../middlewares/auth.middleware.js';
@@ -97,6 +98,15 @@ router.patch(
   authorize(USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER),
   validateDto(cancelOrderSchema),
   OrderController.cancelOrder
+);
+
+// 6.3. Đổi SKU tại quầy kèm bù/hoàn tiền chênh lệch (STAFF, BRANCH_MANAGER, SUPER_ADMIN)
+router.patch(
+  '/:id/exchange-sku',
+  protect,
+  authorize(USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER, USER_ROLES.STAFF),
+  validateDto(exchangeOrderSkuSchema),
+  OrderController.exchangeSku
 );
 
 // 7. Cổng thanh toán VNPay (Sandbox)

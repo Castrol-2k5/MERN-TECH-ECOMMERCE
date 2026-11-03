@@ -133,6 +133,17 @@ export class OrderController {
     });
   });
 
+  static exchangeSku = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const result = await OrderService.exchangeSku(id, req.body, req.user);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Đổi SKU tại quầy và điều chỉnh tồn kho thành công',
+      data: result
+    });
+  });
+
   static createVnpayPaymentUrl = catchAsync(async (req, res) => {
     const { id } = req.params;
     const ipAddr =

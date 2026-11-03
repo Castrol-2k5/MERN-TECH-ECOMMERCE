@@ -230,5 +230,13 @@ export const orderService = {
     }
     const response = await axiosClient.patch(`/orders/${orderId}/cancel`, { reason });
     return response?.data?.order || response?.data;
+  },
+
+  exchangeSku: async (orderId, payload) => {
+    if (isMockEnabled()) {
+      return { success: true, orderId, payload, priceDifference: 0 };
+    }
+    const response = await axiosClient.patch(`/orders/${orderId}/exchange-sku`, payload);
+    return response?.data?.data || response?.data;
   }
 };

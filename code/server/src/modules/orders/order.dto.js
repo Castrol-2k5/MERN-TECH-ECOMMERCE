@@ -174,3 +174,22 @@ export const cancelOrderSchema = z
       .min(1, 'Lý do hủy đơn không được để trống')
   })
   .strict();
+
+export const exchangeOrderSkuSchema = z
+  .object({
+    oldProductSkuId: z
+      .string({ required_error: 'Mã SKU cũ là bắt buộc' })
+      .trim()
+      .regex(OBJECT_ID_REGEX, 'Mã SKU cũ (oldProductSkuId) không hợp lệ'),
+    newProductSkuId: z
+      .string({ required_error: 'Mã SKU mới là bắt buộc' })
+      .trim()
+      .regex(OBJECT_ID_REGEX, 'Mã SKU mới (newProductSkuId) không hợp lệ'),
+    newSerialNumber: z.string().trim().optional(),
+    paymentMethod: z
+      .enum([PAYMENT_METHODS.CASH, PAYMENT_METHODS.VNPAY, 'TRANSFER', 'CARD'])
+      .optional()
+      .default(PAYMENT_METHODS.CASH),
+    note: z.string().trim().optional().default('Đổi SKU theo yêu cầu của khách tại quầy')
+  })
+  .strict();

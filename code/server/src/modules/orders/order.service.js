@@ -831,6 +831,176 @@ export class OrderService {
     return order;
   }
 
+  /**
+   * Đổi SKU / Đổi máy tại quầy cho đơn hàng Click & Collect hoặc đơn chi nhánh
+   * Quyền: STAFF, BRANCH_MANAGER, SUPER_ADMIN
+   */
+  static async exchangeSku(orderId, payload, currentUser) {
+    const { oldProductSkuId, newProductSkuId, newSerialNumber, paymentMethod = 'CASH', note } = payload;
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      throw new AppError('Không tìm thấy đơn hàng cần đổi SKU.', 404, 'ORDER_NOT_FOUND');
+    }
+
+    if (order.orderStatus === ORDER_STATUS.COMPLETED || order.orderStatus === ORDER_STATUS.CANCELLED) {
+      throw new AppError(
+        `Không thể đổi SKU cho đơn hàng ở trạng thái ${order.orderStatus}.`,
+        400,
+        'INVALID_ORDER_STATUS'
+      );
+    }
+
+    // 1. Kiểm tra item cũ trong đơn
+    const itemIndex = (order.items || []).findIndex(
+      (it) => it.productSkuId.toString() === oldProductSkuId.toString()
+    );
+    if (itemIndex === -1) {
+      throw new AppError('SKU cũ không tồn tại trong đơn hàng này.', 404, 'OLD_SKU_NOT_IN_ORDER');
+    }
+    const oldItem = order.items[itemIndex];
+
+    // 2. Tìm sản phẩm và SKU mới
+    const targetProduct = await Product.findOne({ 'skus._id': newProductSkuId }).lean();
+    if (!targetProduct) {
+      throw new AppError('Không tìm thấy sản phẩm chứa SKU mới yêu cầu.', 404, 'TARGET_SKU_NOT_FOUND');
+    }
+    const targetSku = targetProduct.skus.find((s) => s._id.toString() === newProductSkuId.toString());
+    if (!targetSku) {
+      throw new AppError('Không tìm thấy SKU mới trong hệ thống.', 404, 'TARGET_SKU_NOT_FOUND');
+    }
+
+    // 3. Kiểm tra tồn kho SKU mới tại chi nhánh
+    const branchId = order.branchId;
+    if (!branchId) {
+      throw new AppError('Đơn hàng chưa được gắn với chi nhánh cụ thể.', 400, 'ORDER_NO_BRANCH');
+    }
+
+    const newInventory = await BranchInventory.findOne({ branchId, productSkuId: newProductSkuId });
+    if (!newInventory || newInventory.quantity < oldItem.quantity) {
+      throw new AppError(
+        `Chi nhánh hiện không đủ tồn kho SKU mới (${targetSku.sku}). Số lượng tồn khả dụng: ${newInventory?.quantity || 0}.`,
+        400,
+        'INSUFFICIENT_STOCK'
+      );
+    }
+
+    // 4. Hoàn trả tồn kho và Serial của SKU cũ
+    await BranchInventory.updateOne(
+      { branchId, productSkuId: oldItem.productSkuId },
+      { $inc: { quantity: oldItem.quantity } }
+    );
+
+    if (oldItem.serialsAssigned && oldItem.serialsAssigned.length > 0) {
+      await Serial.updateMany(
+        { serialNumber: { $in: oldItem.serialsAssigned } },
+        {
+          $set: {
+            status: SERIAL_STATUS.IN_STOCK,
+            orderId: null,
+            orderItemId: null,
+            soldAt: null,
+            warrantyEndDate: null
+          }
+        }
+      );
+    }
+
+    // 5. Trừ tồn kho SKU mới
+    await BranchInventory.updateOne(
+      { branchId, productSkuId: newProductSkuId },
+      { $inc: { quantity: -oldItem.quantity } }
+    );
+
+    // 6. Xử lý mã Serial mới nếu nhân viên quét tại quầy
+    let newSerials = [];
+    if (newSerialNumber && newSerialNumber.trim()) {
+      const cleanSerial = newSerialNumber.trim().toUpperCase();
+      const serialDoc = await Serial.findOne({
+        serialNumber: cleanSerial,
+        productSkuId: newProductSkuId,
+        branchId
+      });
+      if (!serialDoc) {
+        throw new AppError(
+          `Mã Serial/IMEI ${cleanSerial} không tồn tại hoặc không thuộc chi nhánh này.`,
+          400,
+          'INVALID_SERIAL'
+        );
+      }
+      if (serialDoc.status !== SERIAL_STATUS.IN_STOCK) {
+        throw new AppError(
+          `Mã Serial ${cleanSerial} đang ở trạng thái ${serialDoc.status}, không thể gán.`,
+          400,
+          'SERIAL_NOT_AVAILABLE'
+        );
+      }
+      await Serial.updateOne(
+        { _id: serialDoc._id },
+        {
+          $set: {
+            status: SERIAL_STATUS.RESERVED,
+            orderId: order._id,
+            orderItemId: oldItem._id
+          }
+        }
+      );
+      newSerials = [cleanSerial];
+    }
+
+    // 7. Tính toán chênh lệch giá
+    const oldTotal = Number(oldItem.unitPrice || 0) * Number(oldItem.quantity || 1);
+    const newUnitPrice = Number(targetSku.salePrice || targetSku.price || 0);
+    const newTotal = newUnitPrice * Number(oldItem.quantity || 1);
+    const priceDifference = newTotal - oldTotal;
+
+    // 8. Cập nhật order.items
+    order.items[itemIndex] = {
+      productId: targetProduct._id,
+      productSkuId: targetSku._id,
+      productName: `${targetProduct.name} - ${targetSku.sku}`,
+      sku: targetSku.sku,
+      quantity: oldItem.quantity,
+      unitPrice: newUnitPrice,
+      subtotal: newTotal,
+      serialsAssigned: newSerials
+    };
+
+    order.totalAmount = Math.max(0, Number(order.totalAmount || 0) + priceDifference);
+
+    // 9. Ghi vết lịch sử đổi SKU
+    if (!order.exchangeHistory) order.exchangeHistory = [];
+    order.exchangeHistory.push({
+      exchangedAt: new Date(),
+      exchangedBy: currentUser?.id || currentUser?._id,
+      oldProductSkuId: oldItem.productSkuId,
+      oldSku: oldItem.sku,
+      oldProductName: oldItem.productName,
+      newProductSkuId: targetSku._id,
+      newSku: targetSku.sku,
+      newProductName: `${targetProduct.name} - ${targetSku.sku}`,
+      oldUnitPrice: oldItem.unitPrice,
+      newUnitPrice,
+      priceDifference,
+      paymentMethod,
+      note: note || 'Đổi SKU theo yêu cầu của khách tại quầy'
+    });
+
+    await order.save();
+
+    const populated = await Order.findById(order._id)
+      .populate('branchId', 'name branchCode address phone')
+      .populate('staffId', 'fullName email')
+      .populate('exchangeHistory.exchangedBy', 'fullName email')
+      .lean();
+
+    return {
+      order: populated || order,
+      priceDifference,
+      actionRequired: priceDifference > 0 ? 'COLLECT_MORE' : priceDifference < 0 ? 'REFUND_CUSTOMER' : 'EQUAL_EXCHANGE'
+    };
+  }
+
   static async createVnpayPaymentUrl(orderId, ipAddr) {
     const order = await Order.findById(orderId);
     if (!order) {

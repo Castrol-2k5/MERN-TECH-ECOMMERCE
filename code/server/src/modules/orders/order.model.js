@@ -173,7 +173,24 @@ const orderSchema = new Schema(
     completedAt: {
       type: Date,
       default: null
-    }
+    },
+    exchangeHistory: [
+      {
+        exchangedAt: { type: Date, default: Date.now },
+        exchangedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+        oldProductSkuId: { type: Schema.Types.ObjectId },
+        oldSku: String,
+        oldProductName: String,
+        newProductSkuId: { type: Schema.Types.ObjectId },
+        newSku: String,
+        newProductName: String,
+        oldUnitPrice: Number,
+        newUnitPrice: Number,
+        priceDifference: Number,
+        paymentMethod: { type: String, default: 'CASH' },
+        note: String
+      }
+    ]
   },
   {
     timestamps: true,

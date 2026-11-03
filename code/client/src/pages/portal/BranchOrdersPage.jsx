@@ -22,11 +22,16 @@ import {
   Truck,
   XCircle,
   ArrowUpRight,
-  Barcode
+  ArrowRight,
+  Barcode,
+  AlertCircle
 } from 'lucide-react';
 import { orderService } from '../../features/orders/services/orderService.js';
 import { branchService } from '../../features/branches/services/branchService.js';
 import { warrantyService } from '../../features/warranty/services/warrantyService.js';
+import { inventoryService } from '../../features/inventory/services/inventoryService.js';
+import usePosAudio from '../../features/pos/hooks/usePosAudio';
+import Toast from '../../components/common/Toast';
 
 const formatVND = (val) => `${Number(val || 0).toLocaleString('vi-VN')} ₫`;
 
@@ -87,6 +92,36 @@ export const BranchOrdersPage = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [verifiedSerialInfo, setVerifiedSerialInfo] = useState(null);
   const [verifyingSerial, setVerifyingSerial] = useState('');
+
+  // Toast & Audio Feedback
+  const [toast, setToast] = useState(null);
+  const { playSuccessBeep, playErrorBeep } = usePosAudio();
+
+  const showToast = useCallback(
+    (type, title, message) => {
+      if (type === 'success') {
+        playSuccessBeep();
+      } else {
+        playErrorBeep();
+      }
+      setToast({ type, title, message });
+    },
+    [playSuccessBeep, playErrorBeep]
+  );
+
+  // Exchange SKU Modal State
+  const [isExchangeModalOpen, setIsExchangeModalOpen] = useState(false);
+  const [exchangeOrder, setExchangeOrder] = useState(null);
+  const [exchangeOldSkuId, setExchangeOldSkuId] = useState('');
+  const [exchangeBranchInventory, setExchangeBranchInventory] = useState([]);
+  const [exchangeTargetSkuId, setExchangeTargetSkuId] = useState('');
+  const [exchangeSearchQuery, setExchangeSearchQuery] = useState('');
+  const [exchangeSerialNumber, setExchangeSerialNumber] = useState('');
+  const [exchangePaymentMethod, setExchangePaymentMethod] = useState('CASH');
+  const [exchangeNote, setExchangeNote] = useState('');
+  const [isInventoryLoading, setIsInventoryLoading] = useState(false);
+  const [isExchanging, setIsExchanging] = useState(false);
+  const [exchangeModalError, setExchangeModalError] = useState('');
 
   useEffect(() => {
     const loadBranches = async () => {
@@ -198,13 +233,17 @@ export const BranchOrdersPage = () => {
       setSelectedOrder((prev) =>
         prev && String(prev._id) === String(order._id) ? { ...prev, ...patchData } : prev
       );
-      alert(`Đã bàn giao máy thành công cho đơn hàng ${order.orderCode}! Bảo hành điện tử đã được kích hoạt.`);
-    } catch (err) {
-      alert(
-        err?.response?.data?.error?.message ||
-          err?.message ||
-          'Không thể hoàn tất đơn hàng. Vui lòng thử lại.'
+      showToast(
+        'success',
+        'Bàn giao máy thành công',
+        `Đơn hàng ${order.orderCode} đã hoàn tất và kích hoạt bảo hành điện tử chính hãng!`
       );
+    } catch (err) {
+      const errMsg =
+        err?.response?.data?.error?.message ||
+        err?.message ||
+        'Không thể hoàn tất đơn hàng. Vui lòng thử lại.';
+      showToast('error', 'Lỗi bàn giao đơn hàng', errMsg);
     } finally {
       setActionLoading(false);
     }
@@ -237,15 +276,161 @@ export const BranchOrdersPage = () => {
       setSelectedOrder((prev) =>
         prev && String(prev._id) === String(order._id) ? { ...prev, ...patchData } : prev
       );
-      alert(`Đã hủy đơn ${order.orderCode} và hoàn trả kho chi nhánh thành công!`);
-    } catch (err) {
-      alert(
-        err?.response?.data?.error?.message ||
-          err?.message ||
-          'Không thể hủy đơn hàng. Vui lòng thử lại.'
+      showToast(
+        'success',
+        'Hủy đơn thành công',
+        `Đơn hàng ${order.orderCode} đã được hủy và hoàn trả tồn kho chi nhánh thành công.`
       );
+    } catch (err) {
+      const errMsg =
+        err?.response?.data?.error?.message ||
+        err?.message ||
+        'Không thể hủy đơn hàng. Vui lòng thử lại.';
+      showToast('error', 'Lỗi hủy đơn hàng', errMsg);
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  // Exchange SKU Handlers
+  const handleOpenExchangeModal = async (order) => {
+    if (!order) return;
+    setExchangeOrder(order);
+    const firstSkuId = order.items?.[0]?.productSkuId?._id || order.items?.[0]?.productSkuId || '';
+    setExchangeOldSkuId(firstSkuId);
+    setExchangeTargetSkuId('');
+    setExchangeSearchQuery('');
+    setExchangeSerialNumber('');
+    setExchangePaymentMethod('CASH');
+    setExchangeNote('');
+    setExchangeModalError('');
+    setIsExchangeModalOpen(true);
+    setIsInventoryLoading(true);
+
+    try {
+      const branchId =
+        typeof order.branchId === 'object'
+          ? order.branchId?._id || ''
+          : order.branchId || userBranchId;
+      const inv = await inventoryService.getBranchInventory(branchId);
+      setExchangeBranchInventory(Array.isArray(inv) ? inv : []);
+    } catch {
+      setExchangeBranchInventory([]);
+      setExchangeModalError('Không thể tải danh sách tồn kho chi nhánh để chọn SKU đổi.');
+    } finally {
+      setIsInventoryLoading(false);
+    }
+  };
+
+  const oldItemToExchange = useMemo(() => {
+    if (!exchangeOrder?.items) return null;
+    return (
+      exchangeOrder.items.find(
+        (i) =>
+          String(i.productSkuId?._id || i.productSkuId) === String(exchangeOldSkuId)
+      ) || exchangeOrder.items[0]
+    );
+  }, [exchangeOrder, exchangeOldSkuId]);
+
+  const filteredTargetInventory = useMemo(() => {
+    const oldSkuIdStr = String(oldItemToExchange?.productSkuId?._id || oldItemToExchange?.productSkuId || '');
+    return exchangeBranchInventory.filter((inv) => {
+      if (String(inv.productSkuId?._id || inv.productSkuId) === oldSkuIdStr) return false;
+      if ((Number(inv.quantityAvailable) || Number(inv.quantityPhysical) || 0) <= 0) return false;
+      if (exchangeSearchQuery.trim()) {
+        const q = exchangeSearchQuery.toLowerCase();
+        const matchName = (inv.productName || '').toLowerCase().includes(q);
+        const matchSku = (inv.sku || '').toLowerCase().includes(q);
+        return matchName || matchSku;
+      }
+      return true;
+    });
+  }, [exchangeBranchInventory, oldItemToExchange, exchangeSearchQuery]);
+
+  const targetInventoryItem = useMemo(() => {
+    if (!exchangeTargetSkuId) return null;
+    return exchangeBranchInventory.find(
+      (inv) => String(inv.productSkuId?._id || inv.productSkuId) === String(exchangeTargetSkuId)
+    );
+  }, [exchangeBranchInventory, exchangeTargetSkuId]);
+
+  const priceComparison = useMemo(() => {
+    if (!oldItemToExchange || !targetInventoryItem) return null;
+    const qty = Number(oldItemToExchange.quantity || 1);
+    const oldUnitPrice = Number(oldItemToExchange.unitPrice || 0);
+    const newUnitPrice = Number(targetInventoryItem.unitPrice || 0);
+    const oldTotal = oldUnitPrice * qty;
+    const newTotal = newUnitPrice * qty;
+    const diff = newTotal - oldTotal;
+
+    return {
+      qty,
+      oldUnitPrice,
+      newUnitPrice,
+      oldTotal,
+      newTotal,
+      diff,
+      type: diff > 0 ? 'COLLECT_MORE' : diff < 0 ? 'REFUND_CUSTOMER' : 'EQUAL'
+    };
+  }, [oldItemToExchange, targetInventoryItem]);
+
+  const handleConfirmExchange = async (e) => {
+    if (e) e.preventDefault();
+    if (!exchangeOrder || !oldItemToExchange || !targetInventoryItem) {
+      setExchangeModalError('Vui lòng chọn đầy đủ sản phẩm cần đổi và sản phẩm mới.');
+      return;
+    }
+
+    if (targetInventoryItem.hasSerial && !exchangeSerialNumber.trim()) {
+      setExchangeModalError(
+        `Vui lòng chọn hoặc quét mã Serial / IMEI cho sản phẩm mới (${targetInventoryItem.sku}).`
+      );
+      return;
+    }
+
+    setIsExchanging(true);
+    setExchangeModalError('');
+
+    try {
+      const payload = {
+        oldProductSkuId: oldItemToExchange.productSkuId?._id || oldItemToExchange.productSkuId,
+        newProductSkuId: targetInventoryItem.productSkuId?._id || targetInventoryItem.productSkuId,
+        newSerialNumber: exchangeSerialNumber.trim() || undefined,
+        paymentMethod: priceComparison?.diff > 0 ? exchangePaymentMethod : 'NONE',
+        note: exchangeNote.trim() || 'Đổi SKU theo yêu cầu của khách tại quầy'
+      };
+
+      const result = await orderService.exchangeSku(exchangeOrder._id, payload);
+      const updatedOrder = result?.order || result;
+
+      setOrders((prev) =>
+        prev.map((o) => (String(o._id) === String(exchangeOrder._id) ? { ...o, ...updatedOrder } : o))
+      );
+      setSelectedOrder(updatedOrder);
+      setIsExchangeModalOpen(false);
+
+      const diff = priceComparison?.diff || 0;
+      const diffText =
+        diff > 0
+          ? `Khách bù thêm ${formatVND(diff)} (${exchangePaymentMethod === 'CASH' ? 'Tiền mặt' : 'Chuyển khoản'})`
+          : diff < 0
+          ? `Cửa hàng hoàn lại ${formatVND(Math.abs(diff))}`
+          : 'Đổi ngang giá (0 ₫)';
+
+      showToast(
+        'success',
+        'Đổi SKU thành công',
+        `Đã chuyển đổi sang ${targetInventoryItem.productName}. ${diffText}. Tồn kho và mã Serial đã được điều chỉnh tự động.`
+      );
+    } catch (err) {
+      const errMsg =
+        err?.response?.data?.error?.message ||
+        err?.message ||
+        'Không thể thực hiện đổi SKU tại quầy.';
+      setExchangeModalError(errMsg);
+      showToast('error', 'Lỗi đổi SKU', errMsg);
+    } finally {
+      setIsExchanging(false);
     }
   };
 
@@ -694,6 +879,69 @@ export const BranchOrdersPage = () => {
                 </div>
               )}
 
+              {/* Exchange History Box */}
+              {selectedOrder.exchangeHistory && selectedOrder.exchangeHistory.length > 0 && (
+                <div className="rounded-xl border border-indigo-500/30 bg-indigo-950/20 p-4">
+                  <div className="flex items-center gap-2 text-xs font-bold text-indigo-300 mb-3">
+                    <RefreshCw className="h-4 w-4 text-indigo-400" />
+                    Lịch Sử Đổi SKU / Đổi Máy Tại Quầy ({selectedOrder.exchangeHistory.length} lần đổi)
+                  </div>
+                  <div className="space-y-2.5">
+                    {selectedOrder.exchangeHistory.map((item, idx) => {
+                      const diff = Number(item.priceDifference || 0);
+                      return (
+                        <div
+                          key={idx}
+                          className="rounded-lg border border-slate-800 bg-slate-900/80 p-3 text-xs"
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] text-slate-400 mb-2 border-b border-slate-800 pb-1.5">
+                            <span>
+                              Thời gian: <span className="font-medium text-slate-200">{new Date(item.exchangedAt).toLocaleString('vi-VN')}</span>
+                            </span>
+                            <span>
+                              Nhân viên xử lý: <span className="font-medium text-indigo-300">{item.exchangedBy?.fullName || 'Nhân viên quầy'}</span>
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-300">
+                            <div className="bg-slate-950/50 p-2 rounded border border-slate-800/60">
+                              <div className="text-[10px] text-slate-400 uppercase font-semibold">SKU Ban Đầu</div>
+                              <div className="font-semibold text-rose-300 truncate">{item.oldProductName}</div>
+                              <div className="text-[11px] font-mono text-slate-400">SKU: {item.oldSku} • Đơn giá: {formatVND(item.oldUnitPrice)}</div>
+                            </div>
+                            <div className="bg-slate-950/50 p-2 rounded border border-slate-800/60">
+                              <div className="text-[10px] text-slate-400 uppercase font-semibold">SKU Đã Đổi Sang</div>
+                              <div className="font-semibold text-emerald-300 truncate">{item.newProductName}</div>
+                              <div className="text-[11px] font-mono text-slate-400">SKU: {item.newSku} • Đơn giá: {formatVND(item.newUnitPrice)}</div>
+                            </div>
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 pt-1.5 text-[11px]">
+                            <div>
+                              <span className="text-slate-400">Ghi chú: </span>
+                              <span className="italic text-slate-300">{item.note || 'Đổi theo yêu cầu của khách'}</span>
+                            </div>
+                            <div className="font-semibold">
+                              {diff > 0 ? (
+                                <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                  Khách bù thêm: +{formatVND(diff)} ({item.paymentMethod || 'Tiền mặt'})
+                                </span>
+                              ) : diff < 0 ? (
+                                <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                                  Cửa hàng hoàn lại: -{formatVND(Math.abs(diff))}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 bg-slate-700 text-slate-200">
+                                  Đổi ngang giá: 0 ₫
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Items & Assigned Serials */}
               <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
                 <div className="mb-3 flex items-center justify-between">
@@ -854,6 +1102,19 @@ export const BranchOrdersPage = () => {
                   </button>
                 )}
 
+                {/* Counter SKU Exchange button for Processing or Ready orders */}
+                {['PROCESSING', 'READY_FOR_SHIPPING'].includes(selectedOrder.orderStatus) && canComplete && (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenExchangeModal(selectedOrder)}
+                    disabled={actionLoading}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-500/40 bg-indigo-500/10 hover:bg-indigo-500/20 px-3.5 py-2 text-xs font-semibold text-indigo-300 transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw className="h-4 w-4 text-indigo-400" />
+                    Đổi SKU tại quầy
+                  </button>
+                )}
+
                 {/* Cancel & Stock refund button for Manager / Super Admin */}
                 {!['COMPLETED', 'CANCELLED'].includes(selectedOrder.orderStatus) && isManager && (
                   <button
@@ -882,6 +1143,312 @@ export const BranchOrdersPage = () => {
           </div>
         </div>
       )}
+
+      {/* Exchange SKU Modal */}
+      {isExchangeModalOpen && exchangeOrder && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950/60 px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-2 text-indigo-400">
+                  <RefreshCw className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white">Đổi SKU / Đổi Model Tại Quầy</h2>
+                  <p className="text-xs text-slate-400">
+                    Mã đơn: <span className="font-mono font-semibold text-slate-200">{exchangeOrder.orderCode}</span> • Kho: {exchangeOrder.branchId?.name || currentBranchName}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsExchangeModalOpen(false)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <form onSubmit={handleConfirmExchange} className="flex-1 overflow-y-auto p-6 space-y-5">
+              {exchangeModalError && (
+                <div className="flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-950/20 p-3 text-xs text-rose-300">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-400" />
+                  <span>{exchangeModalError}</span>
+                </div>
+              )}
+
+              {/* Step 1: Select Old Item (if multiple items in order) */}
+              {exchangeOrder.items && exchangeOrder.items.length > 1 && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-300">
+                    Chọn sản phẩm trong đơn cần đổi:
+                  </label>
+                  <select
+                    value={exchangeOldSkuId}
+                    onChange={(e) => setExchangeOldSkuId(e.target.value)}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white focus:border-indigo-500 focus:outline-none"
+                  >
+                    {exchangeOrder.items.map((i) => (
+                      <option key={i.productSkuId?._id || i.productSkuId} value={i.productSkuId?._id || i.productSkuId}>
+                        {i.productName} ({i.sku}) - {formatVND(i.unitPrice)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Current Item Overview */}
+              {oldItemToExchange && (
+                <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3.5 text-xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400">
+                    Sản phẩm hiện tại của đơn hàng
+                  </span>
+                  <div className="mt-1.5 flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-white">{oldItemToExchange.productName}</div>
+                      <div className="mt-0.5 font-mono text-[11px] text-slate-400">
+                        SKU: <span className="text-slate-200">{oldItemToExchange.sku}</span> • SL: {oldItemToExchange.quantity} • Đơn giá: {formatVND(oldItemToExchange.unitPrice)}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-mono font-bold text-slate-200">
+                        {formatVND((oldItemToExchange.unitPrice || 0) * (oldItemToExchange.quantity || 1))}
+                      </div>
+                      {oldItemToExchange.serialsAssigned?.length > 0 && (
+                        <div className="mt-0.5 font-mono text-[10px] text-emerald-400">
+                          Serial cũ: {oldItemToExchange.serialsAssigned.join(', ')}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: Target SKU Selection */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-300">
+                    Chọn sản phẩm / biến thể mới khách muốn đổi:
+                  </label>
+                  {isInventoryLoading && (
+                    <span className="inline-flex items-center gap-1 text-[11px] text-indigo-400">
+                      <RefreshCw className="h-3 w-3 animate-spin" /> Đang tải kho...
+                    </span>
+                  )}
+                </div>
+
+                {/* Search Bar for Candidate SKUs */}
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type="text"
+                    value={exchangeSearchQuery}
+                    onChange={(e) => setExchangeSearchQuery(e.target.value)}
+                    placeholder="Tìm tên sản phẩm hoặc mã SKU trong kho..."
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 py-1.5 pl-8 pr-3 text-xs text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                  />
+                </div>
+
+                {/* SKU List */}
+                <div className="max-h-44 overflow-y-auto space-y-1.5 rounded-xl border border-slate-800 bg-slate-950/80 p-2">
+                  {filteredTargetInventory.length === 0 ? (
+                    <div className="py-4 text-center text-xs text-slate-500">
+                      {isInventoryLoading ? 'Đang tải dữ liệu...' : 'Không có SKU nào khả dụng trong kho chi nhánh.'}
+                    </div>
+                  ) : (
+                    filteredTargetInventory.map((item) => {
+                      const isSelected = String(item.productSkuId?._id || item.productSkuId) === String(exchangeTargetSkuId);
+                      return (
+                        <button
+                          key={item.productSkuId?._id || item.productSkuId}
+                          type="button"
+                          onClick={() => {
+                            setExchangeTargetSkuId(item.productSkuId?._id || item.productSkuId);
+                            // Pre-fill first in-stock serial if available
+                            const inStockSerial = item.serials?.find((s) => s.status === 'IN_STOCK');
+                            if (inStockSerial) {
+                              setExchangeSerialNumber(inStockSerial.serialNumber);
+                            } else {
+                              setExchangeSerialNumber('');
+                            }
+                          }}
+                          className={`w-full flex items-center justify-between p-2.5 rounded-lg text-left text-xs transition-colors ${
+                            isSelected
+                              ? 'border border-indigo-500 bg-indigo-950/40 text-white'
+                              : 'border border-transparent bg-slate-900/60 hover:bg-slate-800 text-slate-300'
+                          }`}
+                        >
+                          <div>
+                            <div className="font-semibold text-white">{item.productName}</div>
+                            <div className="mt-0.5 font-mono text-[11px] text-slate-400">
+                              SKU: {item.sku} • Có sẵn: <span className="text-emerald-400 font-bold">{item.quantityAvailable || item.quantityPhysical}</span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-mono font-bold text-indigo-400">{formatVND(item.unitPrice)}</div>
+                            {item.hasSerial && (
+                              <div className="text-[10px] text-slate-400">Yêu cầu Serial</div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Price Difference & Payment Reconciliation */}
+              {priceComparison && (
+                <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-4 space-y-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-400">Giá trị sản phẩm mới:</span>
+                    <span className="font-mono font-bold text-white">
+                      {formatVND(priceComparison.newTotal)} ({priceComparison.qty} x {formatVND(priceComparison.newUnitPrice)})
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-400">Giá trị sản phẩm cũ:</span>
+                    <span className="font-mono font-semibold text-slate-400">
+                      - {formatVND(priceComparison.oldTotal)}
+                    </span>
+                  </div>
+                  <div className="border-t border-slate-800 pt-2 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-200">Chênh lệch đối soát:</span>
+                    <div>
+                      {priceComparison.diff > 0 ? (
+                        <span className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          Khách cần bù thêm: +{formatVND(priceComparison.diff)}
+                        </span>
+                      ) : priceComparison.diff < 0 ? (
+                        <span className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                          Cửa hàng hoàn lại khách: -{formatVND(Math.abs(priceComparison.diff))}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          Đổi ngang giá: 0 ₫
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Payment Method when customer pays more */}
+                  {priceComparison.diff > 0 && (
+                    <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                      <span className="text-xs text-slate-300">Hình thức thu tiền bù:</span>
+                      <div className="flex items-center gap-2">
+                        {['CASH', 'BANK_TRANSFER', 'VNPAY'].map((method) => (
+                          <button
+                            key={method}
+                            type="button"
+                            onClick={() => setExchangePaymentMethod(method)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                              exchangePaymentMethod === method
+                                ? 'bg-indigo-600 text-white'
+                                : 'border border-slate-700 bg-slate-900 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            {method === 'CASH' ? 'Tiền mặt' : method === 'BANK_TRANSFER' ? 'Chuyển khoản' : 'VNPay'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Step 3: Serial input for new product */}
+              {targetInventoryItem?.hasSerial && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                      <Barcode className="h-3.5 w-3.5 text-indigo-400" />
+                      Mã Serial / IMEI máy mới:
+                    </label>
+                    {targetInventoryItem.serials?.filter((s) => s.status === 'IN_STOCK').length > 0 && (
+                      <span className="text-[11px] text-emerald-400">
+                        {targetInventoryItem.serials.filter((s) => s.status === 'IN_STOCK').length} máy sẵn sàng
+                      </span>
+                    )}
+                  </div>
+
+                  {targetInventoryItem.serials?.filter((s) => s.status === 'IN_STOCK').length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <select
+                        value={exchangeSerialNumber}
+                        onChange={(e) => setExchangeSerialNumber(e.target.value)}
+                        className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-mono text-emerald-400 focus:border-indigo-500 focus:outline-none"
+                      >
+                        <option value="">-- Chọn mã Serial trong kho --</option>
+                        {targetInventoryItem.serials
+                          .filter((s) => s.status === 'IN_STOCK')
+                          .map((s) => (
+                            <option key={s.serialNumber} value={s.serialNumber}>
+                              {s.serialNumber}
+                            </option>
+                          ))}
+                      </select>
+                      <input
+                        type="text"
+                        value={exchangeSerialNumber}
+                        onChange={(e) => setExchangeSerialNumber(e.target.value)}
+                        placeholder="Hoặc quét barcode / gõ mã Serial..."
+                        className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-mono text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                      />
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={exchangeSerialNumber}
+                      onChange={(e) => setExchangeSerialNumber(e.target.value)}
+                      placeholder="Quét mã vạch hoặc nhập mã Serial của máy mới..."
+                      className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-mono text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* Note */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-300">
+                  Lý do / Ghi chú đổi máy:
+                </label>
+                <input
+                  type="text"
+                  value={exchangeNote}
+                  onChange={(e) => setExchangeNote(e.target.value)}
+                  placeholder="Ví dụ: Khách đổi sang bản 512GB hoặc đổi màu Titan Tự Nhiên..."
+                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Footer Actions */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsExchangeModalOpen(false)}
+                  disabled={isExchanging}
+                  className="rounded-xl bg-slate-800 hover:bg-slate-700 px-4 py-2 text-xs font-semibold text-slate-200 transition-colors"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={isExchanging || !targetInventoryItem}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-indigo-900/30 transition-all disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isExchanging ? 'animate-spin' : ''}`} />
+                  Xác nhận đổi SKU &amp; Điều chỉnh kho
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Floating System Toast Notification */}
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 };
