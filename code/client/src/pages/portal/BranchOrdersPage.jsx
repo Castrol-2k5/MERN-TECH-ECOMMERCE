@@ -65,6 +65,8 @@ const ORDER_STATUS_META = {
 export const BranchOrdersPage = () => {
   const authUser = useSelector((state) => state.auth?.user);
   const isSuperAdmin = authUser?.role === 'SUPER_ADMIN';
+  const isManager = authUser?.role === 'BRANCH_MANAGER' || isSuperAdmin;
+  const canComplete = ['STAFF', 'BRANCH_MANAGER', 'SUPER_ADMIN'].includes(authUser?.role);
   const userBranchId =
     typeof authUser?.branchId === 'object'
       ? authUser?.branchId?._id || ''
@@ -77,6 +79,7 @@ export const BranchOrdersPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   // Modal state
@@ -165,6 +168,83 @@ export const BranchOrdersPage = () => {
       });
     } finally {
       setVerifyingSerial('');
+    }
+  };
+
+  const handleCompleteOrder = async (order) => {
+    if (!order) return;
+    const isUnpaid = order.paymentStatus !== 'PAID';
+    const confirmMsg = isUnpaid
+      ? `Đơn hàng ${order.orderCode} chưa thanh toán (${formatVND(order.totalAmount)}).\n\nBạn xác nhận ĐÃ THU ĐỦ TIỀN mặt/chuyển khoản từ khách hàng và BÀN GIAO MÁY thành công?\n\nHệ thống sẽ:\n- Cập nhật trạng thái Đã Thanh Toán (PAID)\n- Hoàn tất đơn hàng (COMPLETED)\n- Kích hoạt bảo hành điện tử chính hãng cho toàn bộ mã Serial.`
+      : `Xác nhận khách hàng đã nhận máy cho đơn hàng ${order.orderCode}?\n\nHệ thống sẽ hoàn tất đơn hàng và kích hoạt bảo hành điện tử chính hãng ngay lập tức.`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    setActionLoading(true);
+    try {
+      const updated = await orderService.completeOrder(order._id);
+      const patchData = {
+        orderStatus: 'COMPLETED',
+        paymentStatus: 'PAID',
+        completedAt: new Date().toISOString(),
+        staffId: authUser ? { _id: authUser._id, fullName: authUser.fullName, email: authUser.email } : order.staffId,
+        ...(updated && typeof updated === 'object' ? updated : {})
+      };
+
+      setOrders((prev) =>
+        prev.map((o) => (String(o._id) === String(order._id) ? { ...o, ...patchData } : o))
+      );
+      setSelectedOrder((prev) =>
+        prev && String(prev._id) === String(order._id) ? { ...prev, ...patchData } : prev
+      );
+      alert(`Đã bàn giao máy thành công cho đơn hàng ${order.orderCode}! Bảo hành điện tử đã được kích hoạt.`);
+    } catch (err) {
+      alert(
+        err?.response?.data?.error?.message ||
+          err?.message ||
+          'Không thể hoàn tất đơn hàng. Vui lòng thử lại.'
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCancelOrder = async (order) => {
+    if (!order) return;
+    const defaultReason = 'Khách quá hạn giữ hàng không đến nhận (No-show)';
+    const reason = window.prompt(
+      `HỦY ĐƠN VÀ HOÀN TRẢ KHO CHI NHÁNH (${order.orderCode})\n\nThao tác này sẽ:\n1. Hủy đơn hàng và ghi nhận người hủy (${authUser?.fullName || 'Quản lý'})\n2. Tự động hoàn lại số lượng tồn kho chi nhánh\n3. Giải phóng mã Serial về trạng thái Đang có trong kho (IN_STOCK)\n\nNhập lý do hủy:`,
+      defaultReason
+    );
+    if (reason === null) return;
+    const finalReason = reason.trim() || defaultReason;
+
+    setActionLoading(true);
+    try {
+      const updated = await orderService.cancelOrder(order._id, finalReason);
+      const patchData = {
+        orderStatus: 'CANCELLED',
+        cancellationReason: finalReason,
+        cancelledBy: authUser ? { _id: authUser._id, fullName: authUser.fullName } : null,
+        cancelledAt: new Date().toISOString(),
+        ...(updated && typeof updated === 'object' ? updated : {})
+      };
+
+      setOrders((prev) =>
+        prev.map((o) => (String(o._id) === String(order._id) ? { ...o, ...patchData } : o))
+      );
+      setSelectedOrder((prev) =>
+        prev && String(prev._id) === String(order._id) ? { ...prev, ...patchData } : prev
+      );
+      alert(`Đã hủy đơn ${order.orderCode} và hoàn trả kho chi nhánh thành công!`);
+    } catch (err) {
+      alert(
+        err?.response?.data?.error?.message ||
+          err?.message ||
+          'Không thể hủy đơn hàng. Vui lòng thử lại.'
+      );
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -443,17 +523,31 @@ export const BranchOrdersPage = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3.5 text-right">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedOrder(order);
-                            setVerifiedSerialInfo(null);
-                          }}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-blue-600 hover:border-blue-500 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:text-white transition-colors"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          Chi tiết
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          {['PROCESSING', 'READY_FOR_SHIPPING'].includes(order.orderStatus) && canComplete && (
+                            <button
+                              type="button"
+                              onClick={() => handleCompleteOrder(order)}
+                              disabled={actionLoading}
+                              title="Bàn giao máy & Hoàn tất đơn"
+                              className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-600 hover:text-white px-2.5 py-1.5 text-xs font-semibold text-emerald-400 transition-colors disabled:opacity-50"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              Bàn giao
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedOrder(order);
+                              setVerifiedSerialInfo(null);
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-blue-600 hover:border-blue-500 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:text-white transition-colors"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            Chi tiết
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -561,6 +655,43 @@ export const BranchOrdersPage = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Order Status Banners (Cancelled / Completed) */}
+              {selectedOrder.orderStatus === 'CANCELLED' && (
+                <div className="rounded-xl border border-rose-500/30 bg-rose-950/25 p-4 text-xs text-rose-300">
+                  <div className="flex items-center gap-2 font-bold text-rose-200">
+                    <XCircle className="h-4 w-4 text-rose-400" />
+                    Đơn hàng đã bị hủy & Hoàn kho thành công
+                  </div>
+                  <div className="mt-2 text-slate-300">
+                    Lý do hủy: <span className="font-semibold text-rose-300">{selectedOrder.cancellationReason || 'Không ghi nhận lý do'}</span>
+                  </div>
+                  {selectedOrder.cancelledAt && (
+                    <div className="mt-1 text-[11px] text-slate-400">
+                      Thời điểm hủy: {new Date(selectedOrder.cancelledAt).toLocaleString('vi-VN')}
+                      {selectedOrder.cancelledBy?.fullName && ` • Bởi: ${selectedOrder.cancelledBy.fullName}`}
+                    </div>
+                  )}
+                  <div className="mt-2 text-[11px] text-emerald-400">
+                    ✓ Số lượng sản phẩm đã được tự động hoàn lại vào kho chi nhánh và mã Serial đã được giải phóng (IN_STOCK).
+                  </div>
+                </div>
+              )}
+
+              {selectedOrder.orderStatus === 'COMPLETED' && selectedOrder.completedAt && (
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/25 p-4 text-xs text-emerald-300">
+                  <div className="flex items-center gap-2 font-bold text-emerald-200">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                    Đơn hàng đã hoàn tất bàn giao & Kích hoạt bảo hành điện tử
+                  </div>
+                  <div className="mt-1.5 text-[11px] text-slate-300">
+                    Thời điểm bàn giao: {new Date(selectedOrder.completedAt).toLocaleString('vi-VN')}
+                  </div>
+                  <div className="mt-1 text-[11px] text-slate-400">
+                    ✓ Khách hàng đã nhận máy và toàn bộ mã Serial / IMEI đã được kích hoạt bảo hành chính hãng.
+                  </div>
+                </div>
+              )}
 
               {/* Items & Assigned Serials */}
               <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
@@ -687,23 +818,54 @@ export const BranchOrdersPage = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-between border-t border-slate-800 bg-slate-950/60 px-6 py-4">
+            <div className="flex flex-col gap-3 border-t border-slate-800 bg-slate-950/60 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-xs text-slate-400">
                 Tổng thanh toán:{' '}
                 <span className="font-mono text-base font-bold text-white">
                   {formatVND(selectedOrder.totalAmount || 0)}
                 </span>
+                <span className="ml-2 inline-block font-mono text-[11px] text-emerald-400">
+                  ({selectedOrder.paymentStatus})
+                </span>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedOrder(null);
-                  setVerifiedSerialInfo(null);
-                }}
-                className="rounded-xl bg-slate-800 hover:bg-slate-700 px-5 py-2 text-xs font-semibold text-white transition-colors"
-              >
-                Đóng cửa sổ
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Handover button for Click & Collect or Ready online orders */}
+                {['PROCESSING', 'READY_FOR_SHIPPING'].includes(selectedOrder.orderStatus) && canComplete && (
+                  <button
+                    type="button"
+                    onClick={() => handleCompleteOrder(selectedOrder)}
+                    disabled={actionLoading}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-emerald-900/30 transition-all disabled:opacity-50"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    Bàn giao máy & Hoàn tất
+                  </button>
+                )}
+
+                {/* Cancel & Stock refund button for Manager / Super Admin */}
+                {!['COMPLETED', 'CANCELLED'].includes(selectedOrder.orderStatus) && isManager && (
+                  <button
+                    type="button"
+                    onClick={() => handleCancelOrder(selectedOrder)}
+                    disabled={actionLoading}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 px-3.5 py-2 text-xs font-semibold text-rose-300 transition-colors disabled:opacity-50"
+                  >
+                    <XCircle className="h-4 w-4 text-rose-400" />
+                    Hủy đơn & Hoàn kho
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedOrder(null);
+                    setVerifiedSerialInfo(null);
+                  }}
+                  className="rounded-xl bg-slate-800 hover:bg-slate-700 px-4 py-2 text-xs font-semibold text-slate-200 transition-colors"
+                >
+                  Đóng
+                </button>
+              </div>
             </div>
           </div>
         </div>

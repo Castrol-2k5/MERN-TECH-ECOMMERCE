@@ -111,6 +111,28 @@ export class OrderController {
     });
   });
 
+  static completeOrder = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const order = await OrderService.completeOrder(id, req.body, req.user);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Bàn giao máy và hoàn tất đơn hàng thành công',
+      data: { order }
+    });
+  });
+
+  static cancelOrder = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const order = await OrderService.cancelOrder(id, req.body, req.user);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Hủy đơn hàng và hoàn trả tồn kho thành công',
+      data: { order }
+    });
+  });
+
   static createVnpayPaymentUrl = catchAsync(async (req, res) => {
     const { id } = req.params;
     const ipAddr =

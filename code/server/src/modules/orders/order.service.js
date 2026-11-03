@@ -690,6 +690,145 @@ export class OrderService {
   /**
    * Tạo URL thanh toán VNPay Sandbox cho đơn hàng
    */
+  /**
+   * Bàn giao máy và hoàn tất đơn hàng Click & Collect tại quầy
+   * Quyền: SUPER_ADMIN, BRANCH_MANAGER, STAFF
+   */
+  static async completeOrder(orderId, payload = {}, currentUser) {
+    const order = await Order.findById(orderId);
+    if (!order) {
+      throw new AppError('Không tìm thấy đơn hàng cần bàn giao.', 404, 'ORDER_NOT_FOUND');
+    }
+
+    if (currentUser.role !== USER_ROLES.SUPER_ADMIN) {
+      const orderBranchId = order.branchId?.toString();
+      if (orderBranchId && orderBranchId !== currentUser.branchId?.toString()) {
+        throw new AppError('Bạn không có quyền bàn giao đơn hàng thuộc chi nhánh khác.', 403, 'CROSS_BRANCH_ACCESS_DENIED');
+      }
+    }
+
+    if (order.orderStatus === ORDER_STATUS.COMPLETED) {
+      throw new AppError('Đơn hàng đã được hoàn tất trước đó.', 400, 'ORDER_ALREADY_COMPLETED');
+    }
+
+    if (order.orderStatus === ORDER_STATUS.CANCELLED) {
+      throw new AppError('Không thể hoàn tất đơn hàng đã bị hủy.', 400, 'ORDER_ALREADY_CANCELLED');
+    }
+
+    const { serials, paymentMethod } = payload;
+    if (Array.isArray(serials) && serials.length > 0) {
+      const cleanSerials = serials.map((s) => String(s).trim().toUpperCase()).filter(Boolean);
+      const foundSerials = await Serial.find({ serialNumber: { $in: cleanSerials } });
+
+      if (foundSerials.length !== cleanSerials.length) {
+        throw new AppError('Một số mã Serial/IMEI không tồn tại trong hệ thống kho.', 400, 'SERIAL_NOT_FOUND');
+      }
+
+      for (const s of foundSerials) {
+        if (s.status !== SERIAL_STATUS.IN_STOCK && s.orderId?.toString() !== order._id.toString()) {
+          throw new AppError(`Mã Serial '${s.serialNumber}' không khả dụng để xuất bán.`, 400, 'INVALID_SERIAL_STATUS');
+        }
+      }
+
+      let offset = 0;
+      for (const item of order.items) {
+        item.serialsAssigned = cleanSerials.slice(offset, offset + (item.quantity || 1));
+        offset += item.quantity || 1;
+      }
+    }
+
+    const allAssignedSerials = (order.items || []).flatMap((it) => it.serialsAssigned || []);
+    if (allAssignedSerials.length > 0) {
+      const now = new Date();
+      const warrantyEndDate = new Date(now);
+      warrantyEndDate.setFullYear(warrantyEndDate.getFullYear() + 1);
+
+      await Serial.updateMany(
+        { serialNumber: { $in: allAssignedSerials } },
+        {
+          $set: {
+            status: SERIAL_STATUS.SOLD,
+            soldAt: now,
+            warrantyEndDate,
+            orderId: order._id
+          }
+        }
+      );
+    }
+
+    order.orderStatus = ORDER_STATUS.COMPLETED;
+    order.paymentStatus = PAYMENT_STATUS.PAID;
+    if (paymentMethod) {
+      order.paymentMethod = paymentMethod;
+    }
+    order.staffId = currentUser.id || currentUser._id;
+    order.completedAt = new Date();
+    await order.save();
+
+    const populated = await Order.findById(order._id)
+      .populate('branchId', 'name branchCode address phone')
+      .populate('staffId', 'fullName email phone')
+      .lean();
+
+    return populated || order;
+  }
+
+  /**
+   * Hủy đơn giữ hàng Click & Collect / B2C và tự động hoàn trả tồn kho & Serial
+   * Quyền: SUPER_ADMIN, BRANCH_MANAGER
+   */
+  static async cancelOrder(orderId, payload, currentUser) {
+    const order = await Order.findById(orderId);
+    if (!order) {
+      throw new AppError('Không tìm thấy đơn hàng cần hủy.', 404, 'ORDER_NOT_FOUND');
+    }
+
+    if (currentUser.role !== USER_ROLES.SUPER_ADMIN) {
+      const orderBranchId = order.branchId?.toString();
+      if (orderBranchId && orderBranchId !== currentUser.branchId?.toString()) {
+        throw new AppError('Bạn không có quyền hủy đơn hàng thuộc chi nhánh khác.', 403, 'CROSS_BRANCH_ACCESS_DENIED');
+      }
+    }
+
+    if (order.orderStatus === ORDER_STATUS.COMPLETED) {
+      throw new AppError('Không thể hủy đơn hàng đã hoàn tất bàn giao.', 400, 'CANNOT_CANCEL_COMPLETED_ORDER');
+    }
+
+    if (order.orderStatus === ORDER_STATUS.CANCELLED) {
+      throw new AppError('Đơn hàng này đã bị hủy trước đó.', 400, 'ORDER_ALREADY_CANCELLED');
+    }
+
+    for (const item of order.items || []) {
+      await BranchInventory.updateOne(
+        { branchId: order.branchId, productSkuId: item.productSkuId },
+        { $inc: { quantity: item.quantity } }
+      );
+    }
+
+    const allAssignedSerials = (order.items || []).flatMap((it) => it.serialsAssigned || []);
+    if (allAssignedSerials.length > 0) {
+      await Serial.updateMany(
+        { serialNumber: { $in: allAssignedSerials } },
+        {
+          $set: {
+            status: SERIAL_STATUS.IN_STOCK,
+            soldAt: null,
+            warrantyEndDate: null,
+            orderId: null
+          }
+        }
+      );
+    }
+
+    order.orderStatus = ORDER_STATUS.CANCELLED;
+    order.cancellationReason = payload.reason || 'Khách không đến nhận hoặc yêu cầu hủy';
+    order.cancelledBy = currentUser.id || currentUser._id;
+    order.cancelledAt = new Date();
+    await order.save();
+
+    return order;
+  }
+
   static async createVnpayPaymentUrl(orderId, ipAddr) {
     const order = await Order.findById(orderId);
     if (!order) {

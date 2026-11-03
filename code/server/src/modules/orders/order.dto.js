@@ -153,3 +153,24 @@ export const trackOrderSchema = z
       .regex(VIETNAMESE_PHONE_REGEX, 'Số điện thoại người nhận không đúng định dạng di động Việt Nam')
   })
   .strict();
+export const completeOrderSchema = z
+  .object({
+    serials: z
+      .array(z.string().trim().min(1, 'Mã Serial không được để trống'))
+      .optional()
+      .default([]),
+    paymentMethod: z
+      .enum([PAYMENT_METHODS.CASH, PAYMENT_METHODS.VNPAY])
+      .optional(),
+    note: z.string().trim().optional()
+  })
+  .strict();
+
+export const cancelOrderSchema = z
+  .object({
+    reason: z
+      .string({ required_error: 'Lý do hủy đơn hàng (reason) là bắt buộc' })
+      .trim()
+      .min(1, 'Lý do hủy đơn không được để trống')
+  })
+  .strict();

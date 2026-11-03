@@ -156,6 +156,23 @@ const orderSchema = new Schema(
         message: 'Trạng thái đơn hàng không hợp lệ'
       },
       default: ORDER_STATUS.PENDING
+    },
+    cancellationReason: {
+      type: String,
+      default: null
+    },
+    cancelledBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    cancelledAt: {
+      type: Date,
+      default: null
+    },
+    completedAt: {
+      type: Date,
+      default: null
     }
   },
   {

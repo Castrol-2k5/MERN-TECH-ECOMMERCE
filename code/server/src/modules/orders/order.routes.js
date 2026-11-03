@@ -5,7 +5,9 @@ import {
   b2cCheckoutSchema,
   allocateOrderSchema,
   dispatchOrderSchema,
-  trackOrderSchema
+  trackOrderSchema,
+  completeOrderSchema,
+  cancelOrderSchema
 } from './order.dto.js';
 import { validateDto } from '../../middlewares/validate.middleware.js';
 import { protect, optionalProtect } from '../../middlewares/auth.middleware.js';
@@ -77,6 +79,24 @@ router.patch(
   authorize(USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER, USER_ROLES.STAFF),
   validateDto(dispatchOrderSchema),
   OrderController.dispatchOrder
+);
+
+// 6.1. Bàn giao máy & Hoàn tất đơn hàng Click & Collect tại quầy (STAFF, BRANCH_MANAGER, SUPER_ADMIN)
+router.patch(
+  '/:id/complete',
+  protect,
+  authorize(USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER, USER_ROLES.STAFF),
+  validateDto(completeOrderSchema),
+  OrderController.completeOrder
+);
+
+// 6.2. Hủy đơn giữ hàng và hoàn trả tồn kho (BRANCH_MANAGER, SUPER_ADMIN)
+router.patch(
+  '/:id/cancel',
+  protect,
+  authorize(USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER),
+  validateDto(cancelOrderSchema),
+  OrderController.cancelOrder
 );
 
 // 7. Cổng thanh toán VNPay (Sandbox)

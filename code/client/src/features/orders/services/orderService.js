@@ -214,5 +214,21 @@ export const orderService = {
       orderStatus: 'READY_FOR_SHIPPING'
     });
     return response?.data?.order || response?.data;
+  },
+
+  completeOrder: async (orderId, payload = {}) => {
+    if (isMockEnabled()) {
+      return { success: true, orderId, orderStatus: 'COMPLETED', paymentStatus: 'PAID' };
+    }
+    const response = await axiosClient.patch(`/orders/${orderId}/complete`, payload);
+    return response?.data?.order || response?.data;
+  },
+
+  cancelOrder: async (orderId, reason) => {
+    if (isMockEnabled()) {
+      return { success: true, orderId, orderStatus: 'CANCELLED' };
+    }
+    const response = await axiosClient.patch(`/orders/${orderId}/cancel`, { reason });
+    return response?.data?.order || response?.data;
   }
 };

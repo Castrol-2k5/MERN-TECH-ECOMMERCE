@@ -17,6 +17,7 @@ describe('Order & POS Checkout Module Integration Tests', () => {
   let superAdminToken;
   let staffAToken;
   let staffBToken;
+  let managerAToken;
   let customerToken;
   let customerUser;
 
@@ -147,6 +148,22 @@ describe('Order & POS Checkout Module Integration Tests', () => {
       password: 'Pass@123'
     });
     customerToken = customerLogin.body.data.accessToken;
+
+    // 3.5 Manager at Branch A
+    await User.create({
+      fullName: 'Manager Branch A',
+      email: 'manager.order.a@techstore.com',
+      phone: '0955000999',
+      passwordHash: 'Pass@123',
+      role: USER_ROLES.BRANCH_MANAGER,
+      branchId: branchA._id,
+      isActive: true
+    });
+    const managerALogin = await request(app).post('/api/v1/auth/login').send({
+      identifier: 'manager.order.a@techstore.com',
+      password: 'Pass@123'
+    });
+    managerAToken = managerALogin.body.data.accessToken;
   });
 
   describe('POST /api/v1/orders/pos/checkout (Web POS Checkout)', () => {
@@ -721,6 +738,132 @@ describe('Order & POS Checkout Module Integration Tests', () => {
 
       expect(res.status).toBe(400);
       expect(res.body.errorCode).toBe('VALIDATION_ERROR');
+    });
+  });
+
+  describe('Click & Collect Pickup: Handover & Cancellation Module Tests', () => {
+    let clickCollectOrder;
+    let pickupSerial;
+    beforeEach(async () => {
+      await BranchInventory.create({
+        branchId: branchA._id,
+        productId: productIpad._id,
+        productSkuId: skuIpad._id,
+        quantity: 5
+      });
+
+      pickupSerial = await Serial.create({
+        serialNumber: 'SR-CC-PICKUP-001',
+        productId: productIpad._id,
+        productSkuId: skuIpad._id,
+        branchId: branchA._id,
+        status: SERIAL_STATUS.IN_STOCK
+      });
+
+      clickCollectOrder = await Order.create({
+        orderCode: 'ORD-B2C-CC-001',
+        orderType: ORDER_TYPES.B2C_ONLINE,
+        branchId: branchA._id,
+        customerId: customerUser._id,
+        customerInfo: {
+          fullName: 'Trần Khách Lấy Quầy',
+          phone: '0988112233',
+          address: '[Nhận tại cửa hàng] Chi nhánh Quận 1 Flagship'
+        },
+        items: [
+          {
+            productId: productIpad._id,
+            productSkuId: skuIpad._id,
+            productName: productIpad.name,
+            sku: skuIpad.sku,
+            quantity: 1,
+            unitPrice: 18490000,
+            subtotal: 18490000,
+            serialsAssigned: ['SR-CC-PICKUP-001']
+          }
+        ],
+        totalAmount: 18490000,
+        paymentMethod: PAYMENT_METHODS.CASH,
+        paymentStatus: PAYMENT_STATUS.PENDING,
+        orderStatus: ORDER_STATUS.READY_FOR_SHIPPING
+      });
+    });
+
+    test('Happy Path: Nhân viên quầy (STAFF) bàn giao máy và thu tiền -> HTTP 200, COMPLETED, PAID, kích hoạt bảo hành', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/orders/${clickCollectOrder._id}/complete`)
+        .set('Authorization', `Bearer ${staffAToken}`)
+        .send({});
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.order.orderStatus).toBe(ORDER_STATUS.COMPLETED);
+      expect(res.body.data.order.paymentStatus).toBe(PAYMENT_STATUS.PAID);
+      expect(res.body.data.order.staffId).toBeDefined();
+      expect(res.body.data.order.staffId.email).toBe('staff.order.a@techstore.com');
+
+      const updatedSerial = await Serial.findOne({ serialNumber: 'SR-CC-PICKUP-001' });
+      expect(updatedSerial.status).toBe(SERIAL_STATUS.SOLD);
+      expect(updatedSerial.soldAt).toBeDefined();
+      expect(updatedSerial.warrantyEndDate).toBeDefined();
+    });
+
+    test('Cross-Branch Security: Staff chi nhánh B không được phép bàn giao đơn hàng chi nhánh A -> HTTP 403', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/orders/${clickCollectOrder._id}/complete`)
+        .set('Authorization', `Bearer ${staffBToken}`)
+        .send({});
+
+      expect(res.status).toBe(403);
+      expect(res.body.errorCode).toBe('CROSS_BRANCH_ACCESS_DENIED');
+    });
+
+    test('Happy Path: Quản lý chi nhánh (BRANCH_MANAGER) hủy đơn hàng giữ máy không đến nhận -> HTTP 200, hoàn kho, Serial quay lại IN_STOCK', async () => {
+      const invBefore = await BranchInventory.findOne({ branchId: branchA._id, productSkuId: skuIpad._id });
+      const initialStock = invBefore.quantity;
+
+      const res = await request(app)
+        .patch(`/api/v1/orders/${clickCollectOrder._id}/cancel`)
+        .set('Authorization', `Bearer ${managerAToken}`)
+        .send({ reason: 'Khách hàng quá 24h không đến lấy máy' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.order.orderStatus).toBe(ORDER_STATUS.CANCELLED);
+      expect(res.body.data.order.cancellationReason).toBe('Khách hàng quá 24h không đến lấy máy');
+
+      const invAfter = await BranchInventory.findOne({ branchId: branchA._id, productSkuId: skuIpad._id });
+      expect(invAfter.quantity).toBe(initialStock + 1);
+
+      const s = await Serial.findOne({ serialNumber: 'SR-CC-PICKUP-001' });
+      expect(s.status).toBe(SERIAL_STATUS.IN_STOCK);
+      expect(s.soldAt).toBeNull();
+      expect(s.warrantyEndDate).toBeNull();
+      expect(s.orderId).toBeNull();
+    });
+
+    test('Security / RBAC: Staff không được quyền hủy đơn hàng giữ máy (chỉ Quản lý hoặc Admin) -> HTTP 403', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/orders/${clickCollectOrder._id}/cancel`)
+        .set('Authorization', `Bearer ${staffAToken}`)
+        .send({ reason: 'Nhân viên muốn tự hủy' });
+
+      expect(res.status).toBe(403);
+    });
+
+    test('Negative Path: Không thể hủy đơn hàng đã COMPLETED -> HTTP 400', async () => {
+      await request(app)
+        .patch(`/api/v1/orders/${clickCollectOrder._id}/complete`)
+        .set('Authorization', `Bearer ${staffAToken}`)
+        .send({});
+
+      const res = await request(app)
+        .patch(`/api/v1/orders/${clickCollectOrder._id}/cancel`)
+        .set('Authorization', `Bearer ${managerAToken}`)
+        .send({ reason: 'Muốn hủy sau khi đã bàn giao' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.errorCode).toBe('CANNOT_CANCEL_COMPLETED_ORDER');
     });
   });
 });
