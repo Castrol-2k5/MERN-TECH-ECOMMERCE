@@ -62,7 +62,8 @@ export const PosPage = () => {
   // Fetch branches on mount
   useEffect(() => {
     let ignore = false;
-    branchService.getAllBranches().then((list) => {
+    const fetcher = branchService.getBranches || branchService.getAllBranches;
+    fetcher().then((list) => {
       if (!ignore && Array.isArray(list) && list.length > 0) {
         setBranches(list);
         if (isSuperAdmin) {

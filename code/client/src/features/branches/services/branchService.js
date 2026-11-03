@@ -95,6 +95,10 @@ export const branchService = {
     }
   },
 
+  getAllBranches: async (params = {}) => {
+    return branchService.getBranches(params);
+  },
+
   getBranchById: async (id) => {
     if (isMockEnabled()) {
       return normalizeBranch(fallbackBranches.find((b) => b._id === id));
