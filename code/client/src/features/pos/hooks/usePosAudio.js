@@ -11,7 +11,7 @@ export const usePosAudio = () => {
       }
     }
     if (audioCtxRef.current?.state === 'suspended') {
-      audioCtxRef.current.resume();
+      audioCtxRef.current.resume().catch(() => {});
     }
     return audioCtxRef.current;
   };
@@ -69,7 +69,12 @@ export const usePosAudio = () => {
     }
   };
 
-  return { playSuccess, playError };
+  return { 
+    playSuccess, 
+    playError,
+    playSuccessBeep: playSuccess,
+    playErrorBeep: playError
+  };
 };
 
 export default usePosAudio;

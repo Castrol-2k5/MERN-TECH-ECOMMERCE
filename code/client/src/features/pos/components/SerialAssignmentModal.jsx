@@ -16,7 +16,9 @@ export const SerialAssignmentModal = ({
   const [errorMsg, setErrorMsg] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
 
-  const { playSuccessBeep, playErrorBeep } = usePosAudio();
+  const audio = usePosAudio() || {};
+  const playSuccessBeep = audio.playSuccessBeep || audio.playSuccess || (() => {});
+  const playErrorBeep = audio.playErrorBeep || audio.playError || (() => {});
 
   useEffect(() => {
     if (isOpen && item) {
@@ -32,7 +34,7 @@ export const SerialAssignmentModal = ({
   const availableDemoSerials = Array.isArray(item.availableSerials) ? item.availableSerials : [];
 
   const handleAddSerial = async (sn) => {
-    const cleanSn = String(sn || inputSerial).trim().toUpperCase();
+    const cleanSn = String(sn || inputSerial || '').trim().toUpperCase();
     if (!cleanSn || isVerifying) return;
 
     if (serials.includes(cleanSn)) {
@@ -48,7 +50,9 @@ export const SerialAssignmentModal = ({
     }
 
     // Nếu Serial nằm trong danh sách tồn khả dụng đã pre-load trực tiếp từ chi nhánh
-    const isPreloadedFromBranch = availableDemoSerials.includes(cleanSn);
+    const isPreloadedFromBranch = availableDemoSerials.some(
+      (s) => String(s?.serialNumber || s).trim().toUpperCase() === cleanSn
+    );
 
     if (isPreloadedFromBranch) {
       // Serial đã được xác thực nằm trong kho chi nhánh cho SKU này
@@ -82,6 +86,7 @@ export const SerialAssignmentModal = ({
         setErrorMsg(
           err?.response?.data?.message ||
             err?.response?.data?.error?.message ||
+            err?.message ||
             `Mã Serial [${cleanSn}] không hợp lệ hoặc không khả dụng tại chi nhánh!`
         );
         return;
@@ -239,21 +244,22 @@ export const SerialAssignmentModal = ({
                 Gợi ý tồn kho chi nhánh ({availableDemoSerials.length} khả dụng):
               </label>
               <div className="flex flex-wrap gap-1.5">
-                {availableDemoSerials.map((sn) => {
-                  const isSelected = serials.includes(sn);
+                {availableDemoSerials.map((rawSn) => {
+                  const snStr = String(rawSn?.serialNumber || rawSn).trim();
+                  const isSelected = serials.includes(snStr.toUpperCase());
                   return (
                     <button
-                      key={sn}
+                      key={snStr}
                       type="button"
                       disabled={isSelected || serials.length >= requiredCount || isVerifying}
-                      onClick={() => handleAddSerial(sn)}
+                      onClick={() => handleAddSerial(snStr)}
                       className={`px-2 py-1 rounded text-[11px] font-mono transition-all cursor-pointer ${
                         isSelected
                           ? 'bg-slate-800 text-slate-500 cursor-not-allowed line-through'
                           : 'bg-slate-800/80 hover:bg-cyan-600 hover:text-white text-slate-300 border border-slate-700/60'
                       }`}
                     >
-                      + {sn}
+                      + {snStr}
                     </button>
                   );
                 })}
