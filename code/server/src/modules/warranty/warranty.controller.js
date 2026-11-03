@@ -33,4 +33,64 @@ export class WarrantyController {
       data: ticket
     });
   });
+
+  static diagnoseTicket = catchAsync(async (req, res) => {
+    const ticket = await WarrantyService.diagnoseTicket(req.params.id, req.body, req.user);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Lưu kết quả chẩn đoán và báo giá thành công',
+      data: ticket
+    });
+  });
+
+  static approveQuotation = catchAsync(async (req, res) => {
+    const ticket = await WarrantyService.approveQuotation(req.params.id, req.body, req.user);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Ghi nhận xác nhận phương án sửa chữa thành công',
+      data: ticket
+    });
+  });
+
+  static completeRepair = catchAsync(async (req, res) => {
+    const ticket = await WarrantyService.completeRepair(req.params.id, req.body, req.user);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Hoàn tất sửa chữa và chuyển trạng thái sẵn sàng trả máy',
+      data: ticket
+    });
+  });
+
+  static handoverTicket = catchAsync(async (req, res) => {
+    const ticket = await WarrantyService.handoverTicket(req.params.id, req.body, req.user);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Bàn giao thiết bị cho khách hàng thành công',
+      data: ticket
+    });
+  });
+
+  static trackTicketPublic = catchAsync(async (req, res) => {
+    const ticket = await WarrantyService.trackTicketPublic(req.query.ticketCode, req.query.phone);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Tra cứu phiếu bảo hành thành công',
+      data: ticket
+    });
+  });
+
+  static customerApprovePublic = catchAsync(async (req, res) => {
+    const ticket = await WarrantyService.approveQuotation(req.params.ticketCode, req.body, null);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Khách hàng xác nhận phương án sửa chữa thành công',
+      data: ticket
+    });
+  });
 }

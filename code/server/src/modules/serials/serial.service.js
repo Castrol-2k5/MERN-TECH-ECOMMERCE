@@ -185,17 +185,32 @@ export class SerialService {
 
     // Fetch related warranty tickets for history timeline
     const warrantyTickets = await WarrantyTicket.find({ serialNumber: cleanSerial })
-      .populate('branchId', 'name')
+      .populate('branchId', 'name address phone')
+      .populate('diagnosis.diagnosedBy', 'fullName')
+      .populate('resolution.repairedBy', 'fullName')
+      .populate('handover.staffId', 'fullName')
       .sort({ createdAt: -1 })
       .lean();
 
     const history = (warrantyTickets || []).map((t) => ({
       id: t.ticketCode || t._id.toString(),
+      ticketCode: t.ticketCode,
       title: t.issueDescription ? `Bảo hành: ${t.issueDescription.slice(0, 45)}` : 'Phiếu tiếp nhận bảo hành',
-      date: t.receivedDate || t.createdAt,
-      description: t.resolution || t.issueDescription || 'Đang xử lý tại trung tâm kỹ thuật',
+      date: t.createdAt,
+      description: t.resolution?.repairNotes || t.issueDescription || 'Đang xử lý tại trung tâm kỹ thuật',
       status: t.status,
-      branchName: t.branchId?.name || ''
+      branchName: t.branchId?.name || '',
+      issueDescription: t.issueDescription,
+      appearanceCondition: t.appearanceCondition,
+      devicePassword: t.devicePassword,
+      powerStatus: t.powerStatus,
+      accessories: t.accessories,
+      estimatedReturnDate: t.estimatedReturnDate,
+      diagnosis: t.diagnosis,
+      quotation: t.quotation,
+      customerApproval: t.customerApproval,
+      resolution: t.resolution,
+      handover: t.handover
     }));
 
     return {

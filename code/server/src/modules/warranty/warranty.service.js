@@ -25,6 +25,8 @@ export class WarrantyService {
       issueDescription,
       customerInfo,
       appearanceCondition,
+      devicePassword,
+      powerStatus,
       accessories,
       estimatedReturnDate,
       notes
@@ -86,6 +88,8 @@ export class WarrantyService {
       staffId: currentUser._id || currentUser.id,
       issueDescription,
       appearanceCondition: appearanceCondition || '',
+      devicePassword: devicePassword || '',
+      powerStatus: powerStatus || 'Lên nguồn bình thường',
       accessories: Array.isArray(accessories) ? accessories : [],
       estimatedReturnDate: estimatedReturnDate || '',
       status: WARRANTY_STATUS.RECEIVED,
@@ -194,5 +198,215 @@ export class WarrantyService {
       .lean();
 
     return populated;
+  }
+
+  /**
+   * Bước 4: Kỹ thuật viên chẩn đoán lỗi & đưa ra phương án/báo giá
+   */
+  static async diagnoseTicket(ticketId, payload, currentUser) {
+    const ticket = await WarrantyTicket.findById(ticketId);
+    if (!ticket) {
+      throw new AppError('Không tìm thấy phiếu bảo hành.', 404, 'WARRANTY_TICKET_NOT_FOUND');
+    }
+
+    const {
+      technicianNotes,
+      isUnderWarranty,
+      partsDescription = '',
+      partsCost = 0,
+      laborCost = 0
+    } = payload;
+
+    const totalCost = isUnderWarranty ? 0 : Number(partsCost || 0) + Number(laborCost || 0);
+
+    ticket.diagnosis = {
+      technicianNotes,
+      diagnosedAt: new Date(),
+      diagnosedBy: currentUser?._id || currentUser?.id
+    };
+
+    ticket.quotation = {
+      isUnderWarranty: Boolean(isUnderWarranty),
+      partsDescription,
+      partsCost: isUnderWarranty ? 0 : partsCost,
+      laborCost: isUnderWarranty ? 0 : laborCost,
+      totalCost
+    };
+
+    if (isUnderWarranty) {
+      // Bảo hành chính hãng miễn phí -> Tự động duyệt sang REPAIRING
+      ticket.customerApproval = {
+        status: 'APPROVED',
+        approvedVia: 'AUTO_UNDER_WARRANTY',
+        note: 'Sản phẩm đủ điều kiện bảo hành chính hãng miễn phí.',
+        decidedAt: new Date()
+      };
+      ticket.status = WARRANTY_STATUS.REPAIRING;
+    } else {
+      // Có tính phí sửa chữa -> Chờ khách duyệt
+      ticket.customerApproval = {
+        status: 'PENDING',
+        approvedVia: 'NONE',
+        note: '',
+        decidedAt: null
+      };
+      ticket.status = WARRANTY_STATUS.QUOTATION_PENDING;
+    }
+
+    await ticket.save();
+
+    return WarrantyTicket.findById(ticket._id)
+      .populate('productId', 'name slug images brand')
+      .populate('branchId', 'name branchCode')
+      .populate('staffId', 'fullName email')
+      .populate('diagnosis.diagnosedBy', 'fullName email')
+      .lean();
+  }
+
+  /**
+   * Bước 4 (Duyệt báo giá): Khách hàng hoặc Nhân viên ghi nhận Đồng ý / Từ chối
+   */
+  static async approveQuotation(idOrCode, payload, currentUser = null) {
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(idOrCode);
+    const query = isObjectId ? { _id: idOrCode } : { ticketCode: idOrCode.toUpperCase() };
+    const ticket = await WarrantyTicket.findOne(query);
+    if (!ticket) {
+      throw new AppError('Không tìm thấy phiếu bảo hành.', 404, 'WARRANTY_TICKET_NOT_FOUND');
+    }
+
+    const { approved, approvedVia = 'PHONE', note = '', phone = '' } = payload;
+
+    // Nếu khách tự duyệt trực tuyến (guest), kiểm tra số điện thoại
+    if (!currentUser && phone) {
+      const cleanPhone = phone.trim();
+      const ticketPhone = (ticket.customerInfo?.phone || '').trim();
+      if (!ticketPhone || cleanPhone !== ticketPhone) {
+        throw new AppError('Số điện thoại xác nhận không khớp với thông tin trên phiếu bảo hành.', 403, 'PHONE_MISMATCH');
+      }
+    }
+
+    if (approved) {
+      ticket.customerApproval = {
+        status: 'APPROVED',
+        approvedVia: currentUser ? (approvedVia || 'PHONE') : 'ONLINE',
+        note: note || 'Khách hàng đồng ý phương án và chi phí sửa chữa.',
+        decidedAt: new Date()
+      };
+      ticket.status = WARRANTY_STATUS.REPAIRING;
+    } else {
+      ticket.customerApproval = {
+        status: 'REJECTED',
+        approvedVia: currentUser ? (approvedVia || 'PHONE') : 'ONLINE',
+        note: note || 'Khách hàng từ chối phương án sửa chữa. Hoàn trả nguyên trạng thiết bị.',
+        decidedAt: new Date()
+      };
+      // Khi từ chối, chuyển sang REPAIR_REJECTED và chuẩn bị máy trả khách
+      ticket.status = WARRANTY_STATUS.REPAIR_REJECTED;
+    }
+
+    await ticket.save();
+
+    return WarrantyTicket.findById(ticket._id)
+      .populate('productId', 'name slug images brand')
+      .populate('branchId', 'name branchCode')
+      .populate('staffId', 'fullName email')
+      .lean();
+  }
+
+  /**
+   * Bước 5: Kỹ thuật viên hoàn tất sửa chữa -> Chuyển sang READY_FOR_PICKUP
+   */
+  static async completeRepair(ticketId, payload, currentUser) {
+    const ticket = await WarrantyTicket.findById(ticketId);
+    if (!ticket) {
+      throw new AppError('Không tìm thấy phiếu bảo hành.', 404, 'WARRANTY_TICKET_NOT_FOUND');
+    }
+
+    const { repairNotes, partsReplaced = [] } = payload;
+
+    ticket.resolution = {
+      repairNotes,
+      partsReplaced: Array.isArray(partsReplaced) ? partsReplaced : [],
+      repairedBy: currentUser?._id || currentUser?.id,
+      completedAt: new Date()
+    };
+    ticket.status = WARRANTY_STATUS.READY_FOR_PICKUP;
+
+    await ticket.save();
+
+    return WarrantyTicket.findById(ticket._id)
+      .populate('productId', 'name slug images brand')
+      .populate('branchId', 'name branchCode')
+      .populate('staffId', 'fullName email')
+      .populate('resolution.repairedBy', 'fullName email')
+      .lean();
+  }
+
+  /**
+   * Bước 5 & 6: Bàn giao máy cho khách tại quầy -> Thu tiền nếu có -> Đóng phiếu RETURNED
+   */
+  static async handoverTicket(ticketId, payload, currentUser) {
+    const ticket = await WarrantyTicket.findById(ticketId);
+    if (!ticket) {
+      throw new AppError('Không tìm thấy phiếu bảo hành.', 404, 'WARRANTY_TICKET_NOT_FOUND');
+    }
+
+    const {
+      paymentMethod = 'NONE',
+      amountPaid = 0,
+      customerNotes = ''
+    } = payload;
+
+    ticket.handover = {
+      returnedAt: new Date(),
+      staffId: currentUser?._id || currentUser?.id,
+      paymentMethod,
+      amountPaid: Number(amountPaid || 0),
+      customerNotes
+    };
+    ticket.status = WARRANTY_STATUS.RETURNED;
+
+    await ticket.save();
+
+    // Khôi phục Serial về trạng thái SOLD
+    await Serial.updateOne(
+      { serialNumber: ticket.serialNumber },
+      { status: SERIAL_STATUS.SOLD }
+    );
+
+    return WarrantyTicket.findById(ticket._id)
+      .populate('productId', 'name slug images brand')
+      .populate('branchId', 'name branchCode')
+      .populate('staffId', 'fullName email')
+      .populate('handover.staffId', 'fullName email')
+      .lean();
+  }
+
+  /**
+   * Tra cứu công khai phiếu bảo hành bằng ticketCode + phone
+   */
+  static async trackTicketPublic(ticketCode, phone) {
+    const cleanCode = ticketCode.trim().toUpperCase();
+    const cleanPhone = phone.trim();
+
+    const ticket = await WarrantyTicket.findOne({ ticketCode: cleanCode })
+      .populate('productId', 'name slug images brand skus')
+      .populate('branchId', 'name branchCode address phone')
+      .populate('staffId', 'fullName email')
+      .populate('diagnosis.diagnosedBy', 'fullName')
+      .populate('resolution.repairedBy', 'fullName')
+      .populate('handover.staffId', 'fullName')
+      .lean();
+
+    if (!ticket) {
+      throw new AppError('Không tìm thấy phiếu bảo hành với mã được cung cấp.', 404, 'TICKET_NOT_FOUND');
+    }
+
+    const ticketPhone = (ticket.customerInfo?.phone || '').trim();
+    if (ticketPhone && cleanPhone !== ticketPhone && !ticketPhone.endsWith(cleanPhone)) {
+      throw new AppError('Số điện thoại xác thực không khớp với phiếu tiếp nhận.', 403, 'PHONE_MISMATCH');
+    }
+
+    return ticket;
   }
 }

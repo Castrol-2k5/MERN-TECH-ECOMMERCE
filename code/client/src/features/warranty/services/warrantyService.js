@@ -182,6 +182,8 @@ export const warrantyService = {
         address: payload.customerInfo?.address || ''
       },
       appearanceCondition: payload.appearanceCondition || '',
+      devicePassword: payload.devicePassword || '',
+      powerStatus: payload.powerStatus || 'Lên nguồn bình thường',
       accessories: Array.isArray(payload.accessories) ? payload.accessories : [],
       estimatedReturnDate: payload.estimatedReturnDate || '',
       notes: payload.notes || ''
@@ -246,6 +248,56 @@ export const warrantyService = {
       return { _id: ticketId, ...payload };
     }
     const res = await axiosClient.patch(`/warranty/${ticketId}/status`, payload);
+    return res?.data?.ticket || res?.data || res;
+  },
+
+  diagnoseTicket: async (ticketId, payload) => {
+    if (isMockEnabled()) {
+      return { _id: ticketId, ...payload, status: payload.isUnderWarranty ? 'REPAIRING' : 'QUOTATION_PENDING' };
+    }
+    const res = await axiosClient.patch(`/warranty/${ticketId}/diagnose`, payload);
+    return res?.data?.ticket || res?.data || res;
+  },
+
+  approveQuotation: async (ticketId, payload) => {
+    if (isMockEnabled()) {
+      return { _id: ticketId, status: payload.approved ? 'REPAIRING' : 'REPAIR_REJECTED' };
+    }
+    const res = await axiosClient.patch(`/warranty/${ticketId}/approve`, payload);
+    return res?.data?.ticket || res?.data || res;
+  },
+
+  completeRepair: async (ticketId, payload) => {
+    if (isMockEnabled()) {
+      return { _id: ticketId, status: 'READY_FOR_PICKUP' };
+    }
+    const res = await axiosClient.patch(`/warranty/${ticketId}/complete`, payload);
+    return res?.data?.ticket || res?.data || res;
+  },
+
+  handoverTicket: async (ticketId, payload) => {
+    if (isMockEnabled()) {
+      return { _id: ticketId, status: 'RETURNED' };
+    }
+    const res = await axiosClient.patch(`/warranty/${ticketId}/handover`, payload);
+    return res?.data?.ticket || res?.data || res;
+  },
+
+  trackTicketPublic: async (ticketCode, phone) => {
+    if (isMockEnabled()) {
+      return fallbackWarrantyData;
+    }
+    const res = await axiosClient.get('/warranty/track', {
+      params: { ticketCode, phone }
+    });
+    return res?.data?.ticket || res?.data || res;
+  },
+
+  customerApprovePublic: async (ticketCode, payload) => {
+    if (isMockEnabled()) {
+      return { ticketCode, ...payload };
+    }
+    const res = await axiosClient.patch(`/warranty/track/${ticketCode}/approve`, payload);
     return res?.data?.ticket || res?.data || res;
   }
 };

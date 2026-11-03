@@ -36,11 +36,85 @@ export const createWarrantyTicketSchema = z
       .optional()
       .default({ fullName: '', phone: '', address: '' }),
     appearanceCondition: z.string().trim().optional().default(''),
+    devicePassword: z.string().trim().optional().default(''),
+    powerStatus: z.string().trim().optional().default('Lên nguồn bình thường'),
     accessories: z.array(z.string().trim()).optional().default([]),
     estimatedReturnDate: z.string().trim().optional().default(''),
     notes: z.string().trim().optional().default('')
   })
   .strict();
+
+export const diagnoseTicketSchema = z
+  .object({
+    branchId: z
+      .string()
+      .trim()
+      .regex(OBJECT_ID_REGEX, 'Mã chi nhánh (branchId) không hợp lệ')
+      .optional(),
+    technicianNotes: z
+      .string({ required_error: 'Kết luận chẩn đoán lỗi của kỹ thuật viên là bắt buộc' })
+      .trim()
+      .min(1, 'Kết luận chẩn đoán không được để trống'),
+    isUnderWarranty: z.boolean({ required_error: 'Xác định diện bảo hành là bắt buộc' }),
+    partsDescription: z.string().trim().optional().default(''),
+    partsCost: z.coerce.number().min(0, 'Chi phí linh kiện không hợp lệ').optional().default(0),
+    laborCost: z.coerce.number().min(0, 'Chi phí công sửa chữa không hợp lệ').optional().default(0)
+  })
+  .strict();
+
+export const approveQuotationSchema = z
+  .object({
+    branchId: z
+      .string()
+      .trim()
+      .regex(OBJECT_ID_REGEX, 'Mã chi nhánh (branchId) không hợp lệ')
+      .optional(),
+    approved: z.boolean({ required_error: 'Trạng thái xác nhận (approved) là bắt buộc' }),
+    approvedVia: z.enum(['ONLINE', 'PHONE', 'IN_PERSON']).optional().default('PHONE'),
+    note: z.string().trim().optional().default(''),
+    phone: z.string().trim().optional()
+  })
+  .strict();
+
+export const completeRepairSchema = z
+  .object({
+    branchId: z
+      .string()
+      .trim()
+      .regex(OBJECT_ID_REGEX, 'Mã chi nhánh (branchId) không hợp lệ')
+      .optional(),
+    repairNotes: z
+      .string({ required_error: 'Ghi chú kết quả sửa chữa là bắt buộc' })
+      .trim()
+      .min(1, 'Ghi chú kết quả sửa chữa không được để trống'),
+    partsReplaced: z.array(z.string().trim()).optional().default([])
+  })
+  .strict();
+
+export const handoverTicketSchema = z
+  .object({
+    branchId: z
+      .string()
+      .trim()
+      .regex(OBJECT_ID_REGEX, 'Mã chi nhánh (branchId) không hợp lệ')
+      .optional(),
+    paymentMethod: z.enum(['NONE', 'CASH', 'TRANSFER', 'VNPAY', 'CARD']).optional().default('NONE'),
+    amountPaid: z.coerce.number().min(0, 'Số tiền thanh toán không hợp lệ').optional().default(0),
+    customerNotes: z.string().trim().optional().default('')
+  })
+  .strict();
+
+export const trackWarrantyPublicSchema = z.object({
+  ticketCode: z
+    .string({ required_error: 'Mã phiếu bảo hành là bắt buộc' })
+    .trim()
+    .min(1, 'Mã phiếu không được để trống')
+    .transform((v) => v.toUpperCase()),
+  phone: z
+    .string({ required_error: 'Số điện thoại khách hàng là bắt buộc' })
+    .trim()
+    .min(1, 'Số điện thoại không được để trống')
+});
 
 export const updateWarrantyStatusSchema = z
   .object({
