@@ -1,6 +1,12 @@
 import { Router } from 'express';
 import { OrderController } from './order.controller.js';
-import { posCheckoutSchema, b2cCheckoutSchema, allocateOrderSchema, dispatchOrderSchema } from './order.dto.js';
+import {
+  posCheckoutSchema,
+  b2cCheckoutSchema,
+  allocateOrderSchema,
+  dispatchOrderSchema,
+  trackOrderSchema
+} from './order.dto.js';
 import { validateDto } from '../../middlewares/validate.middleware.js';
 import { protect, optionalProtect } from '../../middlewares/auth.middleware.js';
 import { authorize, scopeBranch } from '../../middlewares/rbac.middleware.js';
@@ -24,6 +30,13 @@ router.post(
   optionalProtect,
   validateDto(b2cCheckoutSchema),
   OrderController.createB2cOrder
+);
+
+// 2.1. Tra cứu tiến trình đơn hàng công khai (Public Order Tracking bằng orderCode + phone)
+router.get(
+  '/track',
+  validateDto(trackOrderSchema, 'query'),
+  OrderController.trackOrder
 );
 
 // 3. Khách hàng xem lịch sử đơn hàng của mình
@@ -78,7 +91,7 @@ router.get(
   OrderController.handleVnpayReturn
 );
 
-// 8. Xem chi tiết đơn hàng theo orderCode
+// 8. Xem chi tiết đơn hàng theo orderCode (Yêu cầu đăng nhập tài khoản / nhân viên)
 router.get(
   '/:orderCode',
   protect,

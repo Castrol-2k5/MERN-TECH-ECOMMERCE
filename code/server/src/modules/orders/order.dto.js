@@ -141,3 +141,15 @@ export const dispatchOrderSchema = z
   })
   .strict();
 
+export const trackOrderSchema = z
+  .object({
+    orderCode: z
+      .string({ required_error: 'Mã đơn hàng (orderCode) là bắt buộc' })
+      .trim()
+      .min(1, 'Mã đơn hàng không được để trống'),
+    phone: z
+      .string({ required_error: 'Số điện thoại người nhận (phone) là bắt buộc' })
+      .trim()
+      .regex(VIETNAMESE_PHONE_REGEX, 'Số điện thoại người nhận không đúng định dạng di động Việt Nam')
+  })
+  .strict();

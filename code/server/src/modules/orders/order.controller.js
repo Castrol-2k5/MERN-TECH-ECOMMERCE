@@ -23,6 +23,17 @@ export class OrderController {
     });
   });
 
+  static trackOrder = catchAsync(async (req, res) => {
+    const { orderCode, phone } = req.query;
+    const order = await OrderService.trackOrderPublic(orderCode, phone);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Tra cứu thông tin đơn hàng thành công',
+      data: { order }
+    });
+  });
+
   static getMyOrders = catchAsync(async (req, res) => {
     const result = await OrderService.getMyOrders(req.user.id, req.query);
 

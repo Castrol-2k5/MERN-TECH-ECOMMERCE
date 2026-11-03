@@ -147,6 +147,11 @@ export const StorefrontLayout = () => {
             <span className="hidden sm:inline">Đổi trả trong 30 ngày tận nơi</span>
           </div>
           <div className="flex items-center gap-4 text-slate-400">
+            <Link to="/order-tracking" className="hover:text-blue-400 transition-colors flex items-center gap-1.5 text-xs">
+              <Package className="w-3.5 h-3.5 text-blue-400" />
+              <span>Tra cứu đơn hàng</span>
+            </Link>
+            <span>•</span>
             <span>
               Hotline: <strong className="text-white hover:text-blue-400 cursor-pointer">1800 6868</strong>
             </span>
@@ -490,6 +495,14 @@ export const StorefrontLayout = () => {
               </Link>
             ))}
             <Link
+              to="/order-tracking"
+              className={`hover:text-blue-600 transition-colors shrink-0 text-slate-500 font-medium ${
+                location.pathname === '/order-tracking' ? 'text-blue-600 font-bold' : ''
+              }`}
+            >
+              Tra cứu đơn hàng
+            </Link>
+            <Link
               to="/warranty-check"
               className={`hover:text-blue-600 transition-colors shrink-0 text-slate-500 font-medium ${
                 location.pathname === '/warranty-check' ? 'text-blue-600 font-bold' : ''
@@ -587,6 +600,7 @@ export const StorefrontLayout = () => {
           <div>
             <h5 className="text-white font-bold text-sm mb-4">Hỗ trợ khách hàng</h5>
             <ul className="space-y-2.5 text-sm text-slate-400">
+              <li><Link to="/order-tracking" className="hover:text-white transition-colors">Tra cứu tiến độ đơn hàng</Link></li>
               <li><Link to="/warranty-check" className="hover:text-white transition-colors">Tra cứu e-Warranty</Link></li>
               <li><a href="#return" className="hover:text-white transition-colors">Chính sách đổi trả 30 ngày</a></li>
               <li><a href="#installment" className="hover:text-white transition-colors">Hướng dẫn trả góp 0%</a></li>

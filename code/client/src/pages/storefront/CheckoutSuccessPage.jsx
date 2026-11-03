@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useLocation, useSearchParams, Link } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import {
   CheckCircle2,
   Copy,
@@ -10,13 +11,17 @@ import {
   Clock,
   Store,
   CreditCard,
-  AlertTriangle
+  AlertTriangle,
+  Search,
+  Info
 } from 'lucide-react';
 
 export const CheckoutSuccessPage = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const [copied, setCopied] = useState(false);
+
+  const isAuthenticated = useSelector((state) => state.auth?.isAuthenticated);
 
   // Get order data from router state or fallback to query params
   const orderState = location.state?.order || null;
@@ -225,15 +230,39 @@ export const CheckoutSuccessPage = () => {
           )}
         </div>
 
+        {/* Guest Order Advice Notice */}
+        {!isAuthenticated && (
+          <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 text-left max-w-lg mx-auto space-y-1.5">
+            <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
+              <Info className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>Lưu ý dành cho Khách vãng lai</span>
+            </div>
+            <p className="text-xs text-amber-800 leading-relaxed">
+              Quý khách đã đặt hàng mà không cần đăng nhập. Vui lòng chụp lại màn hình hoặc ghi nhớ{' '}
+              <strong>Mã đơn hàng ({orderCode || 'ORD-TECHONE'})</strong> và <strong>Số điện thoại ({customerInfo.phone})</strong> để tra cứu lộ trình đơn hàng bất cứ lúc nào.
+            </p>
+          </div>
+        )}
+
         {/* Next Action CTAs */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
-          <Link
-            to="/account/orders"
-            className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-blue-600/25 transition-all"
-          >
-            <Package className="w-4 h-4" />
-            <span>THEO DÕI ĐƠN HÀNG</span>
-          </Link>
+          {isAuthenticated ? (
+            <Link
+              to="/account/orders"
+              className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-blue-600/25 transition-all"
+            >
+              <Package className="w-4 h-4" />
+              <span>XEM ĐƠN HÀNG TRONG TÀI KHOẢN</span>
+            </Link>
+          ) : (
+            <Link
+              to={`/order-tracking?orderCode=${encodeURIComponent(orderCode)}&phone=${encodeURIComponent(customerInfo.phone || '')}`}
+              className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-blue-600/25 transition-all"
+            >
+              <Search className="w-4 h-4" />
+              <span>TRA CỨU TIẾN TRÌNH ĐƠN HÀNG</span>
+            </Link>
+          )}
 
           <Link
             to="/"

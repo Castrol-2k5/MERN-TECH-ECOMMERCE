@@ -453,6 +453,74 @@ export class OrderService {
    * Quyền: SUPER_ADMIN, BRANCH_MANAGER
    * Thực thi: Nếu đổi chi nhánh xử lý, kiểm tra & chuyển giữ tồn kho từ chi nhánh cũ sang chi nhánh mới
    */
+  /**
+   * Tra cứu đơn hàng công khai (Public Order Tracking)
+   * Không yêu cầu đăng nhập, bảo mật bằng cặp khóa: orderCode + phone
+   */
+  static async trackOrderPublic(orderCode, phone) {
+    if (!orderCode || !phone) {
+      throw new AppError('Vui lòng cung cấp mã đơn hàng và số điện thoại đặt hàng.', 400, 'VALIDATION_ERROR');
+    }
+
+    const cleanOrderCode = orderCode.trim().toUpperCase();
+    const cleanPhone = phone.trim().replace(/\s+/g, '');
+    const standardInputPhone = cleanPhone.startsWith('+84') ? '0' + cleanPhone.substring(3) : cleanPhone;
+
+    const order = await Order.findOne({ orderCode: cleanOrderCode })
+      .populate('branchId', 'name branchCode address phone')
+      .lean();
+
+    if (!order) {
+      throw new AppError('Không tìm thấy thông tin đơn hàng với mã và số điện thoại đã cung cấp.', 404, 'ORDER_NOT_FOUND');
+    }
+
+    const orderPhone = (order.customerInfo?.phone || '').trim().replace(/\s+/g, '');
+    const standardOrderPhone = orderPhone.startsWith('+84') ? '0' + orderPhone.substring(3) : orderPhone;
+
+    if (standardOrderPhone !== standardInputPhone) {
+      throw new AppError('Số điện thoại không khớp với thông tin đơn hàng đã đặt.', 404, 'ORDER_NOT_FOUND');
+    }
+
+    const rawPhone = order.customerInfo?.phone || '';
+    const maskedPhone =
+      rawPhone.length >= 10
+        ? `${rawPhone.substring(0, 3)}****${rawPhone.slice(-3)}`
+        : rawPhone;
+
+    return {
+      orderCode: order.orderCode,
+      orderType: order.orderType,
+      orderStatus: order.orderStatus,
+      paymentMethod: order.paymentMethod,
+      paymentStatus: order.paymentStatus,
+      totalAmount: order.totalAmount,
+      customerInfo: {
+        fullName: order.customerInfo?.fullName || 'Khách hàng',
+        phone: maskedPhone,
+        address: order.customerInfo?.address || ''
+      },
+      branch: order.branchId
+        ? {
+            name: order.branchId.name,
+            branchCode: order.branchId.branchCode,
+            address: order.branchId.address,
+            phone: order.branchId.phone
+          }
+        : null,
+      items: (order.items || []).map((it) => ({
+        productId: it.productId,
+        productSkuId: it.productSkuId,
+        productName: it.productName,
+        sku: it.sku,
+        quantity: it.quantity,
+        unitPrice: it.unitPrice,
+        subtotal: it.subtotal
+      })),
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt
+    };
+  }
+
   static async allocateOrder(orderId, branchId, currentUser) {
     const order = await Order.findById(orderId);
     if (!order) {

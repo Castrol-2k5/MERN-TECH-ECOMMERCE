@@ -647,4 +647,80 @@ describe('Order & POS Checkout Module Integration Tests', () => {
       expect(res.body.data.orders[0].orderCode).toBe('ORD-20260930-MY01');
     });
   });
+
+  describe('GET /api/v1/orders/track (Public Order Tracking)', () => {
+    let trackedOrder;
+
+    beforeEach(async () => {
+      trackedOrder = await Order.create({
+        orderCode: 'ORD-B2C-TRACK01',
+        orderType: ORDER_TYPES.B2C_ONLINE,
+        branchId: branchA._id,
+        customerId: null,
+        customerInfo: {
+          fullName: 'Nguyễn Văn A',
+          phone: '0988776655',
+          address: '123 Nguyễn Huệ, Q1'
+        },
+        items: [
+          {
+            productId: productIpad._id,
+            productSkuId: skuIpad._id,
+            productName: productIpad.name,
+            sku: skuIpad.sku,
+            quantity: 1,
+            unitPrice: 18490000,
+            subtotal: 18490000,
+            serialsAssigned: []
+          }
+        ],
+        totalAmount: 18490000,
+        paymentMethod: PAYMENT_METHODS.CASH,
+        paymentStatus: PAYMENT_STATUS.PENDING,
+        orderStatus: ORDER_STATUS.PENDING
+      });
+    });
+
+    test('Happy Path: Khách vãng lai tra cứu đơn hàng bằng orderCode + phone chính xác -> HTTP 200, masked phone, không cần token', async () => {
+      const res = await request(app)
+        .get('/api/v1/orders/track')
+        .query({
+          orderCode: 'ORD-B2C-TRACK01',
+          phone: '0988776655'
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.order.orderCode).toBe('ORD-B2C-TRACK01');
+      expect(res.body.data.order.orderStatus).toBe(ORDER_STATUS.PENDING);
+      expect(res.body.data.order.customerInfo.fullName).toBe('Nguyễn Văn A');
+      expect(res.body.data.order.customerInfo.phone).toBe('098****655');
+      expect(res.body.data.order.items.length).toBe(1);
+      expect(res.body.data.order.branch.name).toBe(branchA.name);
+    });
+
+    test('Negative Path: Tra cứu với số điện thoại sai -> HTTP 404 ORDER_NOT_FOUND', async () => {
+      const res = await request(app)
+        .get('/api/v1/orders/track')
+        .query({
+          orderCode: 'ORD-B2C-TRACK01',
+          phone: '0911223344'
+        });
+
+      expect(res.status).toBe(404);
+      expect(res.body.errorCode).toBe('ORDER_NOT_FOUND');
+    });
+
+    test('Negative Path: Thiếu tham số hoặc phone không đúng định dạng VN -> HTTP 400 VALIDATION_ERROR', async () => {
+      const res = await request(app)
+        .get('/api/v1/orders/track')
+        .query({
+          orderCode: 'ORD-B2C-TRACK01',
+          phone: '123'
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.errorCode).toBe('VALIDATION_ERROR');
+    });
+  });
 });

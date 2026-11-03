@@ -10,6 +10,7 @@ import CategoryPage from '../pages/storefront/CategoryPage.jsx';
 import ProductDetailPage from '../pages/storefront/ProductDetailPage.jsx';
 import ComparePage from '../pages/storefront/ComparePage.jsx';
 import WarrantyCheckPage from '../pages/storefront/WarrantyCheckPage.jsx';
+import OrderTrackingPage from '../pages/storefront/OrderTrackingPage.jsx';
 import CartPage from '../pages/storefront/CartPage.jsx';
 import CheckoutPage from '../pages/storefront/CheckoutPage.jsx';
 import NotFoundPage from '../pages/storefront/NotFoundPage.jsx';
@@ -85,6 +86,7 @@ export const AppRoutes = () => {
         <Route path="/product/:slug" element={<ProductDetailPage />} />
         <Route path="/compare" element={<ComparePage />} />
         <Route path="/warranty-check" element={<WarrantyCheckPage />} />
+        <Route path="/order-tracking" element={<OrderTrackingPage />} />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/checkout/success" element={<CheckoutSuccessPage />} />

@@ -194,6 +194,17 @@ export const orderService = {
     return response?.data?.order || response?.data;
   },
 
+  trackOrderPublic: async (orderCode, phone) => {
+    if (isMockEnabled()) {
+      const match = fallbackOrders.find((o) => o.orderCode === orderCode);
+      return match || fallbackOrders[0];
+    }
+    const response = await axiosClient.get('/orders/track', {
+      params: { orderCode, phone }
+    });
+    return response?.data?.order || response?.data;
+  },
+
   dispatchOrder: async (orderId, serials = []) => {
     if (isMockEnabled()) {
       return { success: true, orderId, serials, orderStatus: 'READY_FOR_SHIPPING' };
