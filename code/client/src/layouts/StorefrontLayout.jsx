@@ -10,6 +10,8 @@ import {
   Truck,
   RotateCcw,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Menu,
   X,
   Scale,
@@ -43,6 +45,78 @@ export const StorefrontLayout = () => {
   const [isSuggestOpen, setIsSuggestOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const searchContainerRef = useRef(null);
+  const navContainerRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const isDraggingNav = useRef(false);
+  const startX = useRef(0);
+  const startScrollLeft = useRef(0);
+  const hasMoved = useRef(false);
+
+  const checkNavScroll = () => {
+    const el = navContainerRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanScrollLeft(scrollLeft > 6);
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 6);
+  };
+
+  useEffect(() => {
+    checkNavScroll();
+    const el = navContainerRef.current;
+    if (!el) return;
+
+    el.addEventListener('scroll', checkNavScroll, { passive: true });
+    window.addEventListener('resize', checkNavScroll);
+    const timer = setTimeout(checkNavScroll, 300);
+
+    return () => {
+      clearTimeout(timer);
+      el.removeEventListener('scroll', checkNavScroll);
+      window.removeEventListener('resize', checkNavScroll);
+    };
+  }, [categories]);
+
+  const handleNavScroll = (direction) => {
+    const el = navContainerRef.current;
+    if (!el) return;
+    const scrollAmount = direction === 'left' ? -280 : 280;
+    el.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+  };
+
+  const handleNavMouseDown = (e) => {
+    if (e.button !== 0) return;
+    const el = navContainerRef.current;
+    if (!el) return;
+    isDraggingNav.current = true;
+    hasMoved.current = false;
+    startX.current = e.pageX - el.offsetLeft;
+    startScrollLeft.current = el.scrollLeft;
+  };
+
+  const handleNavMouseMove = (e) => {
+    if (!isDraggingNav.current) return;
+    const el = navContainerRef.current;
+    if (!el) return;
+    const x = e.pageX - el.offsetLeft;
+    const walk = (x - startX.current) * 1.5;
+    if (Math.abs(walk) > 4) {
+      hasMoved.current = true;
+    }
+    el.scrollLeft = startScrollLeft.current - walk;
+  };
+
+  const handleNavMouseUp = () => {
+    if (isDraggingNav.current && hasMoved.current) {
+      const preventClick = (clickEvent) => {
+        clickEvent.preventDefault();
+        clickEvent.stopPropagation();
+        window.removeEventListener('click', preventClick, true);
+      };
+      window.addEventListener('click', preventClick, true);
+    }
+    isDraggingNav.current = false;
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -473,43 +547,83 @@ export const StorefrontLayout = () => {
         )}
 
         {/* 3. NAVIGATION BAR (FIGMA #11:1123) */}
-        <nav className="border-t border-slate-100 bg-white">
-          <div className="max-w-7xl mx-auto px-4 md:px-12 flex items-center gap-6 overflow-x-auto scrollbar-none h-12 text-sm font-semibold text-slate-600">
-            <Link
-              to="/category/all"
-              className="flex items-center gap-2 text-blue-600 hover:text-blue-700 shrink-0 font-bold"
+        <nav className="border-t border-slate-100 bg-white relative group">
+          <div className="max-w-7xl mx-auto px-4 md:px-12 relative flex items-center">
+            {/* Scroll Left Button */}
+            {canScrollLeft && (
+              <div className="absolute left-2 md:left-6 z-20 flex items-center h-full pr-4 bg-gradient-to-r from-white via-white/95 to-transparent">
+                <button
+                  type="button"
+                  onClick={() => handleNavScroll('left')}
+                  className="w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-blue-600 hover:border-blue-400 flex items-center justify-center shadow-md transition-all cursor-pointer hover:scale-110 active:scale-95"
+                  title="Cuộn sang trái"
+                  aria-label="Cuộn sang trái"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Scrollable Categories List with Mouse Drag */}
+            <div
+              ref={navContainerRef}
+              onMouseDown={handleNavMouseDown}
+              onMouseMove={handleNavMouseMove}
+              onMouseUp={handleNavMouseUp}
+              onMouseLeave={handleNavMouseUp}
+              className="flex-1 flex items-center gap-6 overflow-x-auto scrollbar-none h-12 text-sm font-semibold text-slate-600 select-none scroll-smooth cursor-grab active:cursor-grabbing"
             >
-              <span>☰</span>
-              <span>Danh mục sản phẩm</span>
-            </Link>
-            <div className="h-4 w-px bg-slate-200 shrink-0" />
-            {categories.map((cat) => (
               <Link
-                key={cat.slug}
-                to={`/category/${cat.slug}`}
-                className={`hover:text-blue-600 transition-colors shrink-0 ${
-                  location.pathname.includes(`/category/${cat.slug}`) ? 'text-blue-600 font-bold' : ''
+                to="/category/all"
+                className="flex items-center gap-2 text-blue-600 hover:text-blue-700 shrink-0 font-bold whitespace-nowrap"
+              >
+                <span>☰</span>
+                <span>Danh mục sản phẩm</span>
+              </Link>
+              <div className="h-4 w-px bg-slate-200 shrink-0" />
+              {categories.map((cat) => (
+                <Link
+                  key={cat.slug}
+                  to={`/category/${cat.slug}`}
+                  className={`hover:text-blue-600 transition-colors shrink-0 whitespace-nowrap ${
+                    location.pathname.includes(`/category/${cat.slug}`) ? 'text-blue-600 font-bold' : ''
+                  }`}
+                >
+                  {cat.name.replace(' chính hãng', '').replace(' cao cấp', '')}
+                </Link>
+              ))}
+              <Link
+                to="/order-tracking"
+                className={`hover:text-blue-600 transition-colors shrink-0 text-slate-500 font-medium whitespace-nowrap ${
+                  location.pathname === '/order-tracking' ? 'text-blue-600 font-bold' : ''
                 }`}
               >
-                {cat.name.replace(' chính hãng', '').replace(' cao cấp', '')}
+                Tra cứu đơn hàng
               </Link>
-            ))}
-            <Link
-              to="/order-tracking"
-              className={`hover:text-blue-600 transition-colors shrink-0 text-slate-500 font-medium ${
-                location.pathname === '/order-tracking' ? 'text-blue-600 font-bold' : ''
-              }`}
-            >
-              Tra cứu đơn hàng
-            </Link>
-            <Link
-              to="/warranty-check"
-              className={`hover:text-blue-600 transition-colors shrink-0 text-slate-500 font-medium ${
-                location.pathname === '/warranty-check' ? 'text-blue-600 font-bold' : ''
-              }`}
-            >
-              Tra cứu bảo hành
-            </Link>
+              <Link
+                to="/warranty-check"
+                className={`hover:text-blue-600 transition-colors shrink-0 text-slate-500 font-medium whitespace-nowrap ${
+                  location.pathname === '/warranty-check' ? 'text-blue-600 font-bold' : ''
+                }`}
+              >
+                Tra cứu bảo hành
+              </Link>
+            </div>
+
+            {/* Scroll Right Button */}
+            {canScrollRight && (
+              <div className="absolute right-2 md:right-6 z-20 flex items-center h-full pl-4 bg-gradient-to-l from-white via-white/95 to-transparent">
+                <button
+                  type="button"
+                  onClick={() => handleNavScroll('right')}
+                  className="w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-blue-600 hover:border-blue-400 flex items-center justify-center shadow-md transition-all cursor-pointer hover:scale-110 active:scale-95"
+                  title="Cuộn sang phải"
+                  aria-label="Cuộn sang phải"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
         </nav>
       </header>

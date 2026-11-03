@@ -64,12 +64,15 @@ export const CompareSpecsPage = () => {
     );
 
     if (!currentCat) {
-      return {
-        _id: 'root-default',
-        name: anchorProduct.categoryName || 'Sản phẩm',
-        slug: anchorProduct.category || 'laptop',
-        parentId: null,
-      };
+      if (anchorCatSlug) {
+        return {
+          _id: 'root-default',
+          name: anchorProduct.categoryName || 'Sản phẩm',
+          slug: anchorCatSlug,
+          parentId: null,
+        };
+      }
+      return null;
     }
 
     // Lần ngược lên parentId đến khi gặp danh mục cha cao nhất (parentId === null)
@@ -117,7 +120,6 @@ export const CompareSpecsPage = () => {
       try {
         const params = {
           limit: 50,
-          isActive: true,
         };
 
         // Phạm vi danh mục:

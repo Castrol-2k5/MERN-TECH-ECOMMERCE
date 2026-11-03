@@ -114,7 +114,10 @@ export class ProductService {
       'maxPrice',
       'search',
       'sortBy',
-      'includeInactive'
+      'includeInactive',
+      'isActive',
+      'isactive',
+      'status'
     ]);
 
     const {
@@ -133,7 +136,11 @@ export class ProductService {
     const limitNum = Math.max(1, Number(limit));
     const filterConditions = {};
     if (includeInactive !== 'true' && includeInactive !== true) {
-      filterConditions.isActive = true;
+      if (queryParams.isActive === 'false' || queryParams.isActive === false) {
+        filterConditions.isActive = false;
+      } else {
+        filterConditions.isActive = true;
+      }
     }
 
     let targetCategory = null;
