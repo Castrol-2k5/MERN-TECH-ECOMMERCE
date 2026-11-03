@@ -4,6 +4,7 @@ import WarrantySearchBar from '../../features/warranty/components/WarrantySearch
 import WarrantyResultCard from '../../features/warranty/components/WarrantyResultCard.jsx';
 import warrantyService from '../../features/warranty/services/warrantyService.js';
 import { HelpCircle, CheckCircle2 } from 'lucide-react';
+import Toast from '../../components/common/Toast.jsx';
 
 export const WarrantyCheckPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -15,6 +16,7 @@ export const WarrantyCheckPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [searchError, setSearchError] = useState(null);
   const [actionSuccess, setActionSuccess] = useState(null);
+  const [toast, setToast] = useState(null);
 
   const handleSearchSerial = useCallback(async (serial) => {
     if (!serial || !serial.trim()) return;
@@ -29,18 +31,26 @@ export const WarrantyCheckPage = () => {
       const data = await warrantyService.verifySerial(cleanSerial);
       if (data) {
         setWarrantyData(data);
+        setToast({
+          type: 'success',
+          title: 'Tra cứu thành công',
+          message: `Đã tìm thấy thông tin thiết bị ${data.productName} (${data.serialNumber}).`
+        });
       } else {
-        setSearchError(`Không tìm thấy mã Serial/IMEI '${cleanSerial}' trong hệ thống bảo hành.`);
+        const msg = `Không tìm thấy mã Serial/IMEI '${cleanSerial}' trong hệ thống bảo hành.`;
+        setSearchError(msg);
         setWarrantyData(null);
+        setToast({ type: 'error', title: 'Không tìm thấy', message: msg });
       }
     } catch (err) {
-      setSearchError(
+      const msg =
         err.response?.data?.message ||
-          err.response?.data?.error?.message ||
-          err.message ||
-          `Không tìm thấy mã Serial/IMEI '${cleanSerial}' trong hệ thống bảo hành.`
-      );
+        err.response?.data?.error?.message ||
+        err.message ||
+        `Không tìm thấy mã Serial/IMEI '${cleanSerial}' trong hệ thống bảo hành.`;
+      setSearchError(msg);
       setWarrantyData(null);
+      setToast({ type: 'error', title: 'Tra cứu thất bại', message: msg });
     } finally {
       setIsLoading(false);
     }
@@ -94,18 +104,26 @@ export const WarrantyCheckPage = () => {
           ]
         };
         setWarrantyData(formattedData);
+        setToast({
+          type: 'success',
+          title: 'Tra cứu phiếu RMA thành công',
+          message: `Đã tìm thấy phiếu ${cleanCode} của khách hàng ${ticket.customerInfo?.fullName || ''}.`
+        });
       } else {
-        setSearchError(`Không tìm thấy phiếu bảo hành '${cleanCode}'. Vui lòng kiểm tra lại mã và số điện thoại.`);
+        const msg = `Không tìm thấy phiếu bảo hành '${cleanCode}'. Vui lòng kiểm tra lại mã và số điện thoại.`;
+        setSearchError(msg);
         setWarrantyData(null);
+        setToast({ type: 'error', title: 'Không tìm thấy phiếu', message: msg });
       }
     } catch (err) {
-      setSearchError(
+      const msg =
         err.response?.data?.message ||
-          err.response?.data?.error?.message ||
-          err.message ||
-          `Không tìm thấy phiếu bảo hành '${cleanCode}'.`
-      );
+        err.response?.data?.error?.message ||
+        err.message ||
+        `Không tìm thấy phiếu bảo hành '${cleanCode}'.`;
+      setSearchError(msg);
       setWarrantyData(null);
+      setToast({ type: 'error', title: 'Tra cứu thất bại', message: msg });
     } finally {
       setIsLoading(false);
     }
@@ -115,11 +133,15 @@ export const WarrantyCheckPage = () => {
   const handleApproveQuotation = async (ticketCode, payload) => {
     try {
       await warrantyService.customerApprovePublic(ticketCode, payload);
-      setActionSuccess(
-        `✓ Đã ghi nhận quyết định của bạn (${
-          payload.approved ? 'Đồng ý sửa chữa' : 'Từ chối sửa chữa & nhận lại máy'
-        }). Kỹ thuật viên sẽ tiến hành xử lý ngay!`
-      );
+      const msg = payload.approved
+        ? 'Cảm ơn quý khách! Bạn đã ĐỒNG Ý sửa chữa. Kỹ thuật viên sẽ tiến hành sửa máy ngay.'
+        : 'Đã ghi nhận quyết định TỪ CHỐI sửa chữa. Thiết bị sẽ được hoàn trả nguyên trạng 0₫ tại cửa hàng.';
+      setActionSuccess(`✓ ${msg}`);
+      setToast({
+        type: payload.approved ? 'success' : 'warning',
+        title: 'Xác nhận thành công',
+        message: msg
+      });
       // Re-fetch to refresh data
       if (warrantyData?.serialNumber) {
         handleSearchSerial(warrantyData.serialNumber);
@@ -127,11 +149,15 @@ export const WarrantyCheckPage = () => {
         handleSearchRma(ticketCode, payload.phone);
       }
     } catch (err) {
-      alert(
+      const errMsg =
         err.response?.data?.error?.message ||
-          err.message ||
-          'Không thể ghi nhận phản hồi. Vui lòng thử lại.'
-      );
+        err.message ||
+        'Không thể ghi nhận phản hồi. Vui lòng thử lại.';
+      setToast({
+        type: 'error',
+        title: 'Lỗi xác nhận',
+        message: errMsg
+      });
     }
   };
 
@@ -203,6 +229,8 @@ export const WarrantyCheckPage = () => {
           </div>
         </div>
       </section>
+      {/* Floating System Toast Notification */}
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 };

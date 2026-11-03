@@ -24,6 +24,7 @@ import usePosAudio from '../../features/pos/hooks/usePosAudio';
 import RmaScanLookup from '../../features/warranty/components/RmaScanLookup';
 import RmaTicketForm from '../../features/warranty/components/RmaTicketForm';
 import RmaPrintReceiptModal from '../../features/warranty/components/RmaPrintReceiptModal';
+import Toast from '../../components/common/Toast';
 
 const STATUS_BADGE_MAP = {
   RECEIVED: {
@@ -69,6 +70,18 @@ export const WarrantyReceptionPage = () => {
   const [completedTicket, setCompletedTicket] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [successBanner, setSuccessBanner] = useState('');
+  const [toast, setToast] = useState(null);
+
+  const { playSuccessBeep, playErrorBeep } = usePosAudio();
+
+  const showToast = useCallback((type, title, message) => {
+    if (type === 'success') {
+      playSuccessBeep();
+    } else {
+      playErrorBeep();
+    }
+    setToast({ type, title, message });
+  }, [playSuccessBeep, playErrorBeep]);
 
   const [activeTab, setActiveTab] = useState('RECEPTION'); // 'RECEPTION' | 'TICKETS'
   const [tickets, setTickets] = useState([]);
@@ -100,8 +113,6 @@ export const WarrantyReceptionPage = () => {
   const [handoverPaymentMethod, setHandoverPaymentMethod] = useState('CASH');
   const [handoverNotes, setHandoverNotes] = useState('');
 
-  const { playSuccessBeep, playErrorBeep } = usePosAudio();
-
   const handleLookup = async (serialNumber) => {
     setIsLookingUp(true);
     setErrorMessage('');
@@ -109,16 +120,22 @@ export const WarrantyReceptionPage = () => {
     try {
       const data = await warrantyService.verifySerial(serialNumber);
       setLookupResult(data);
-      playSuccessBeep();
-    } catch (err) {
-      playErrorBeep();
-      setLookupResult(null);
-      setErrorMessage(
-        err?.response?.data?.message ||
-          err?.response?.data?.error?.message ||
-          err?.message ||
-          'Không tìm thấy mã Serial/IMEI trong hệ thống.'
+      showToast(
+        'success',
+        'Tra cứu Serial thành công',
+        `Đã tìm thấy thiết bị: ${data.productName} (${data.serialNumber}). ${
+          data.isEligible ? 'Đủ điều kiện bảo hành chính hãng.' : 'Hết hạn bảo hành chính hãng (Sửa chữa dịch vụ có phí).'
+        }`
       );
+    } catch (err) {
+      setLookupResult(null);
+      const errMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error?.message ||
+        err?.message ||
+        'Không tìm thấy mã Serial/IMEI trong hệ thống.';
+      setErrorMessage(errMsg);
+      showToast('error', 'Không tìm thấy Serial', errMsg);
     } finally {
       setIsLookingUp(false);
     }
@@ -130,21 +147,20 @@ export const WarrantyReceptionPage = () => {
     setSuccessBanner('');
     try {
       const result = await warrantyService.createWarrantyTicket(formData);
-      playSuccessBeep();
       setCompletedTicket(result);
-      setSuccessBanner(
-        `✓ Tiếp nhận bảo hành thành công! Mã phiếu: ${result.ticketCode}. Hệ thống đã mở biên bản để in cho khách.`
-      );
+      const msg = `Tiếp nhận thiết bị thành công! Mã phiếu: ${result.ticketCode}. Hệ thống đang mở biên bản tiếp nhận để in cho khách.`;
+      setSuccessBanner(`✓ ${msg}`);
+      showToast('success', 'Lập biên bản thành công', msg);
       // Auto add to tickets state so it shows up immediately in TICKETS tab
       setTickets((prev) => [result, ...prev]);
     } catch (err) {
-      playErrorBeep();
-      setErrorMessage(
+      const errMsg =
         err?.response?.data?.message ||
-          err?.response?.data?.error?.message ||
-          err?.message ||
-          'Không thể tạo phiếu tiếp nhận bảo hành. Vui lòng kiểm tra trạng thái Serial.'
-      );
+        err?.response?.data?.error?.message ||
+        err?.message ||
+        'Không thể tạo phiếu tiếp nhận bảo hành. Vui lòng kiểm tra trạng thái Serial.';
+      setErrorMessage(errMsg);
+      showToast('error', 'Lỗi tiếp nhận bảo hành', errMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -166,12 +182,14 @@ export const WarrantyReceptionPage = () => {
       }
       const data = await warrantyService.getWarrantyTickets(params);
       setTickets(Array.isArray(data) ? data : []);
-    } catch {
+      showToast('info', 'Đồng bộ danh sách', `Đã tải ${Array.isArray(data) ? data.length : 0} phiếu bảo hành.`);
+    } catch (err) {
       setTickets([]);
+      showToast('error', 'Lỗi tải danh sách', 'Không thể đồng bộ danh sách phiếu bảo hành.');
     } finally {
       setIsLoadingTickets(false);
     }
-  }, [statusFilter, searchCode]);
+  }, [statusFilter, searchCode, showToast]);
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
@@ -179,6 +197,31 @@ export const WarrantyReceptionPage = () => {
     setSuccessBanner('');
     if (tab === 'TICKETS') {
       fetchTickets();
+    }
+  };
+
+  // Quick direct status dropdown change
+  const handleStatusChange = async (ticketId, newStatus) => {
+    if (!ticketId) return;
+    setIsActionLoading(true);
+    try {
+      const updated = await warrantyService.updateTicketStatus(ticketId, { status: newStatus });
+      setTickets((prev) =>
+        prev.map((t) => (t._id === ticketId ? { ...t, ...updated, status: updated?.status || newStatus } : t))
+      );
+      showToast(
+        'success',
+        'Cập nhật trạng thái thành công',
+        `Phiếu đã chuyển sang: ${STATUS_BADGE_MAP[newStatus]?.label || newStatus}`
+      );
+    } catch (err) {
+      showToast(
+        'error',
+        'Lỗi cập nhật trạng thái',
+        err?.response?.data?.error?.message || err?.message || 'Không thể cập nhật trạng thái phiếu bảo hành.'
+      );
+    } finally {
+      setIsActionLoading(false);
     }
   };
 
@@ -196,21 +239,23 @@ export const WarrantyReceptionPage = () => {
         laborCost: isUnderWarranty ? 0 : Number(laborCost || 0)
       };
       const updated = await warrantyService.diagnoseTicket(diagnosingTicket._id, payload);
-      playSuccessBeep();
 
       // Reactive update
       setTickets((prev) =>
         prev.map((t) => (t._id === diagnosingTicket._id ? { ...t, ...updated } : t))
       );
+      const ticketCode = diagnosingTicket.ticketCode;
       setDiagnosingTicket(null);
-      setSuccessBanner(
-        `✓ Đã lưu kết quả chẩn đoán cho phiếu ${diagnosingTicket.ticketCode}! Trạng thái: ${
-          isUnderWarranty ? 'Bảo hành miễn phí (Chuyển Đang sửa chữa)' : 'Có phí (Chờ khách duyệt báo giá)'
-        }`
-      );
+
+      const msg = isUnderWarranty
+        ? `Phiếu ${ticketCode}: Đủ điều kiện bảo hành chính hãng miễn phí. Đã tự động duyệt sang 'Đang sửa chữa'.`
+        : `Phiếu ${ticketCode}: Báo giá ${formatVND(Number(partsCost || 0) + Number(laborCost || 0))}. Đã chuyển sang 'Chờ khách duyệt giá'.`;
+
+      setSuccessBanner(`✓ ${msg}`);
+      showToast('success', 'Chẩn đoán & Báo giá thành công', msg);
     } catch (err) {
-      playErrorBeep();
-      alert(err?.response?.data?.error?.message || err?.message || 'Lỗi khi lưu chẩn đoán.');
+      const errMsg = err?.response?.data?.error?.message || err?.message || 'Lỗi khi lưu chẩn đoán.';
+      showToast('error', 'Lỗi chẩn đoán lỗi', errMsg);
     } finally {
       setIsActionLoading(false);
     }
@@ -228,21 +273,23 @@ export const WarrantyReceptionPage = () => {
         note: approvalNote.trim()
       };
       const updated = await warrantyService.approveQuotation(approvingTicket._id, payload);
-      playSuccessBeep();
 
       // Reactive update
       setTickets((prev) =>
         prev.map((t) => (t._id === approvingTicket._id ? { ...t, ...updated } : t))
       );
+      const ticketCode = approvingTicket.ticketCode;
       setApprovingTicket(null);
-      setSuccessBanner(
-        `✓ Đã ghi nhận phản hồi của khách cho phiếu ${approvingTicket.ticketCode}! (${
-          approvalDecision ? 'Đồng ý sửa chữa' : 'Từ chối - Chuẩn bị trả máy'
-        })`
-      );
+
+      const msg = approvalDecision
+        ? `Đã ghi nhận khách ĐỒNG Ý sửa chữa cho phiếu ${ticketCode}! Kỹ thuật viên có thể tiến hành sửa ngay.`
+        : `Đã ghi nhận khách TỪ CHỐI sửa chữa cho phiếu ${ticketCode}! Thiết bị đã chuyển sang chuẩn bị hoàn trả nguyên trạng 0₫.`;
+
+      setSuccessBanner(`✓ ${msg}`);
+      showToast('success', 'Ghi nhận phản hồi thành công', msg);
     } catch (err) {
-      playErrorBeep();
-      alert(err?.response?.data?.error?.message || err?.message || 'Lỗi khi ghi nhận phê duyệt.');
+      const errMsg = err?.response?.data?.error?.message || err?.message || 'Lỗi khi ghi nhận phê duyệt.';
+      showToast('error', 'Lỗi ghi nhận phê duyệt', errMsg);
     } finally {
       setIsActionLoading(false);
     }
@@ -263,19 +310,20 @@ export const WarrantyReceptionPage = () => {
         partsReplaced: partsArray
       };
       const updated = await warrantyService.completeRepair(completingTicket._id, payload);
-      playSuccessBeep();
 
       // Reactive update
       setTickets((prev) =>
         prev.map((t) => (t._id === completingTicket._id ? { ...t, ...updated } : t))
       );
+      const ticketCode = completingTicket.ticketCode;
       setCompletingTicket(null);
-      setSuccessBanner(
-        `✓ Hoàn tất sửa chữa phiếu ${completingTicket.ticketCode}! Thiết bị đã sẵn sàng chờ khách đến nhận máy.`
-      );
+
+      const msg = `Hoàn tất sửa chữa phiếu ${ticketCode}! Thiết bị đã sẵn sàng chờ khách đến kiểm tra và nhận máy.`;
+      setSuccessBanner(`✓ ${msg}`);
+      showToast('success', 'Sửa chữa hoàn tất', msg);
     } catch (err) {
-      playErrorBeep();
-      alert(err?.response?.data?.error?.message || err?.message || 'Lỗi khi hoàn tất sửa chữa.');
+      const errMsg = err?.response?.data?.error?.message || err?.message || 'Lỗi khi hoàn tất sửa chữa.';
+      showToast('error', 'Lỗi hoàn tất sửa chữa', errMsg);
     } finally {
       setIsActionLoading(false);
     }
@@ -294,22 +342,25 @@ export const WarrantyReceptionPage = () => {
         customerNotes: handoverNotes.trim()
       };
       const updated = await warrantyService.handoverTicket(handingOverTicket._id, payload);
-      playSuccessBeep();
 
       // Reactive update
       setTickets((prev) =>
         prev.map((t) => (t._id === handingOverTicket._id ? { ...t, ...updated } : t))
       );
       const handoverDataToPrint = { ...handingOverTicket, ...updated, status: 'RETURNED' };
+      const ticketCode = handingOverTicket.ticketCode;
+      const sn = handingOverTicket.serialNumber;
       setHandingOverTicket(null);
-      setSuccessBanner(
-        `✓ Đã bàn giao thiết bị thành công cho khách hàng! Mã Serial đã khôi phục về trạng thái SOLD.`
-      );
+
+      const msg = `Bàn giao thiết bị cho khách thành công! Đã đóng phiếu ${ticketCode}. Serial ${sn} đã khôi phục về trạng thái Đã bán (SOLD). Đang mở biên bản bàn giao để in.`;
+      setSuccessBanner(`✓ ${msg}`);
+      showToast('success', 'Bàn giao thiết bị thành công', msg);
+
       // Auto open print receipt for handover
       setCompletedTicket(handoverDataToPrint);
     } catch (err) {
-      playErrorBeep();
-      alert(err?.response?.data?.error?.message || err?.message || 'Lỗi khi bàn giao thiết bị.');
+      const errMsg = err?.response?.data?.error?.message || err?.message || 'Lỗi khi bàn giao thiết bị.';
+      showToast('error', 'Lỗi bàn giao thiết bị', errMsg);
     } finally {
       setIsActionLoading(false);
     }
@@ -564,11 +615,35 @@ export const WarrantyReceptionPage = () => {
                         </td>
 
                         <td className="py-3 px-4 text-center">
-                          <span
-                            className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold border ${badgeMeta.className}`}
+                          <select
+                            value={currentStatus}
+                            onChange={(e) => handleStatusChange(t._id, e.target.value)}
+                            disabled={isActionLoading}
+                            title="Chọn để chuyển nhanh trạng thái phiếu bảo hành"
+                            className={`px-2.5 py-1 rounded-full text-[11px] font-bold border focus:outline-none cursor-pointer bg-slate-900 ${badgeMeta.className}`}
                           >
-                            {badgeMeta.label}
-                          </span>
+                            <option value="RECEIVED" className="bg-slate-900 text-amber-300">
+                              RECEIVED • Đã tiếp nhận tại quầy
+                            </option>
+                            <option value="DIAGNOSING" className="bg-slate-900 text-purple-300">
+                              DIAGNOSING • Đang kiểm tra lỗi
+                            </option>
+                            <option value="QUOTATION_PENDING" className="bg-slate-900 text-yellow-300">
+                              QUOTATION • Chờ duyệt báo giá
+                            </option>
+                            <option value="REPAIRING" className="bg-slate-900 text-blue-300">
+                              REPAIRING • Đang sửa chữa
+                            </option>
+                            <option value="REPAIR_REJECTED" className="bg-slate-900 text-rose-300">
+                              REJECTED • Khách từ chối (Chờ trả)
+                            </option>
+                            <option value="READY_FOR_PICKUP" className="bg-slate-900 text-emerald-300">
+                              READY • Đã xong chờ khách nhận
+                            </option>
+                            <option value="RETURNED" className="bg-slate-900 text-slate-300">
+                              RETURNED • Đã bàn giao hoàn tất
+                            </option>
+                          </select>
                         </td>
 
                         <td className="py-3 px-4 text-right">
@@ -1176,6 +1251,9 @@ export const WarrantyReceptionPage = () => {
         ticketData={completedTicket}
         onNewTicket={handleNewTicket}
       />
+
+      {/* Floating System Toast Notification */}
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 };
