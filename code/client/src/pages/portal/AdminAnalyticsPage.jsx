@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   BarChart3, 
   Calendar, 
@@ -29,7 +29,7 @@ export const AdminAnalyticsPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const fetchOverview = async (branchId, start = startDate, end = endDate) => {
+  const fetchOverview = useCallback(async (branchId, start = startDate, end = endDate) => {
     setIsLoading(true);
     setErrorMsg('');
     try {
@@ -45,7 +45,7 @@ export const AdminAnalyticsPage = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [startDate, endDate]);
 
   const handleExportReport = () => {
     const perfRows = analyticsData.branchPerformance || [];
@@ -76,13 +76,37 @@ export const AdminAnalyticsPage = () => {
         setBranches(list);
       }
     }).catch(() => {});
-
-    fetchOverview(selectedBranch);
-
     return () => {
       ignore = true;
     };
   }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        const data = await analyticsService.getOverview({ branchId: selectedBranch });
+        if (!ignore) {
+          setAnalyticsData(data);
+        }
+      } catch {
+        if (!ignore) {
+          setAnalyticsData(isMockEnabled() ? fallbackAnalyticsOverview : emptyAnalyticsOverview);
+        }
+      } finally {
+        if (!ignore) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadData();
+
+    return () => {
+      ignore = true;
+    };
+  }, [selectedBranch]);
 
   return (
     <div className="space-y-5 select-none font-sans text-slate-100">

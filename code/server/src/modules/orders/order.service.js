@@ -453,7 +453,7 @@ export class OrderService {
    * Quyền: SUPER_ADMIN, BRANCH_MANAGER
    * Thực thi: Nếu đổi chi nhánh xử lý, kiểm tra & chuyển giữ tồn kho từ chi nhánh cũ sang chi nhánh mới
    */
-  /**
+/**
    * Tra cứu đơn hàng công khai (Public Order Tracking)
    * Không yêu cầu đăng nhập, bảo mật bằng cặp khóa: orderCode + phone
    */
@@ -523,7 +523,7 @@ export class OrderService {
     };
   }
 
-  static async allocateOrder(orderId, branchId, currentUser) {
+  static async allocateOrder(orderId, branchId, _currentUser) {
     const order = await Order.findById(orderId);
     if (!order) {
       throw new AppError('Không tìm thấy đơn hàng cần điều phối.', 404, 'ORDER_NOT_FOUND');

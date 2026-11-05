@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Plus, Edit2, Trash2, FolderTree, Tag, CheckCircle2, AlertCircle, CornerDownRight } from 'lucide-react';
 import categoryService from '../services/categoryService.js';
 
@@ -15,7 +15,7 @@ export const CategoryManagementTab = ({ onCategoriesChanged }) => {
     attributeKeys: '',
   });
 
-  const loadCategories = async () => {
+  const loadCategories = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await categoryService.getCategories();
@@ -28,10 +28,36 @@ export const CategoryManagementTab = ({ onCategoriesChanged }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    loadCategories();
+    let ignore = false;
+    const fetchCats = async () => {
+      setIsLoading(true);
+      try {
+        const data = await categoryService.getCategories();
+        if (!ignore) {
+          setCategories(data || []);
+        }
+      } catch (err) {
+        if (!ignore) {
+          setToastMsg({
+            type: 'error',
+            message: 'Lỗi tải danh mục: ' + (err.response?.data?.message || err.message),
+          });
+        }
+      } finally {
+        if (!ignore) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchCats();
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const handleOpenAdd = () => {

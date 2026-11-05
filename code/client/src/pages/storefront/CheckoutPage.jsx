@@ -107,7 +107,7 @@ export const CheckoutPage = () => {
       return;
     }
 
-    let finalAddress = '';
+    let finalAddress;
     const chosenBranch = branches.find((b) => b._id === selectedBranchId) || branches[0];
 
     if (deliveryType === 'CLICK_COLLECT') {
