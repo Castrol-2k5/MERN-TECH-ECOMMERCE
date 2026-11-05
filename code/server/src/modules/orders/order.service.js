@@ -443,7 +443,7 @@ export class OrderService {
    * Điều phối / Phân bổ đơn hàng B2C sang chi nhánh xử lý
    * Quyền: SUPER_ADMIN, BRANCH_MANAGER
    */
-  static async allocateOrder(orderId, branchId, currentUser) {
+  static async allocateOrder(orderId, branchId, _currentUser) {
     const order = await Order.findById(orderId);
     if (!order) {
       throw new AppError('Không tìm thấy đơn hàng cần điều phối.', 404, 'ORDER_NOT_FOUND');

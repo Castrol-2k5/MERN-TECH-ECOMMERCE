@@ -12,27 +12,40 @@ export const SerialListDrawer = ({ isOpen, onClose, item, branchId }) => {
   useEffect(() => {
     if (!isOpen || !item) return;
 
-    if (isMockEnabled()) {
-      setLiveSerials(item.serials || []);
-      return;
-    }
-
+    let ignore = false;
     const fetchSerials = async () => {
+      if (isMockEnabled()) {
+        if (!ignore) {
+          setLiveSerials(item.serials || []);
+        }
+        return;
+      }
+
       setIsLoading(true);
       try {
         const data = await inventoryService.getSerials({
           productSkuId: item.productSkuId || item._id,
           branchId: branchId || item.branchId,
         });
-        setLiveSerials(data.length > 0 ? data : (item.serials || []));
+        if (!ignore) {
+          setLiveSerials(data.length > 0 ? data : (item.serials || []));
+        }
       } catch {
-        setLiveSerials(item.serials || []);
+        if (!ignore) {
+          setLiveSerials(item.serials || []);
+        }
       } finally {
-        setIsLoading(false);
+        if (!ignore) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchSerials();
+
+    return () => {
+      ignore = true;
+    };
   }, [isOpen, item, branchId]);
 
   if (!isOpen || !item) return null;
@@ -158,7 +171,12 @@ export const SerialListDrawer = ({ isOpen, onClose, item, branchId }) => {
 
           {/* List of serials */}
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {filteredSerials.length === 0 ? (
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-400 text-xs">
+                <div className="w-5 h-5 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin"></div>
+                <span>Đang tải danh sách Serial/IMEI...</span>
+              </div>
+            ) : filteredSerials.length === 0 ? (
               <div className="text-center py-10 text-slate-500 text-xs">
                 Không tìm thấy mã Serial/IMEI nào phù hợp
               </div>

@@ -12,7 +12,6 @@ import { Product } from '../../src/modules/products/product.model.js';
 setupTestDB();
 
 describe('Order Dispatch & Fulfillment Integration Tests (UC-BM-04 -> UC-BM-06)', () => {
-  let superAdminToken;
   let managerToken;
   let branchQ1;
   let branchTD;
@@ -47,11 +46,10 @@ describe('Order Dispatch & Fulfillment Integration Tests (UC-BM-04 -> UC-BM-06)'
       role: USER_ROLES.SUPER_ADMIN,
       isActive: true
     });
-    const adminLogin = await request(app).post('/api/v1/auth/login').send({
+    await request(app).post('/api/v1/auth/login').send({
       identifier: 'admin.dispatch@techstore.com',
       password: 'Pass@123'
     });
-    superAdminToken = adminLogin.body.data.accessToken;
 
     await User.create({
       fullName: 'Manager Q1',
