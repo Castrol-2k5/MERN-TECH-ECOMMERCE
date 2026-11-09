@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import {
   X,
@@ -10,8 +10,10 @@ import {
   ExternalLink,
   Store,
   Compass,
+  Layers,
+  Crosshair,
+  Maximize2
 } from 'lucide-react';
-import { useState } from 'react';
 import {
   extractBranchCoordinates,
   calculateDistanceKm,
@@ -23,7 +25,9 @@ import {
 export const BranchMapModal = ({ isOpen, onClose, branch, userCoords, onSelectBranch }) => {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
+  const tileLayerRef = useRef(null);
   const [copied, setCopied] = useState(false);
+  const [mapLayerType, setMapLayerType] = useState('streets'); // 'streets' | 'satellite' | 'google_embed'
 
   const branchCoords = extractBranchCoordinates(branch);
   const userLat = userCoords?.lat;
@@ -42,8 +46,32 @@ export const BranchMapModal = ({ isOpen, onClose, branch, userCoords, onSelectBr
     }
   };
 
+  // Switch Tile Layer dynamically (Streets vs Satellite)
   useEffect(() => {
-    if (!isOpen || !mapContainerRef.current || !branchCoords) return;
+    if (!mapInstanceRef.current || mapLayerType === 'google_embed') return;
+
+    if (tileLayerRef.current) {
+      mapInstanceRef.current.removeLayer(tileLayerRef.current);
+      tileLayerRef.current = null;
+    }
+
+    const tileUrl =
+      mapLayerType === 'satellite'
+        ? 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'
+        : 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
+
+    const newLayer = L.tileLayer(tileUrl, {
+      subdomains: ['0', '1', '2', '3'],
+      maxZoom: 20,
+      attribution: '&copy; Google Maps Imagery',
+    }).addTo(mapInstanceRef.current);
+
+    tileLayerRef.current = newLayer;
+  }, [mapLayerType]);
+
+  // Initialize Leaflet Map
+  useEffect(() => {
+    if (!isOpen || mapLayerType === 'google_embed' || !mapContainerRef.current || !branchCoords) return;
 
     // Destroy existing map if any
     if (mapInstanceRef.current) {
@@ -63,46 +91,53 @@ export const BranchMapModal = ({ isOpen, onClose, branch, userCoords, onSelectBr
 
     mapInstanceRef.current = map;
 
-    // Add OpenStreetMap tile layer
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',
-      maxZoom: 19,
+    // Add high-speed Google Maps Tile Layer
+    const tileUrl =
+      mapLayerType === 'satellite'
+        ? 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'
+        : 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
+
+    const tileLayer = L.tileLayer(tileUrl, {
+      subdomains: ['0', '1', '2', '3'],
+      maxZoom: 20,
+      attribution: '&copy; Google Maps Imagery',
     }).addTo(map);
 
-    // Custom Red Pin for Store
+    tileLayerRef.current = tileLayer;
+
+    // Custom Red Pin for Showroom
     const branchIcon = L.divIcon({
       className: 'custom-branch-marker',
       html: `
         <div style="
           background-color: #ef4444;
-          width: 38px;
-          height: 38px;
+          width: 40px;
+          height: 40px;
           border-radius: 50% 50% 50% 0;
           transform: rotate(-45deg);
           border: 3px solid #ffffff;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+          box-shadow: 0 4px 14px rgba(0,0,0,0.35);
           display: flex;
           align-items: center;
           justify-content: center;
         ">
-          <svg style="transform: rotate(45deg); width: 18px; height: 18px; fill: none; stroke: #ffffff; stroke-width: 2.2;" viewBox="0 0 24 24">
+          <svg style="transform: rotate(45deg); width: 20px; height: 20px; fill: none; stroke: #ffffff; stroke-width: 2.2;" viewBox="0 0 24 24">
             <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
             <polyline points="9 22 9 12 15 12 15 22"></polyline>
           </svg>
         </div>
       `,
-      iconSize: [38, 38],
-      iconAnchor: [19, 38],
-      popupAnchor: [0, -38],
+      iconSize: [40, 40],
+      iconAnchor: [20, 40],
+      popupAnchor: [0, -40],
     });
 
     const branchMarker = L.marker([lat, lng], { icon: branchIcon }).addTo(map);
     branchMarker
       .bindPopup(
-        `<div style="font-family: inherit; font-size: 13px; line-height: 1.4;">
-          <b style="color: #1e3a8a; font-size: 14px;">${branch.branchName || branch.name}</b><br/>
-          <span style="color: #475569;">${branch.address}</span>
+        `<div style="font-family: inherit; font-size: 13px; line-height: 1.4; padding: 2px;">
+          <b style="color: #1e3a8a; font-size: 14px; display: block; margin-bottom: 2px;">${branch.branchName || branch.name}</b>
+          <span style="color: #475569; font-size: 12px;">${branch.address}</span>
         </div>`
       )
       .openPopup();
@@ -113,23 +148,28 @@ export const BranchMapModal = ({ isOpen, onClose, branch, userCoords, onSelectBr
         className: 'custom-user-marker',
         html: `
           <div style="
-            background-color: #3b82f6;
-            width: 24px;
-            height: 24px;
+            background-color: #2563eb;
+            width: 26px;
+            height: 26px;
             border-radius: 50%;
             border: 3px solid #ffffff;
-            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.35), 0 3px 8px rgba(0,0,0,0.3);
-          "></div>
+            box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.4), 0 3px 8px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          ">
+            <div style="width: 8px; height: 8px; background-color: #ffffff; border-radius: 50%;"></div>
+          </div>
         `,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
-        popupAnchor: [0, -12],
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
+        popupAnchor: [0, -13],
       });
 
       const userMarker = L.marker([userLat, userLng], { icon: userIcon }).addTo(map);
       userMarker.bindPopup(
         `<div style="font-family: inherit; font-size: 12px; font-weight: bold; color: #2563eb;">
-          📍 Vị trí hiện tại của bạn
+          📍 Vị trí xuất phát của bạn
         </div>`
       );
 
@@ -138,10 +178,10 @@ export const BranchMapModal = ({ isOpen, onClose, branch, userCoords, onSelectBr
         [userLat, userLng],
         [lat, lng],
       ];
-      const polyline = L.polyline(latlngs, {
+      L.polyline(latlngs, {
         color: '#2563eb',
-        weight: 4,
-        opacity: 0.8,
+        weight: 5,
+        opacity: 0.85,
         dashArray: '8, 8',
       }).addTo(map);
 
@@ -150,10 +190,10 @@ export const BranchMapModal = ({ isOpen, onClose, branch, userCoords, onSelectBr
         [userLat, userLng],
         [lat, lng],
       ]);
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
     }
 
-    // Force map to re-calculate container size after modal animation
+    // Force map to re-calculate container size
     setTimeout(() => {
       map.invalidateSize();
     }, 200);
@@ -164,7 +204,19 @@ export const BranchMapModal = ({ isOpen, onClose, branch, userCoords, onSelectBr
         mapInstanceRef.current = null;
       }
     };
-  }, [isOpen, branchCoords, userLat, userLng, branch]);
+  }, [isOpen, branchCoords, userLat, userLng, branch, mapLayerType]);
+
+  const handleCenterStore = () => {
+    if (mapInstanceRef.current && branchCoords) {
+      mapInstanceRef.current.setView([branchCoords.lat, branchCoords.lng], 16, { animate: true });
+    }
+  };
+
+  const handleCenterUser = () => {
+    if (mapInstanceRef.current && userLat && userLng) {
+      mapInstanceRef.current.setView([userLat, userLng], 16, { animate: true });
+    }
+  };
 
   if (!isOpen || !branch) return null;
 
@@ -176,11 +228,17 @@ export const BranchMapModal = ({ isOpen, onClose, branch, userCoords, onSelectBr
     userLng,
   });
 
+  // Google Maps Embed URL (Fallback & Alternative view)
+  const googleEmbedUrl =
+    userLat && userLng && branchCoords
+      ? `https://maps.google.com/maps?saddr=${userLat},${userLng}&daddr=${branchCoords.lat},${branchCoords.lng}&hl=vi&output=embed`
+      : `https://maps.google.com/maps?q=${branchCoords?.lat || 10.7725},${branchCoords?.lng || 106.6917}&hl=vi&z=16&output=embed`;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between gap-3 bg-slate-50/50 shrink-0">
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between gap-3 bg-slate-50/70 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20">
               <Store className="w-5 h-5" />
@@ -202,19 +260,95 @@ export const BranchMapModal = ({ isOpen, onClose, branch, userCoords, onSelectBr
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer"
-            title="Đóng bản đồ"
-          >
-            <X className="w-5 h-5" />
-          </button>
+
+          <div className="flex items-center gap-2">
+            {/* Map Mode Selector Tabs */}
+            <div className="hidden sm:flex items-center bg-slate-200/80 p-0.5 rounded-xl text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setMapLayerType('streets')}
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  mapLayerType === 'streets'
+                    ? 'bg-white text-blue-700 shadow-2xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Đường phố
+              </button>
+              <button
+                type="button"
+                onClick={() => setMapLayerType('satellite')}
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  mapLayerType === 'satellite'
+                    ? 'bg-white text-blue-700 shadow-2xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Vệ tinh
+              </button>
+              <button
+                type="button"
+                onClick={() => setMapLayerType('google_embed')}
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  mapLayerType === 'google_embed'
+                    ? 'bg-white text-blue-700 shadow-2xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Google Maps Embed
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer"
+              title="Đóng bản đồ"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Map Body */}
-        <div className="relative flex-1 min-h-[300px] sm:min-h-[380px] w-full bg-slate-100">
-          <div ref={mapContainerRef} className="absolute inset-0 w-full h-full z-10" />
+        <div className="relative flex-1 min-h-[340px] sm:min-h-[440px] w-full bg-slate-100">
+          {mapLayerType === 'google_embed' ? (
+            <iframe
+              src={googleEmbedUrl}
+              title="Google Maps Embed View"
+              className="w-full h-full border-0 absolute inset-0"
+              loading="lazy"
+              allowFullScreen
+            />
+          ) : (
+            <>
+              <div ref={mapContainerRef} className="absolute inset-0 w-full h-full z-10" />
+
+              {/* Floating Quick Action Controls on Map */}
+              <div className="absolute top-3 right-3 z-20 flex flex-col gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleCenterStore}
+                  className="p-2 rounded-xl bg-white/95 backdrop-blur-md shadow-md border border-slate-200 text-slate-700 hover:text-blue-600 hover:bg-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Di chuyển tới vị trí Showroom"
+                >
+                  <Store className="w-4 h-4 text-rose-500" />
+                  <span className="hidden sm:inline">Về Showroom</span>
+                </button>
+                {userLat && userLng && (
+                  <button
+                    type="button"
+                    onClick={handleCenterUser}
+                    className="p-2 rounded-xl bg-white/95 backdrop-blur-md shadow-md border border-slate-200 text-slate-700 hover:text-blue-600 hover:bg-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title="Di chuyển tới vị trí của bạn"
+                  >
+                    <Crosshair className="w-4 h-4 text-blue-600" />
+                    <span className="hidden sm:inline">Vị trí của tôi</span>
+                  </button>
+                )}
+              </div>
+            </>
+          )}
 
           {/* Floating Distance Badge on Map */}
           {distanceKm !== null && (
