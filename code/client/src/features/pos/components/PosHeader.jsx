@@ -11,7 +11,8 @@ import {
   Wifi, 
   ShoppingBag,
   ArrowLeft,
-  LogOut
+  LogOut,
+  Coins
 } from 'lucide-react';
 import { logout } from '../../../store/slices/authSlice.js';
 import { clearCart } from '../../../store/slices/posCartSlice.js';
@@ -22,7 +23,9 @@ export const PosHeader = ({
   branches = [],
   selectedBranchId = '',
   onSelectBranch,
-  isSuperAdmin = false
+  isSuperAdmin = false,
+  currentShift = null,
+  onOpenShiftModal
 }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -173,6 +176,21 @@ export const PosHeader = ({
 
       {/* Control Actions & Status */}
       <div className="flex items-center gap-2">
+        {/* Két tiền & Ca thu ngân Button */}
+        <button
+          type="button"
+          onClick={onOpenShiftModal}
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+            currentShift
+              ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25'
+              : 'bg-amber-500/20 border-amber-500/40 text-amber-300 hover:bg-amber-500/30 animate-pulse'
+          }`}
+          title="Quản lý két tiền và chốt ca thu ngân"
+        >
+          <Coins className="w-3.5 h-3.5" />
+          <span>{currentShift ? `Ca: ${currentShift.shiftCode}` : '⚠️ Mở ca bán hàng'}</span>
+        </button>
+
         {/* Máy in nhiệt K80 Status */}
         <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-slate-800/80 rounded-md border border-slate-700/60 text-xs">
           <Printer className="w-3.5 h-3.5 text-emerald-400" />

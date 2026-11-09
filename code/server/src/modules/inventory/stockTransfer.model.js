@@ -8,6 +8,67 @@ export const TRANSFER_STATUS = {
   CANCELLED: 'CANCELLED'
 };
 
+const transferItemSchema = new Schema(
+  {
+    productId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Product',
+      required: true
+    },
+    productSkuId: {
+      type: Schema.Types.ObjectId,
+      required: true
+    },
+    sku: {
+      type: String,
+      required: true,
+      uppercase: true,
+      trim: true
+    },
+    productName: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    quantity: {
+      type: Number,
+      required: true,
+      min: [1, 'Số lượng mặt hàng tối thiểu là 1']
+    },
+    serialNumbers: {
+      type: [String],
+      default: []
+    },
+    receivedQuantity: {
+      type: Number,
+      default: 0
+    },
+    receivedSerials: {
+      type: [String],
+      default: []
+    },
+    discrepancyCount: {
+      type: Number,
+      default: 0
+    },
+    discrepancyReason: {
+      type: String,
+      default: ''
+    }
+  },
+  { _id: true }
+);
+
+const carrierInfoSchema = new Schema(
+  {
+    carrierName: { type: String, default: 'Vận chuyển nội bộ TechOne' },
+    driverName: { type: String, default: '' },
+    driverPhone: { type: String, default: '' },
+    trackingNumber: { type: String, default: '' }
+  },
+  { _id: false }
+);
+
 const stockTransferSchema = new Schema(
   {
     transferCode: {
@@ -26,25 +87,36 @@ const stockTransferSchema = new Schema(
       ref: 'Branch',
       required: [true, 'Chi nhánh tiếp nhận là bắt buộc']
     },
+    // Hỗ trợ chuyển nhiều mặt hàng trên 1 phiếu (Multi-SKU Manifest)
+    items: {
+      type: [transferItemSchema],
+      default: []
+    },
+    // Thông tin vận chuyển logistics
+    carrierInfo: {
+      type: carrierInfoSchema,
+      default: () => ({})
+    },
+    // Trường tương thích ngược đơn sản phẩm (Single SKU)
     productId: {
       type: Schema.Types.ObjectId,
       ref: 'Product',
-      required: [true, 'Sản phẩm là bắt buộc']
+      default: null
     },
     productSkuId: {
       type: Schema.Types.ObjectId,
-      required: [true, 'Mã biến thể SKU là bắt buộc']
+      default: null
     },
     sku: {
       type: String,
-      required: [true, 'Mã SKU là bắt buộc'],
       uppercase: true,
-      trim: true
+      trim: true,
+      default: ''
     },
     productName: {
       type: String,
-      required: [true, 'Tên sản phẩm là bắt buộc'],
-      trim: true
+      trim: true,
+      default: ''
     },
     quantity: {
       type: Number,
@@ -54,6 +126,14 @@ const stockTransferSchema = new Schema(
     serialNumbers: {
       type: [String],
       default: []
+    },
+    hasDiscrepancy: {
+      type: Boolean,
+      default: false
+    },
+    discrepancyReport: {
+      type: String,
+      default: ''
     },
     status: {
       type: String,

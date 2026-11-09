@@ -17,7 +17,9 @@ import {
   ShieldCheck,
   BarChart3,
   ArrowLeftRight,
-  ShieldAlert
+  ShieldAlert,
+  Coins,
+  CreditCard
 } from 'lucide-react';
 import { logout } from '../store/slices/authSlice.js';
 import { clearCart } from '../store/slices/posCartSlice.js';
@@ -124,10 +126,24 @@ export const PortalLayout = () => {
       badge: 'P-20',
       icon: ArrowLeftRight,
       roles: ['STAFF', 'BRANCH_MANAGER', 'SUPER_ADMIN']
+    },
+    {
+      to: '/portal/shifts',
+      label: 'Két Tiền & Ca Thu Ngân',
+      badge: 'Kiểm quỹ',
+      icon: Coins,
+      roles: ['STAFF', 'BRANCH_MANAGER', 'SUPER_ADMIN']
     }
   ].filter((item) => item.roles.includes(userRole));
 
   const hqAdminLinks = [
+    {
+      to: '/portal/settlements',
+      label: 'Đối Soát & Bù Trừ Chuỗi',
+      badge: 'Clearing',
+      icon: CreditCard,
+      roles: ['BRANCH_MANAGER', 'SUPER_ADMIN']
+    },
     {
       to: '/portal/admin/products',
       label: 'Quản Trị Sản Phẩm',

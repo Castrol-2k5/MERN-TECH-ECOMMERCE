@@ -152,6 +152,10 @@ export class InventoryService {
   /**
    * Tạo phiếu điều chuyển kho liên chi nhánh (Stock Transfer)
    */
+  /**
+   * Tạo phiếu điều chuyển kho liên chi nhánh (Stock Transfer)
+   * Hỗ trợ cả Multi-SKU Manifest (nhiều sản phẩm một chuyến xe) lẫn Single-SKU
+   */
   static async createTransfer(payload, currentUser) {
     const {
       sourceBranchId,
@@ -160,6 +164,8 @@ export class InventoryService {
       productSkuId,
       quantity,
       serialNumbers = [],
+      items = [],
+      carrierInfo = {},
       notes = ''
     } = payload;
 
@@ -176,10 +182,9 @@ export class InventoryService {
       );
     }
 
-    const [sourceBranch, destinationBranch, product] = await Promise.all([
+    const [sourceBranch, destinationBranch] = await Promise.all([
       Branch.findById(sourceBranchId).lean(),
-      Branch.findById(destinationBranchId).lean(),
-      Product.findById(productId).lean()
+      Branch.findById(destinationBranchId).lean()
     ]);
 
     if (!sourceBranch || !sourceBranch.isActive) {
@@ -188,61 +193,123 @@ export class InventoryService {
     if (!destinationBranch || !destinationBranch.isActive) {
       throw new AppError('Chi nhánh nhận không tồn tại hoặc đã tạm ngưng hoạt động.', 404, 'DESTINATION_BRANCH_NOT_FOUND');
     }
-    if (!product || !product.isActive) {
-      throw new AppError('Sản phẩm không tồn tại hoặc đã ngưng kinh doanh.', 404, 'PRODUCT_NOT_FOUND');
+
+    // Chuẩn hóa danh sách mặt hàng (Multi-SKU items)
+    let rawItems = [];
+    if (Array.isArray(items) && items.length > 0) {
+      rawItems = items;
+    } else if (productId && productSkuId) {
+      rawItems = [{
+        productId,
+        productSkuId,
+        quantity: Number(quantity) || 1,
+        serialNumbers: Array.isArray(serialNumbers) ? serialNumbers : []
+      }];
+    } else {
+      throw new AppError('Vui lòng chọn ít nhất một mặt hàng để điều chuyển kho.', 400, 'NO_ITEMS_TO_TRANSFER');
     }
 
-    const skuObj = product.skus?.find((s) => s._id.toString() === productSkuId.toString());
-    if (!skuObj || !skuObj.isActive) {
-      throw new AppError('Mã biến thể SKU không hợp lệ.', 400, 'SKU_NOT_FOUND');
-    }
+    const enrichedItems = [];
+    const allSerialsToTransit = [];
+    const deductedRecords = [];
 
-    if (product.isSerialManaged) {
-      if (!Array.isArray(serialNumbers) || serialNumbers.length !== quantity) {
-        throw new AppError(
-          `Sản phẩm quản lý Serial yêu cầu chọn đúng ${quantity} mã Serial tương ứng.`,
-          400,
-          'SERIAL_COUNT_MISMATCH'
+    try {
+      for (const item of rawItems) {
+        const product = await Product.findById(item.productId).lean();
+        if (!product || !product.isActive) {
+          throw new AppError(`Sản phẩm không tồn tại hoặc đã ngưng kinh doanh.`, 404, 'PRODUCT_NOT_FOUND');
+        }
+
+        const skuObj = product.skus?.find((s) => s._id.toString() === item.productSkuId.toString());
+        if (!skuObj || !skuObj.isActive) {
+          throw new AppError(`Mã biến thể SKU của '${product.name}' không hợp lệ.`, 400, 'SKU_NOT_FOUND');
+        }
+
+        const itemQty = Number(item.quantity) || 1;
+        const itemSerials = Array.isArray(item.serialNumbers) ? item.serialNumbers : [];
+
+        if (product.isSerialManaged) {
+          if (itemSerials.length !== itemQty) {
+            throw new AppError(
+              `Sản phẩm '${product.name}' quản lý Serial yêu cầu chọn đúng ${itemQty} mã Serial.`,
+              400,
+              'SERIAL_COUNT_MISMATCH'
+            );
+          }
+
+          const foundSerials = await Serial.find({
+            serialNumber: { $in: itemSerials },
+            branchId: sourceBranchId,
+            productSkuId: item.productSkuId,
+            status: SERIAL_STATUS.IN_STOCK
+          });
+
+          if (foundSerials.length !== itemSerials.length) {
+            throw new AppError(
+              `Một số mã Serial của '${product.name}' không tồn tại hoặc không ở trạng thái sẵn sàng (IN_STOCK) tại kho xuất.`,
+              400,
+              'INVALID_SERIALS'
+            );
+          }
+
+          allSerialsToTransit.push(...itemSerials);
+        }
+
+        // Trừ tồn kho tại kho xuất
+        const sourceInv = await BranchInventory.findOneAndUpdate(
+          {
+            branchId: sourceBranchId,
+            productSkuId: item.productSkuId,
+            quantity: { $gte: itemQty }
+          },
+          {
+            $inc: { quantity: -itemQty }
+          },
+          { new: true }
         );
+
+        if (!sourceInv) {
+          throw new AppError(
+            `Số lượng tồn kho của '${product.name}' tại kho xuất không đủ để điều chuyển.`,
+            400,
+            'INSUFFICIENT_STOCK'
+          );
+        }
+
+        deductedRecords.push({
+          branchId: sourceBranchId,
+          productSkuId: item.productSkuId,
+          quantity: itemQty
+        });
+
+        enrichedItems.push({
+          productId: product._id,
+          productSkuId: skuObj._id,
+          sku: skuObj.sku,
+          productName: product.name,
+          quantity: itemQty,
+          serialNumbers: itemSerials,
+          receivedQuantity: 0,
+          receivedSerials: []
+        });
       }
 
-      const foundSerials = await Serial.find({
-        serialNumber: { $in: serialNumbers },
-        branchId: sourceBranchId,
-        productSkuId,
-        status: SERIAL_STATUS.IN_STOCK
-      });
-
-      if (foundSerials.length !== serialNumbers.length) {
-        throw new AppError(
-          'Một số mã Serial không tồn tại hoặc không ở trạng thái sẵn sàng (IN_STOCK) tại chi nhánh xuất.',
-          400,
-          'INVALID_SERIALS'
+      // Khóa toàn bộ Serial sang TRANSIT
+      if (allSerialsToTransit.length > 0) {
+        await Serial.updateMany(
+          { serialNumber: { $in: allSerialsToTransit } },
+          { $set: { status: SERIAL_STATUS.TRANSIT } }
         );
       }
-    }
-
-    const sourceInv = await BranchInventory.findOneAndUpdate(
-      {
-        branchId: sourceBranchId,
-        productSkuId,
-        quantity: { $gte: quantity }
-      },
-      {
-        $inc: { quantity: -quantity }
-      },
-      { new: true }
-    );
-
-    if (!sourceInv) {
-      throw new AppError('Số lượng tồn kho tại chi nhánh xuất không đủ để điều chuyển.', 400, 'INSUFFICIENT_STOCK');
-    }
-
-    if (product.isSerialManaged && serialNumbers.length > 0) {
-      await Serial.updateMany(
-        { serialNumber: { $in: serialNumbers } },
-        { $set: { status: SERIAL_STATUS.TRANSIT } }
-      );
+    } catch (err) {
+      // Rollback nếu có lỗi ở bất kỳ mặt hàng nào
+      for (const d of deductedRecords) {
+        await BranchInventory.updateOne(
+          { branchId: d.branchId, productSkuId: d.productSkuId },
+          { $inc: { quantity: d.quantity } }
+        );
+      }
+      throw err;
     }
 
     const now = new Date();
@@ -250,16 +317,27 @@ export class InventoryService {
     const randomSuffix = crypto.randomBytes(2).toString('hex').toUpperCase();
     const transferCode = `TRF-${dateStr}-${randomSuffix}`;
 
+    const totalQty = enrichedItems.reduce((s, it) => s + it.quantity, 0);
+    const firstItem = enrichedItems[0];
+
     const transfer = await StockTransfer.create({
       transferCode,
       sourceBranchId,
       destinationBranchId,
-      productId,
-      productSkuId,
-      sku: skuObj.sku,
-      productName: product.name,
-      quantity,
-      serialNumbers,
+      items: enrichedItems,
+      carrierInfo: {
+        carrierName: carrierInfo.carrierName || 'Vận chuyển nội bộ TechOne',
+        driverName: carrierInfo.driverName || '',
+        driverPhone: carrierInfo.driverPhone || '',
+        trackingNumber: carrierInfo.trackingNumber || ''
+      },
+      // Trường tương thích ngược
+      productId: firstItem.productId,
+      productSkuId: firstItem.productSkuId,
+      sku: firstItem.sku,
+      productName: firstItem.productName,
+      quantity: totalQty,
+      serialNumbers: allSerialsToTransit,
       status: TRANSFER_STATUS.IN_TRANSIT,
       createdById: currentUser.id,
       notes
@@ -268,9 +346,6 @@ export class InventoryService {
     return transfer;
   }
 
-  /**
-   * Lấy danh sách phiếu điều chuyển kho theo chi nhánh (Inbound / Outbound)
-   */
   static async getTransfers(query = {}, currentUser) {
     const filter = {};
 
@@ -311,7 +386,10 @@ export class InventoryService {
   /**
    * Tiếp nhận điều chuyển kho tại chi nhánh đích
    */
-  static async receiveTransfer(transferId, payload, currentUser) {
+  /**
+   * Xác nhận nhập kho tại chi nhánh đích (Hỗ trợ quét kiểm đếm Barcode và biên bản sai lệch)
+   */
+  static async receiveTransfer(transferId, payload = {}, currentUser) {
     if (!mongoose.Types.ObjectId.isValid(transferId)) {
       throw new AppError('Mã phiếu điều chuyển không hợp lệ.', 400, 'INVALID_TRANSFER_ID');
     }
@@ -342,21 +420,79 @@ export class InventoryService {
       );
     }
 
-    if (transfer.serialNumbers && transfer.serialNumbers.length > 0) {
-      const scannedSerials = payload.scannedSerials || [];
-      if (scannedSerials.length > 0) {
-        const isMatched = transfer.serialNumbers.every((s) => scannedSerials.includes(s));
-        if (!isMatched) {
-          throw new AppError(
-            'Danh sách Serial quét đối chiếu không khớp với phiếu điều chuyển.',
-            400,
-            'SERIAL_VERIFICATION_FAILED'
+    const scannedSerials = Array.isArray(payload.scannedSerials)
+      ? payload.scannedSerials.map((s) => String(s).trim().toUpperCase()).filter(Boolean)
+      : [];
+    const discrepancyReport = payload.discrepancyReport || '';
+
+    // Xử lý các items trong phiếu
+    const itemsList = Array.isArray(transfer.items) && transfer.items.length > 0
+      ? transfer.items
+      : [{
+          productId: transfer.productId,
+          productSkuId: transfer.productSkuId,
+          sku: transfer.sku,
+          productName: transfer.productName,
+          quantity: transfer.quantity,
+          serialNumbers: transfer.serialNumbers || []
+        }];
+
+    let hasAnyDiscrepancy = Boolean(discrepancyReport);
+    const validSerialsToImport = [];
+
+    for (const item of itemsList) {
+      if (item.serialNumbers && item.serialNumbers.length > 0) {
+        // Lấy danh sách serials thực tế được quét khớp
+        const matched = item.serialNumbers.filter((s) => scannedSerials.includes(s));
+        // Nếu không gửi scannedSerials (nhận nhanh toàn bộ) thì mặc định nhận đủ
+        const effectiveReceived = scannedSerials.length > 0 ? matched : item.serialNumbers;
+
+        item.receivedQuantity = effectiveReceived.length;
+        item.receivedSerials = effectiveReceived;
+
+        if (effectiveReceived.length < item.quantity) {
+          hasAnyDiscrepancy = true;
+          item.discrepancyCount = item.quantity - effectiveReceived.length;
+          item.discrepancyReason = discrepancyReport || 'Thiếu serial khi quét kiểm đếm';
+        }
+
+        validSerialsToImport.push(...effectiveReceived);
+
+        // Tăng tồn kho thực nhận vào chi nhánh đích
+        if (effectiveReceived.length > 0) {
+          await BranchInventory.findOneAndUpdate(
+            {
+              branchId: transfer.destinationBranchId,
+              productId: item.productId,
+              productSkuId: item.productSkuId
+            },
+            {
+              $inc: { quantity: effectiveReceived.length }
+            },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
           );
         }
+      } else {
+        // Hàng không quản lý serial: Nhận theo số lượng
+        item.receivedQuantity = item.quantity;
+        await BranchInventory.findOneAndUpdate(
+          {
+            branchId: transfer.destinationBranchId,
+            productId: item.productId,
+            productSkuId: item.productSkuId
+          },
+          {
+            $inc: { quantity: item.quantity }
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
       }
+    }
 
+    // Cập nhật trạng thái Serial đã nhận thành IN_STOCK tại chi nhánh đích
+    if (validSerialsToImport.length > 0) {
       await Serial.updateMany(
-        { serialNumber: { $in: transfer.serialNumbers } },
+        { serialNumber: { $in: validSerialsToImport } },
         {
           $set: {
             status: SERIAL_STATUS.IN_STOCK,
@@ -366,18 +502,9 @@ export class InventoryService {
       );
     }
 
-    await BranchInventory.findOneAndUpdate(
-      {
-        branchId: transfer.destinationBranchId,
-        productId: transfer.productId,
-        productSkuId: transfer.productSkuId
-      },
-      {
-        $inc: { quantity: transfer.quantity }
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
-
+    transfer.items = itemsList;
+    transfer.hasDiscrepancy = hasAnyDiscrepancy;
+    transfer.discrepancyReport = discrepancyReport;
     transfer.status = TRANSFER_STATUS.COMPLETED;
     transfer.receivedById = currentUser.id;
     transfer.receivedAt = new Date();

@@ -39,7 +39,10 @@ export const StockTransferPage = () => {
     productSkuId: '',
     quantity: 1,
     serialNumbers: [],
-    notes: ''
+    notes: '',
+    carrierName: 'Vận chuyển nội bộ TechOne',
+    driverName: '',
+    driverPhone: ''
   });
   const [availableSerials, setAvailableSerials] = useState([]);
   const [createLoading, setCreateLoading] = useState(false);
@@ -51,6 +54,8 @@ export const StockTransferPage = () => {
   const [scanInput, setScanInput] = useState('');
   const [receiveLoading, setReceiveLoading] = useState(false);
   const [receiveError, setReceiveError] = useState('');
+  const [discrepancyReport, setDiscrepancyReport] = useState('');
+  const [isReportingDiscrepancy, setIsReportingDiscrepancy] = useState(false);
 
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -693,7 +698,31 @@ export const StockTransferPage = () => {
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              {/* Discrepancy Reporting Block */}
+            <div className="p-3 bg-slate-950 border border-slate-800 rounded-2xl space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-amber-400">
+                <input
+                  type="checkbox"
+                  checked={isReportingDiscrepancy}
+                  onChange={(e) => setIsReportingDiscrepancy(e.target.checked)}
+                  className="rounded text-amber-500 bg-slate-900 border-slate-700"
+                />
+                <span>Lập biên bản nhận thiếu / hàng hỏng (Sai lệch kiểm đếm)</span>
+              </label>
+
+              {isReportingDiscrepancy && (
+                <textarea
+                  rows="2"
+                  value={discrepancyReport}
+                  onChange={(e) => setDiscrepancyReport(e.target.value)}
+                  placeholder="Ghi rõ số lượng máy thiếu, vỡ màn hình hoặc lý do từ chối nhận..."
+                  className="w-full p-2 bg-slate-900 border border-amber-500/40 rounded-xl text-white text-xs focus:outline-none"
+                  required
+                />
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}

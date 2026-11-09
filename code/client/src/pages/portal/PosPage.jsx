@@ -27,6 +27,8 @@ import PosCartTable from '../../features/pos/components/PosCartTable';
 import PosCheckoutPanel from '../../features/pos/components/PosCheckoutPanel';
 import SerialAssignmentModal from '../../features/pos/components/SerialAssignmentModal';
 import InvoiceK80Modal from '../../features/pos/components/InvoiceK80Modal';
+import ShiftControlModal from '../../features/pos/components/ShiftControlModal';
+import posShiftService from '../../features/pos/services/posShiftService';
 import { toPosCheckoutPayload } from '../../features/orders/services/orderAdapter';
 
 export const PosPage = () => {
@@ -58,6 +60,22 @@ export const PosPage = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [scanNotification, setScanNotification] = useState(null);
+  const [currentShift, setCurrentShift] = useState(null);
+  const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
+
+  // Load current shift on mount and branch change
+  const reloadShift = useCallback(async () => {
+    try {
+      const shift = await posShiftService.getCurrentShift();
+      setCurrentShift(shift || null);
+    } catch {
+      setCurrentShift(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    reloadShift();
+  }, [reloadShift, activeBranchId]);
 
   // Fetch branches on mount
   useEffect(() => {
@@ -241,6 +259,7 @@ export const PosPage = () => {
 
       // Tải lại danh mục tồn kho & Serial khả dụng sau khi thanh toán thành công
       loadPosCatalog();
+      reloadShift();
     } catch (err) {
       playErrorBeep();
       setScanNotification({
@@ -281,6 +300,8 @@ export const PosPage = () => {
         selectedBranchId={activeBranchId}
         onSelectBranch={handleSelectBranch}
         isSuperAdmin={isSuperAdmin}
+        currentShift={currentShift}
+        onOpenShiftModal={() => setIsShiftModalOpen(true)}
       />
 
       {/* Main Split Screen Workspace: Left (Catalog/Scan 60%) + Right (Cart/Checkout 40%) */}
@@ -386,6 +407,18 @@ export const PosPage = () => {
         onClose={() => setCompletedOrder(null)}
         orderData={completedOrder}
         onNewOrder={handleNewOrder}
+      />
+
+      {/* POS Cash Drawer Shift Management Modal */}
+      <ShiftControlModal
+        isOpen={isShiftModalOpen}
+        onClose={() => setIsShiftModalOpen(false)}
+        currentShift={currentShift}
+        onShiftUpdated={(updated) => {
+          setCurrentShift(updated);
+          reloadShift();
+        }}
+        branchName={branches.find((b) => String(b._id) === String(activeBranchId))?.name || 'Showroom'}
       />
     </div>
   );

@@ -207,6 +207,14 @@ export class OrderService {
       );
     }
 
+    if (order.paymentMethod === PAYMENT_METHODS.CASH) {
+      try {
+        await PosShiftService.recordCashSale(branchId, currentUser.id || currentUser._id, calculatedTotal);
+      } catch (shiftErr) {
+        console.warn('Could not record cash sale to POS shift:', shiftErr.message);
+      }
+    }
+
     return order;
   }
 
@@ -766,6 +774,12 @@ export class OrderService {
     order.staffId = currentUser.id || currentUser._id;
     order.completedAt = new Date();
     await order.save();
+
+    try {
+      await SettlementService.recordOrderSettlement(order);
+    } catch (settleErr) {
+      console.warn('Could not record order settlement:', settleErr.message);
+    }
 
     const populated = await Order.findById(order._id)
       .populate('branchId', 'name branchCode address phone')

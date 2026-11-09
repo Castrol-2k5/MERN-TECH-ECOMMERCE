@@ -19,6 +19,8 @@ import orderRoutes from './modules/orders/order.routes.js';
 import warrantyRoutes from './modules/warranty/warranty.routes.js';
 import userRoutes from './modules/users/user.routes.js';
 import analyticsRoutes from './modules/analytics/analytics.routes.js';
+import posShiftRoutes from './modules/shifts/posShift.routes.js';
+import settlementRoutes from './modules/accounting/settlement.routes.js';
 
 const app = express();
 
@@ -66,6 +68,8 @@ app.use(`${env.API_PREFIX}/orders`, orderRoutes);
 app.use(`${env.API_PREFIX}/warranty`, warrantyRoutes);
 app.use(`${env.API_PREFIX}/users`, userRoutes);
 app.use(`${env.API_PREFIX}/analytics`, analyticsRoutes);
+app.use(`${env.API_PREFIX}/shifts`, posShiftRoutes);
+app.use(`${env.API_PREFIX}/settlements`, settlementRoutes);
 
 // Internal routes for integration testing RBAC and data scoping
 app.get(`${env.API_PREFIX}/test/admin-only`, protect, authorize('SUPER_ADMIN'), (req, res) => {

@@ -40,6 +40,8 @@ import SerialImportPage from '../pages/portal/SerialImportPage.jsx';
 import OrderDispatchPage from '../pages/portal/OrderDispatchPage.jsx';
 import AdminBranchesUsersPage from '../pages/portal/AdminBranchesUsersPage.jsx';
 import AdminAnalyticsPage from '../pages/portal/AdminAnalyticsPage.jsx';
+import PosShiftReportPage from '../pages/portal/PosShiftReportPage.jsx';
+import InterBranchSettlementPage from '../pages/portal/InterBranchSettlementPage.jsx';
 
 const PortalIndexRedirect = () => {
   const user = useSelector((state) => state.auth?.user);
@@ -63,11 +65,13 @@ export const AppRoutes = () => {
           <Route path="warranty-reception" element={<WarrantyReceptionPage />} />
           <Route path="branch/orders" element={<BranchOrdersPage />} />
           <Route path="branch/transfers" element={<StockTransferPage />} />
+          <Route path="shifts" element={<PosShiftReportPage />} />
           <Route path="admin/orders-dispatch" element={<OrderDispatchPage />} />
 
           {/* Branch Manager & Super Admin Operations */}
           <Route element={<RoleProtectedRoute allowedRoles={['BRANCH_MANAGER', 'SUPER_ADMIN']} />}>
             <Route path="admin/import-serials" element={<SerialImportPage />} />
+            <Route path="settlements" element={<InterBranchSettlementPage />} />
           </Route>
 
           {/* HQ Administration & Operations (SUPER_ADMIN Only) */}
