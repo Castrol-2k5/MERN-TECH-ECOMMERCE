@@ -249,10 +249,21 @@ export const MultiBranchStockBox = ({
                   <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
                     <span
                       className={`px-2.5 py-1 rounded-full text-[11px] font-bold border shrink-0 ${
-                        badgeStyles[branch.badgeVariant] || (isAvailable ? badgeStyles.success : badgeStyles.danger)
+                        branch.badgeVariant
+                          ? badgeStyles[branch.badgeVariant]
+                          : !isAvailable
+                          ? badgeStyles.danger
+                          : branch.quantity <= 3
+                          ? badgeStyles.warning
+                          : badgeStyles.success
                       }`}
                     >
-                      {branch.statusLabel || (isAvailable ? `Còn ${branch.quantity} máy` : 'Hết hàng')}
+                      {branch.statusLabel ||
+                        (!isAvailable
+                          ? 'Hết hàng'
+                          : branch.quantity <= 3
+                          ? `⚠️ Chỉ còn ${branch.quantity} máy`
+                          : `Còn ${branch.quantity} máy`)}
                     </span>
 
                     {/* Map Modal Button */}

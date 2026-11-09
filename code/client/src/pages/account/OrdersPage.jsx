@@ -16,12 +16,15 @@ import {
   User
 } from 'lucide-react';
 import { orderService } from '../../features/orders/services/orderService.js';
+import DataTablePagination from '../../components/common/DataTablePagination';
 
 export const OrdersPage = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   useEffect(() => {
     let ignore = false;
@@ -72,6 +75,16 @@ export const OrdersPage = () => {
     }
     return order.orderStatus === activeTab;
   });
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    setCurrentPage(1);
+  };
+
+  const paginatedOrders = filteredOrders.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -182,7 +195,7 @@ export const OrdersPage = () => {
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => handleTabChange(tab.id)}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
               activeTab === tab.id
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
@@ -234,80 +247,97 @@ export const OrdersPage = () => {
       ) : (
         /* Orders List */
         <div className="space-y-4">
-          {filteredOrders.map((order) => (
-            <div
-              key={order._id || order.id}
-              className="bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-6 shadow-xs hover:border-blue-200 transition-all space-y-4"
-            >
-              {/* Order Card Top Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-slate-100">
-                <div className="flex items-center gap-3">
-                  <span className="font-mono font-black text-sm text-blue-600">
-                    {order.orderCode}
-                  </span>
-                  <span className="text-xs text-slate-400 flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5" />
-                    {formatDate(order.createdAt)}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  {getStatusBadge(order.orderStatus)}
-                </div>
-              </div>
-
-              {/* Order Items Preview */}
-              <div className="space-y-2">
-                {order.items?.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between text-xs py-1"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full bg-slate-300" />
-                      <span className="font-bold text-slate-900 line-clamp-1 max-w-[280px] sm:max-w-md">
-                        {item.productName}
-                      </span>
-                      <span className="text-slate-400 font-mono text-[11px]">
-                        x{item.quantity}
-                      </span>
-                    </div>
-                    <span className="font-bold text-slate-700">
-                      {formatPrice(item.unitPrice * item.quantity)}
+          <div className="space-y-4">
+            {paginatedOrders.map((order) => (
+              <div
+                key={order._id || order.id}
+                className="bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-6 shadow-xs hover:border-blue-200 transition-all space-y-4"
+              >
+                {/* Order Card Top Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono font-black text-sm text-blue-600">
+                      {order.orderCode}
+                    </span>
+                    <span className="text-xs text-slate-400 flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5" />
+                      {formatDate(order.createdAt)}
                     </span>
                   </div>
-                ))}
-              </div>
 
-              {/* Order Footer & Actions */}
-              <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
-                <div className="flex items-center gap-4 text-slate-500">
-                  {order.branchId?.name && (
-                    <span className="flex items-center gap-1.5">
-                      <Store className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{order.branchId.name}</span>
+                  <div className="flex items-center gap-3">
+                    {getStatusBadge(order.orderStatus)}
+                  </div>
+                </div>
+
+                {/* Order Items Preview */}
+                <div className="space-y-2">
+                  {order.items?.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between text-xs py-1"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-slate-300" />
+                        <span className="font-bold text-slate-900 line-clamp-1 max-w-[280px] sm:max-w-md">
+                          {item.productName}
+                        </span>
+                        <span className="text-slate-400 font-mono text-[11px]">
+                          x{item.quantity}
+                        </span>
+                      </div>
+                      <span className="font-bold text-slate-700">
+                        {formatPrice(item.unitPrice * item.quantity)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Order Footer & Actions */}
+                <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-4 text-slate-500">
+                    {order.branchId?.name && (
+                      <span className="flex items-center gap-1.5">
+                        <Store className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{order.branchId.name}</span>
+                      </span>
+                    )}
+                    <span>
+                      Tổng thanh toán:{' '}
+                      <strong className="text-sm font-black text-blue-600">
+                        {formatPrice(order.totalAmount)}
+                      </strong>
                     </span>
-                  )}
-                  <span>
-                    Tổng thanh toán:{' '}
-                    <strong className="text-sm font-black text-blue-600">
-                      {formatPrice(order.totalAmount)}
-                    </strong>
-                  </span>
-                </div>
+                  </div>
 
-                <div className="flex items-center gap-2">
-                  <Link
-                    to={`/account/orders/${order._id || order.id}`}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold transition-colors"
-                  >
-                    <span>Chi tiết đơn hàng</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <Link
+                      to={`/account/orders/${order._id || order.id}`}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold transition-colors"
+                    >
+                      <span>Chi tiết đơn hàng</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+
+          {/* Light Pagination */}
+          <DataTablePagination
+            currentPage={currentPage}
+            pageSize={pageSize}
+            totalItems={filteredOrders.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            }}
+            pageSizeOptions={[5, 10, 20]}
+            variant="light"
+            itemLabel="đơn hàng"
+          />
         </div>
       )}
     </div>

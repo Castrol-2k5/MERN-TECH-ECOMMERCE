@@ -39,7 +39,13 @@ export const ProductCard = ({ product }) => {
     }
   };
 
-  const isOutOfStock = product.stockStatus === 'OUT_OF_STOCK_ONLINE';
+  const isOutOfStock =
+    product.stockStatus === 'OUT_OF_STOCK_ONLINE' ||
+    product.stockStatus === 'OUT_OF_STOCK';
+  const isLowStock =
+    !isOutOfStock &&
+    (product.stockStatus === 'LOW_STOCK' ||
+      (typeof product.totalStock === 'number' && product.totalStock > 0 && product.totalStock <= 5));
 
   return (
     <div className="group relative bg-white rounded-2xl border border-slate-200/80 p-4 transition-all duration-200 hover:shadow-xl hover:border-blue-200 flex flex-col justify-between">
@@ -47,6 +53,12 @@ export const ProductCard = ({ product }) => {
         {product.discountPercentage > 0 && (
           <span className="absolute top-2.5 left-2.5 z-10 px-2 py-1 bg-red-600 text-white text-[11px] font-bold rounded-lg shadow-xs">
             -{product.discountPercentage}%
+          </span>
+        )}
+
+        {isLowStock && (
+          <span className="absolute top-2.5 right-11 z-10 px-2 py-0.5 bg-amber-500 text-white text-[10px] font-bold rounded-md shadow-xs flex items-center gap-1 animate-pulse">
+            🔥 Sắp hết
           </span>
         )}
 
@@ -110,10 +122,14 @@ export const ProductCard = ({ product }) => {
         <div className="mt-2.5 pt-2 border-t border-slate-50 flex items-center justify-between text-[11px]">
           <span
             className={`font-semibold ${
-              isOutOfStock ? 'text-red-500' : 'text-emerald-600'
+              isOutOfStock
+                ? 'text-rose-500'
+                : isLowStock
+                ? 'text-amber-600'
+                : 'text-emerald-600'
             }`}
           >
-            ● {isOutOfStock ? 'Hết hàng online' : 'Còn hàng tại showroom'}
+            ● {isOutOfStock ? 'Hết hàng online' : isLowStock ? 'Sắp hết hàng' : 'Còn hàng tại showroom'}
           </span>
           <span className="text-slate-400">Trả góp 0%</span>
         </div>

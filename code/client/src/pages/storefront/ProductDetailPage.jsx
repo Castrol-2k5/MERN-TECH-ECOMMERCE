@@ -10,7 +10,8 @@ import {
   CheckCircle2,
   Scale,
   ShoppingCart,
-  AlertCircle
+  AlertCircle,
+  Flame
 } from 'lucide-react';
 import useProductDetail from '../../features/products/hooks/useProductDetail.js';
 import ProductImageGallery from '../../features/products/components/ProductImageGallery.jsx';
@@ -325,6 +326,27 @@ export const ProductDetailPage = () => {
               </li>
             </ul>
           </div>
+
+          {/* Low-stock urgency warning banner */}
+          {selectedBranch && selectedBranch.quantity > 0 && selectedBranch.quantity <= 3 ? (
+            <div className="flex items-center gap-2.5 px-4 py-2.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300/80 rounded-2xl text-amber-950 text-xs font-semibold shadow-xs">
+              <span className="flex h-2.5 w-2.5 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+              </span>
+              <Flame className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                Chỉ còn <strong className="text-amber-700">{selectedBranch.quantity} sản phẩm</strong> tại showroom <strong className="text-slate-900">{selectedBranch.branchName || 'được chọn'}</strong> — Đặt giữ ngay trước khi hết!
+              </span>
+            </div>
+          ) : stockSummary.totalStock !== null && stockSummary.totalStock > 0 && stockSummary.totalStock <= 5 ? (
+            <div className="flex items-center gap-2.5 px-4 py-2.5 bg-gradient-to-r from-rose-50 to-orange-50 border border-rose-300/80 rounded-2xl text-rose-950 text-xs font-semibold shadow-xs">
+              <Flame className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>
+                ⚡ Toàn hệ thống chỉ còn <strong className="text-rose-700">{stockSummary.totalStock} sản phẩm</strong> — Nhanh tay đặt hàng!
+              </span>
+            </div>
+          ) : null}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
             <button

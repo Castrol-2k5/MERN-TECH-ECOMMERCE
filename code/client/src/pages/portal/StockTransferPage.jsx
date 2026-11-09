@@ -14,12 +14,15 @@ import {
 } from 'lucide-react';
 import axiosClient from '../../services/axiosClient.js';
 import usePosAudio from '../../features/pos/hooks/usePosAudio.js';
+import DataTablePagination from '../../components/common/DataTablePagination';
 
 export const StockTransferPage = () => {
   const authUser = useSelector((state) => state.auth?.user);
   const { playSuccessBeep, playErrorBeep } = usePosAudio();
   const [activeTab, setActiveTab] = useState(authUser?.role === 'STAFF' ? 'inbound' : 'outbound'); // 'outbound' | 'inbound'
   const [selectedBranchFilter, setSelectedBranchFilter] = useState('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [transfers, setTransfers] = useState([]);
   const [branches, setBranches] = useState([]);
   const [products, setProducts] = useState([]);
@@ -207,6 +210,12 @@ export const StockTransferPage = () => {
   };
 
   // Receive Verification Flow
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, selectedBranchFilter]);
+
+  const paginatedTransfers = transfers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   const handleOpenReceiveModal = (transfer) => {
     setSelectedTransferForReceive(transfer);
     setScannedSerials([]);
@@ -401,6 +410,7 @@ export const StockTransferPage = () => {
             Không có phiếu điều chuyển nào trong mục này.
           </div>
         ) : (
+          <>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-slate-300">
               <thead className="bg-slate-950 text-slate-400 uppercase text-[11px] font-bold border-b border-slate-800">
@@ -416,7 +426,7 @@ export const StockTransferPage = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 font-medium">
-                {transfers.map((item) => (
+                {paginatedTransfers.map((item) => (
                   <tr key={item._id} className="hover:bg-slate-800/40 transition-colors">
                     <td className="py-3.5 px-4 font-mono font-bold text-blue-400">
                       {item.transferCode}
@@ -478,6 +488,19 @@ export const StockTransferPage = () => {
               </tbody>
             </table>
           </div>
+          <DataTablePagination
+            currentPage={currentPage}
+            pageSize={pageSize}
+            totalItems={transfers.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            }}
+            variant="dark"
+            itemLabel="phiếu chuyển kho"
+          />
+          </>
         )}
       </div>
 

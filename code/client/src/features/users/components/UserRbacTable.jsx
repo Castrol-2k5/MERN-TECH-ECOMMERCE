@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Search, Filter } from 'lucide-react';
+import DataTablePagination from '../../../components/common/DataTablePagination';
 
 export const UserRbacTable = ({
   users = [],
@@ -10,16 +11,25 @@ export const UserRbacTable = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-  const filteredUsers = users.filter((u) => {
-    const q = searchTerm.toLowerCase();
-    const matchSearch =
-      u.fullName?.toLowerCase().includes(q) ||
-      u.email?.toLowerCase().includes(q) ||
-      u.phone?.includes(searchTerm);
-    const matchRole = roleFilter === 'ALL' || u.role === roleFilter;
-    return matchSearch && matchRole;
-  });
+  const filteredUsers = useMemo(() => {
+    return users.filter((u) => {
+      const q = searchTerm.toLowerCase();
+      const matchSearch =
+        u.fullName?.toLowerCase().includes(q) ||
+        u.email?.toLowerCase().includes(q) ||
+        u.phone?.includes(searchTerm);
+      const matchRole = roleFilter === 'ALL' || u.role === roleFilter;
+      return matchSearch && matchRole;
+    });
+  }, [users, searchTerm, roleFilter]);
+
+  const paginatedUsers = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredUsers.slice(start, start + pageSize);
+  }, [filteredUsers, currentPage, pageSize]);
 
   const getRoleBadge = (role) => {
     switch (role) {
@@ -85,7 +95,7 @@ export const UserRbacTable = ({
                 </td>
               </tr>
             ) : (
-              filteredUsers.map((user) => {
+              paginatedUsers.map((user) => {
                 const isActive = user.isActive !== false;
                 const currentBranchId =
                   typeof user.branchId === 'object'
@@ -187,6 +197,20 @@ export const UserRbacTable = ({
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      <DataTablePagination
+        currentPage={currentPage}
+        pageSize={pageSize}
+        totalItems={filteredUsers.length}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(newSize) => {
+          setPageSize(newSize);
+          setCurrentPage(1);
+        }}
+        variant="dark"
+        itemLabel="tài khoản"
+      />
     </div>
   );
 };

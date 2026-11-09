@@ -32,6 +32,7 @@ import { warrantyService } from '../../features/warranty/services/warrantyServic
 import { inventoryService } from '../../features/inventory/services/inventoryService.js';
 import usePosAudio from '../../features/pos/hooks/usePosAudio';
 import Toast from '../../components/common/Toast';
+import DataTablePagination from '../../components/common/DataTablePagination';
 
 const formatVND = (val) => `${Number(val || 0).toLocaleString('vi-VN')} ₫`;
 
@@ -87,6 +88,8 @@ export const BranchOrdersPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Modal state
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -171,6 +174,15 @@ export const BranchOrdersPage = () => {
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedBranchId, orderTypeFilter, orderStatusFilter, searchQuery]);
+
+  const paginatedOrders = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return orders.slice(startIndex, startIndex + pageSize);
+  }, [orders, currentPage, pageSize]);
 
   const currentBranchName = useMemo(() => {
     if (authUser?.branch?.name) return authUser.branch.name;
@@ -607,7 +619,7 @@ export const BranchOrdersPage = () => {
                   </td>
                 </tr>
               ) : (
-                orders.map((order) => {
+                paginatedOrders.map((order) => {
                   const statusMeta = ORDER_STATUS_META[order.orderStatus] || {
                     label: order.orderStatus,
                     badgeClass: 'bg-slate-800 text-slate-300 border-slate-700',
@@ -742,6 +754,20 @@ export const BranchOrdersPage = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        <DataTablePagination
+          currentPage={currentPage}
+          pageSize={pageSize}
+          totalItems={orders.length}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setCurrentPage(1);
+          }}
+          variant="dark"
+          itemLabel="đơn hàng"
+        />
       </div>
 
       {/* Order Detail & Serial Warranty Modal */}
