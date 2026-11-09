@@ -47,6 +47,8 @@ export const PosPage = () => {
     return localStorage.getItem('techone_selected_branch') || userBranchId || '';
   });
 
+  const activeBranchId = isSuperAdmin ? selectedBranchId : userBranchId;
+
   const cart = useSelector(selectPosCart);
   const totals = useSelector(selectPosCartTotals);
   const missingSerialCount = useSelector(selectMissingSerialsCount);
@@ -103,8 +105,6 @@ export const PosPage = () => {
       ignore = true;
     };
   }, [isSuperAdmin]);
-
-  const activeBranchId = isSuperAdmin ? selectedBranchId : userBranchId;
 
   // Handle branch switch for Super Admin
   const handleSelectBranch = (newBranchId) => {
