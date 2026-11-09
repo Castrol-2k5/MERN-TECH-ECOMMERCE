@@ -49,6 +49,24 @@ export const StorefrontLayout = () => {
   const [selectedBranch, setSelectedBranch] = useState(null);
   const [categories, setCategories] = useState([]);
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
+  const [activeHeaderMapBranch, setActiveHeaderMapBranch] = useState(null);
+
+  const { userCoords, loading: geoLoading, requestLocation } = useUserLocation(true);
+
+  // Compute distance and sort branches
+  const sortedBranches = branches.map((b) => {
+    const coords = extractBranchCoordinates(b);
+    const distanceKm =
+      userCoords && coords
+        ? calculateDistanceKm(userCoords.lat, userCoords.lng, coords.lat, coords.lng)
+        : null;
+    return { ...b, coords, distanceKm };
+  }).sort((a, b) => {
+    if (a.distanceKm !== null && b.distanceKm !== null) {
+      return a.distanceKm - b.distanceKm;
+    }
+    return 0;
+  });
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
