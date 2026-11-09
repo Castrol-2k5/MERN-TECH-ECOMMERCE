@@ -172,6 +172,13 @@ export const PortalLayout = () => {
       badge: 'BI',
       icon: BarChart3,
       roles: ['SUPER_ADMIN']
+    },
+    {
+      to: '/portal/admin/audit-logs',
+      label: 'Nhật Ký & Kiểm Toán',
+      badge: '5W1H',
+      icon: ShieldAlert,
+      roles: ['SUPER_ADMIN']
     }
   ].filter((item) => item.roles.includes(userRole));
 

@@ -2,6 +2,8 @@ import { User, USER_ROLES } from './user.model.js';
 import { Branch } from '../branches/branch.model.js';
 import { Session } from '../auth/session.model.js';
 import { AppError } from '../../utils/appError.js';
+import { AuditLogService } from '../audit/auditLog.service.js';
+import { AUDIT_ACTIONS } from '../audit/auditLog.model.js';
 
 const BRANCH_POPULATE_FIELDS = 'name branchCode address phone isHeadquarter';
 
@@ -186,6 +188,7 @@ export class UserService {
       user.fullName = payload.fullName;
     }
 
+    const oldRole = user.role;
     if (payload.role) {
       user.role = payload.role;
       if (payload.role === USER_ROLES.SUPER_ADMIN || payload.role === USER_ROLES.CUSTOMER) {
@@ -227,6 +230,26 @@ export class UserService {
 
     await user.save();
 
+    if (payload.role && payload.role !== oldRole) {
+      AuditLogService.record({
+        action: AUDIT_ACTIONS.USER_ROLE_CHANGE,
+        target: {
+          model: 'User',
+          entityId: user._id,
+          code: user.email,
+          name: user.fullName
+        },
+        changes: {
+          before: { role: oldRole },
+          after: { role: user.role },
+          diff: { role: { before: oldRole, after: user.role } }
+        },
+        context: {
+          notes: `Thay đổi vai trò nhân sự từ ${oldRole} sang ${user.role}`
+        }
+      });
+    }
+
     if (payload.isActive === false) {
       await Session.deleteMany({ userId: user._id });
     }
@@ -251,6 +274,24 @@ export class UserService {
     if (isActive === false) {
       await Session.deleteMany({ userId: user._id });
     }
+
+    AuditLogService.record({
+      action: AUDIT_ACTIONS.USER_STATUS_TOGGLE,
+      target: {
+        model: 'User',
+        entityId: user._id,
+        code: user.email,
+        name: user.fullName
+      },
+      changes: {
+        before: { isActive: !isActive },
+        after: { isActive },
+        diff: { isActive }
+      },
+      context: {
+        notes: isActive ? 'Mở khóa tài khoản người dùng' : 'Khóa tài khoản và thu hồi các phiên đăng nhập'
+      }
+    });
 
     return {
       _id: user._id,

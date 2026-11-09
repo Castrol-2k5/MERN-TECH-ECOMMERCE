@@ -11,6 +11,8 @@ import { VnpayService } from './vnpay.service.js';
 import { env } from '../../config/environment.js';
 import { PosShiftService } from '../shifts/posShift.service.js';
 import { SettlementService } from '../accounting/settlement.service.js';
+import { AuditLogService } from '../audit/auditLog.service.js';
+import { AUDIT_ACTIONS } from '../audit/auditLog.model.js';
 
 export class OrderService {
   /**
@@ -216,6 +218,28 @@ export class OrderService {
         console.warn('Could not record cash sale to POS shift:', shiftErr.message);
       }
     }
+
+    AuditLogService.record({
+      actor: currentUser,
+      action: AUDIT_ACTIONS.ORDER_POS_CHECKOUT,
+      target: {
+        model: 'Order',
+        entityId: order._id,
+        code: order.orderCode,
+        name: `Đơn bán POS ${order.orderCode}`
+      },
+      changes: {
+        after: {
+          totalAmount: order.totalAmount,
+          paymentMethod: order.paymentMethod,
+          itemsCount: order.items?.length || 0,
+          status: order.orderStatus
+        }
+      },
+      context: {
+        notes: `Bán hàng tại quầy chi nhánh: ${order.totalAmount?.toLocaleString('vi-VN')} đ`
+      }
+    });
 
     return order;
   }
@@ -842,6 +866,24 @@ export class OrderService {
     order.cancellationReason = payload.reason || 'Khách không đến nhận hoặc yêu cầu hủy';
     order.cancelledBy = currentUser.id || currentUser._id;
     order.cancelledAt = new Date();
+    AuditLogService.record({
+      actor: currentUser,
+      action: AUDIT_ACTIONS.ORDER_CANCEL,
+      target: {
+        model: 'Order',
+        entityId: order._id,
+        code: order.orderCode,
+        name: `Đơn hàng ${order.orderCode}`
+      },
+      changes: {
+        before: { orderStatus: ORDER_STATUS.PENDING },
+        after: { orderStatus: ORDER_STATUS.CANCELLED }
+      },
+      context: {
+        reason: order.cancellationReason,
+        notes: 'Hủy đơn hàng và hoàn lại tồn kho/Serial'
+      }
+    });
     await order.save();
 
     return order;

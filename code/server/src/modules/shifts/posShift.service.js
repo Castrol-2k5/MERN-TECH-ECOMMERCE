@@ -4,6 +4,8 @@ import { PosShift, SHIFT_STATUS } from './posShift.model.js';
 import { Branch } from '../branches/branch.model.js';
 import { AppError } from '../../utils/appError.js';
 import { USER_ROLES } from '../users/user.model.js';
+import { AuditLogService } from '../audit/auditLog.service.js';
+import { AUDIT_ACTIONS } from '../audit/auditLog.model.js';
 
 export class PosShiftService {
   /**
@@ -53,6 +55,26 @@ export class PosShiftService {
       cashRefunds: 0,
       cashDrops: [],
       totalOrdersCount: 0
+    });
+
+    AuditLogService.record({
+      actor: currentUser,
+      action: AUDIT_ACTIONS.POS_SHIFT_OPEN,
+      target: {
+        model: 'PosShift',
+        entityId: shift._id,
+        code: shift.shiftCode,
+        name: `Ca thu ngân ${shift.shiftCode}`
+      },
+      changes: {
+        after: {
+          openingBalance,
+          status: SHIFT_STATUS.OPEN
+        }
+      },
+      context: {
+        notes: `Mở ca tại chi nhánh ${branch.branchCode || branch.name}`
+      }
     });
 
     return shift;
@@ -155,6 +177,26 @@ export class PosShiftService {
       totalDrops;
 
     await shift.save();
+
+    AuditLogService.record({
+      actor: currentUser,
+      action: AUDIT_ACTIONS.POS_SHIFT_CASH_DROP,
+      target: {
+        model: 'PosShift',
+        entityId: shift._id,
+        code: shift.shiftCode,
+        name: `Ca thu ngân ${shift.shiftCode}`
+      },
+      changes: {
+        before: { expectedEndingBalance: shift.expectedEndingBalance + dropAmount },
+        after: { expectedEndingBalance: shift.expectedEndingBalance, dropAmount },
+        diff: { dropAmount: -dropAmount }
+      },
+      context: {
+        reason: payload.reason || 'Nộp két sắt an toàn giữa ca'
+      }
+    });
+
     return shift;
   }
 
@@ -203,6 +245,33 @@ export class PosShiftService {
     }
 
     await shift.save();
+
+    AuditLogService.record({
+      actor: currentUser,
+      action: AUDIT_ACTIONS.POS_SHIFT_CLOSE,
+      target: {
+        model: 'PosShift',
+        entityId: shift._id,
+        code: shift.shiftCode,
+        name: `Ca thu ngân ${shift.shiftCode}`
+      },
+      changes: {
+        before: { status: SHIFT_STATUS.OPEN },
+        after: {
+          status: SHIFT_STATUS.CLOSED,
+          expectedEndingBalance: expected,
+          actualEndingBalance,
+          discrepancy: shift.discrepancy
+        },
+        diff: { discrepancy: shift.discrepancy }
+      },
+      context: {
+        notes: shift.discrepancy !== 0
+          ? `Chốt ca lệch ${shift.discrepancy.toLocaleString('vi-VN')} đ: ${shift.discrepancyNote || 'Không có giải trình'}`
+          : 'Chốt ca cân đối két tiền thành công'
+      }
+    });
+
     return shift;
   }
 

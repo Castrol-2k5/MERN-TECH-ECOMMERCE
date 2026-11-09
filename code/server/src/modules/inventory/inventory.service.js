@@ -7,6 +7,8 @@ import { Branch } from '../branches/branch.model.js';
 import { Product } from '../products/product.model.js';
 import { AppError } from '../../utils/appError.js';
 import { USER_ROLES } from '../users/user.model.js';
+import { AuditLogService } from '../audit/auditLog.service.js';
+import { AUDIT_ACTIONS } from '../audit/auditLog.model.js';
 
 export class InventoryService {
   /**
@@ -136,6 +138,26 @@ export class InventoryService {
         );
       }
 
+      AuditLogService.record({
+        actor: currentUser,
+        action: AUDIT_ACTIONS.STOCK_ADJUST,
+        target: {
+          model: 'BranchInventory',
+          entityId: inventory._id,
+          code: targetSku.sku || targetSku.code || '',
+          name: `${product.name} (${targetSku.sku || ''})`
+        },
+        changes: {
+          before: { quantity: inventory.quantity - quantityDelta },
+          after: { quantity: inventory.quantity },
+          diff: { quantityPhysical: quantityDelta, quantityAvailable: quantityDelta }
+        },
+        context: {
+          reason: reason || 'Điều chỉnh kiểm kê tồn kho',
+          notes: `Chi nhánh ${branch.branchCode || branch.name}: delta ${quantityDelta}`
+        }
+      });
+
       return { inventory, reason };
     }
 
@@ -145,6 +167,26 @@ export class InventoryService {
       { $inc: { quantity: quantityDelta } },
       { new: true, upsert: true, setDefaultsOnInsert: true }
     ).lean();
+
+    AuditLogService.record({
+      actor: currentUser,
+      action: AUDIT_ACTIONS.STOCK_ADJUST,
+      target: {
+        model: 'BranchInventory',
+        entityId: inventory._id,
+        code: targetSku.sku || targetSku.code || '',
+        name: `${product.name} (${targetSku.sku || ''})`
+      },
+      changes: {
+        before: { quantity: inventory.quantity - quantityDelta },
+        after: { quantity: inventory.quantity },
+        diff: { quantityPhysical: quantityDelta, quantityAvailable: quantityDelta }
+      },
+      context: {
+        reason: reason || 'Điều chỉnh kiểm kê tồn kho',
+        notes: `Chi nhánh ${branch.branchCode || branch.name}: delta +${quantityDelta}`
+      }
+    });
 
     return { inventory, reason };
   }
@@ -343,6 +385,28 @@ export class InventoryService {
       notes
     });
 
+    AuditLogService.record({
+      actor: currentUser,
+      action: AUDIT_ACTIONS.TRANSFER_CREATE,
+      target: {
+        model: 'StockTransfer',
+        entityId: transfer._id,
+        code: transfer.transferCode,
+        name: `Phiếu chuyển kho ${transfer.transferCode}`
+      },
+      changes: {
+        after: {
+          transferCode: transfer.transferCode,
+          itemsCount: enrichedItems.length,
+          totalQuantity: totalQty,
+          status: TRANSFER_STATUS.IN_TRANSIT
+        }
+      },
+      context: {
+        notes: `Từ chi nhánh ${sourceBranch.branchCode} đến ${destinationBranch.branchCode}`
+      }
+    });
+
     return transfer;
   }
 
@@ -509,6 +573,27 @@ export class InventoryService {
     transfer.receivedById = currentUser.id;
     transfer.receivedAt = new Date();
     await transfer.save();
+
+    AuditLogService.record({
+      actor: currentUser,
+      action: AUDIT_ACTIONS.TRANSFER_RECEIVE,
+      target: {
+        model: 'StockTransfer',
+        entityId: transfer._id,
+        code: transfer.transferCode,
+        name: `Phiếu chuyển kho ${transfer.transferCode}`
+      },
+      changes: {
+        before: { status: TRANSFER_STATUS.IN_TRANSIT },
+        after: { status: TRANSFER_STATUS.COMPLETED, hasDiscrepancy: hasAnyDiscrepancy }
+      },
+      context: {
+        hasDiscrepancy: hasAnyDiscrepancy,
+        notes: hasAnyDiscrepancy
+          ? `Nhận hàng có chênh lệch: ${discrepancyReport.note || ''}`
+          : 'Tiếp nhận đủ số lượng và Serial điều chuyển'
+      }
+    });
 
     return transfer;
   }

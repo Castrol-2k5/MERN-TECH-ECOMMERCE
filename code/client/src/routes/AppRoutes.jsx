@@ -42,6 +42,7 @@ import AdminBranchesUsersPage from '../pages/portal/AdminBranchesUsersPage.jsx';
 import AdminAnalyticsPage from '../pages/portal/AdminAnalyticsPage.jsx';
 import PosShiftReportPage from '../pages/portal/PosShiftReportPage.jsx';
 import InterBranchSettlementPage from '../pages/portal/InterBranchSettlementPage.jsx';
+import AuditTrailPage from '../pages/portal/AuditTrailPage.jsx';
 
 const PortalIndexRedirect = () => {
   const user = useSelector((state) => state.auth?.user);
@@ -79,6 +80,7 @@ export const AppRoutes = () => {
             <Route path="admin/products" element={<AdminProductsPage />} />
             <Route path="admin/branches-rbac" element={<AdminBranchesUsersPage />} />
             <Route path="admin/analytics" element={<AdminAnalyticsPage />} />
+            <Route path="admin/audit-logs" element={<AuditTrailPage />} />
           </Route>
         </Route>
       </Route>
