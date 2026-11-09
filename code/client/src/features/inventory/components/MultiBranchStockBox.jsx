@@ -10,6 +10,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import inventoryService from '../services/inventoryService.js';
+import branchService from '../../branches/services/branchService.js';
 import useUserLocation from '../../branches/hooks/useUserLocation.js';
 import BranchMapModal from '../../branches/components/BranchMapModal.jsx';
 import {
@@ -33,7 +34,6 @@ export const MultiBranchStockBox = ({
   const {
     userCoords,
     loading: geoLoading,
-    permissionStatus,
     requestLocation
   } = useUserLocation(true);
 
@@ -41,15 +41,40 @@ export const MultiBranchStockBox = ({
     let isMounted = true;
     const fetchStock = async () => {
       setLoading(true);
-      const data = await inventoryService.getBranchesWithSkuStock(skuId || 'default-sku');
-      if (!isMounted) return;
-      const list = Array.isArray(data) ? data : [];
-      setStockList(list);
-      setLoading(false);
+      try {
+        const data = await inventoryService.getBranchesWithSkuStock(skuId || 'default-sku');
+        if (!isMounted) return;
+        let list = Array.isArray(data) ? data : [];
 
-      const totalStock = list.reduce((sum, b) => sum + (Number(b.quantity) || 0), 0);
-      if (onStockSummaryChange) {
-        onStockSummaryChange({ totalStock, branches: list });
+        // If no stock record exists for this SKU (e.g. newly created product),
+        // fallback to loading all active showroom branches with 0 stock so the user
+        // can still view showroom addresses, distances, and map navigation.
+        if (list.length === 0) {
+          const allBranches = await branchService.getBranches();
+          list = (allBranches || []).map((b) => ({
+            branchId: b._id,
+            branchName: b.name || b.branchName,
+            address: b.address,
+            phone: b.phone,
+            location: b.location,
+            quantity: 0,
+            status: 'OUT_OF_STOCK',
+            statusLabel: 'Hết hàng tại showroom này',
+            badgeVariant: 'danger',
+            isHeadquarter: b.isHeadquarter
+          }));
+        }
+
+        setStockList(list);
+
+        const totalStock = list.reduce((sum, b) => sum + (Number(b.quantity) || 0), 0);
+        if (onStockSummaryChange) {
+          onStockSummaryChange({ totalStock, branches: list });
+        }
+      } catch (err) {
+        console.warn('Failed to load branch stock for box:', err);
+      } finally {
+        if (isMounted) setLoading(false);
       }
     };
     fetchStock();
@@ -92,7 +117,7 @@ export const MultiBranchStockBox = ({
   // Auto-select nearest available branch if none selected yet
   useEffect(() => {
     if (!selectedBranchId && enrichedAndSortedBranches.length > 0 && onSelectBranch) {
-      const firstAvail = enrichedAndSortedBranches.find((b) => b.quantity > 0);
+      const firstAvail = enrichedAndSortedBranches.find((b) => b.quantity > 0) || enrichedAndSortedBranches[0];
       if (firstAvail) {
         onSelectBranch(firstAvail);
       }
@@ -159,136 +184,113 @@ export const MultiBranchStockBox = ({
           <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
           <span>Đang kiểm tra tồn kho đa chi nhánh...</span>
         </div>
-      ) : stockList.length === 0 || totalAvailable === 0 ? (
-        <div className="space-y-3">
-          <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold text-center flex items-center justify-center gap-2">
-            <AlertCircle className="w-4 h-4" />
-            <span>Tạm thời hết hàng trên toàn hệ thống showroom</span>
-          </div>
-          {enrichedAndSortedBranches.map((branch) => (
-            <div
-              key={branch.branchId}
-              className="p-3.5 rounded-xl border border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 opacity-60 bg-slate-50/50"
-            >
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-xs text-slate-900">{branch.branchName}</span>
-                  {branch.distanceKm !== null && (
-                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200/60">
-                      {formatDistance(branch.distanceKm)}
-                    </span>
-                  )}
-                </div>
-                {/* Full address display - no truncation */}
-                <div className="flex items-start gap-1.5 text-[11px] text-slate-500">
-                  <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                  <span>{branch.address}</span>
-                </div>
-              </div>
-              <span className="px-2.5 py-1 rounded-full text-[11px] font-bold border shrink-0 bg-rose-50 text-rose-700 border-rose-200 self-start sm:self-auto">
-                {branch.statusLabel || 'Hết hàng'}
-              </span>
-            </div>
-          ))}
-        </div>
       ) : (
-        <div className="space-y-2.5">
-          {enrichedAndSortedBranches.map((branch) => {
-            const isAvailable = branch.quantity > 0;
-            const isSelected = selectedBranchId && String(selectedBranchId) === String(branch.branchId);
+        <div className="space-y-3">
+          {totalAvailable === 0 && (
+            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold text-center flex items-center justify-center gap-2">
+              <AlertCircle className="w-4 h-4" />
+              <span>Sản phẩm này tạm thời chưa có sẵn tại showroom. Bạn vẫn có thể xem vị trí và đường đi đến các showroom bên dưới:</span>
+            </div>
+          )}
 
-            return (
-              <div
-                key={branch.branchId}
-                onClick={() => isAvailable && onSelectBranch && onSelectBranch(branch)}
-                className={`p-3.5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                  isSelected
-                    ? 'border-blue-600 bg-blue-50/40 shadow-xs ring-1 ring-blue-600/20 cursor-pointer'
-                    : isAvailable
-                      ? 'border-slate-200 hover:border-blue-300 hover:bg-slate-50/80 cursor-pointer'
-                      : 'border-slate-100 opacity-60 bg-slate-50/50'
-                }`}
-              >
-                {/* Branch Info & Full Address */}
-                <div className="flex flex-col gap-1 flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-bold text-xs text-slate-900">
-                      {branch.branchName}
+          <div className="space-y-2.5">
+            {enrichedAndSortedBranches.map((branch) => {
+              const isAvailable = branch.quantity > 0;
+              const isSelected = selectedBranchId && String(selectedBranchId) === String(branch.branchId);
+
+              return (
+                <div
+                  key={branch.branchId}
+                  onClick={() => onSelectBranch && onSelectBranch(branch)}
+                  className={`p-3.5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                    isSelected
+                      ? 'border-blue-600 bg-blue-50/40 shadow-xs ring-1 ring-blue-600/20 cursor-pointer'
+                      : isAvailable
+                        ? 'border-slate-200 hover:border-blue-300 hover:bg-slate-50/80 cursor-pointer'
+                        : 'border-slate-200/80 bg-slate-50/60 hover:border-slate-300 cursor-pointer'
+                  }`}
+                >
+                  {/* Branch Info & Full Address */}
+                  <div className="flex flex-col gap-1 flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-bold text-xs text-slate-900">
+                        {branch.branchName}
+                      </span>
+
+                      {/* Nearest Badge */}
+                      {branch.distanceKm !== null && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded-md">
+                          <Navigation className="w-2.5 h-2.5 rotate-45" />
+                          {formatDistance(branch.distanceKm)}
+                        </span>
+                      )}
+
+                      {isSelected && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-white bg-blue-600 px-2 py-0.5 rounded-md shadow-xs">
+                          <CheckCircle2 className="w-3 h-3" /> Đang chọn
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Complete Address without line-clamp truncation */}
+                    <div className="flex items-start gap-1.5 text-[11px] text-slate-600 mt-0.5">
+                      <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
+                      <span className="leading-relaxed font-normal">{branch.address}</span>
+                    </div>
+
+                    {branch.phone && (
+                      <div className="text-[11px] text-slate-400 ml-5">
+                        Hotline showroom: <span className="text-slate-600 font-medium">{branch.phone}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right Actions: Stock Badge + Map Button + Google Maps Nav */}
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                    <span
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-bold border shrink-0 ${
+                        badgeStyles[branch.badgeVariant] || (isAvailable ? badgeStyles.success : badgeStyles.danger)
+                      }`}
+                    >
+                      {branch.statusLabel || (isAvailable ? `Còn ${branch.quantity} máy` : 'Hết hàng')}
                     </span>
 
-                    {/* Nearest Badge */}
-                    {branch.distanceKm !== null && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded-md">
-                        <Navigation className="w-2.5 h-2.5 rotate-45" />
-                        {formatDistance(branch.distanceKm)}
-                      </span>
-                    )}
+                    {/* Map Modal Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveMapBranch(branch);
+                      }}
+                      className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-blue-50 hover:border-blue-300 text-slate-700 hover:text-blue-600 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                      title="Xem vị trí trên bản đồ tương tác"
+                    >
+                      <Compass className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Xem bản đồ</span>
+                    </button>
 
-                    {isSelected && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-white bg-blue-600 px-2 py-0.5 rounded-md shadow-xs">
-                        <CheckCircle2 className="w-3 h-3" /> Đang chọn nhận máy
-                      </span>
-                    )}
+                    {/* Direct Google Maps Navigation */}
+                    <a
+                      href={getGoogleMapsDirectionsUrl({
+                        destLat: branch.coords?.lat,
+                        destLng: branch.coords?.lng,
+                        destAddress: branch.address,
+                        userLat: userCoords?.lat,
+                        userLng: userCoords?.lng,
+                      })}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="p-1.5 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors"
+                      title="Mở chỉ đường Google Maps"
+                    >
+                      <Navigation className="w-3.5 h-3.5" />
+                    </a>
                   </div>
-
-                  {/* Complete Address without line-clamp truncation */}
-                  <div className="flex items-start gap-1.5 text-[11px] text-slate-600 mt-0.5">
-                    <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
-                    <span className="leading-relaxed font-normal">{branch.address}</span>
-                  </div>
-
-                  {branch.phone && (
-                    <div className="text-[11px] text-slate-400 ml-5">
-                      Hotline showroom: <span className="text-slate-600 font-medium">{branch.phone}</span>
-                    </div>
-                  )}
                 </div>
-
-                {/* Right Actions: Stock Badge + Map Button */}
-                <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                  <span
-                    className={`px-2.5 py-1 rounded-full text-[11px] font-bold border shrink-0 ${
-                      badgeStyles[branch.badgeVariant] || badgeStyles.success
-                    }`}
-                  >
-                    {branch.statusLabel}
-                  </span>
-
-                  {/* Map Button */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveMapBranch(branch);
-                    }}
-                    className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 hover:text-blue-600 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
-                    title="Xem vị trí trên bản đồ &amp; chỉ đường"
-                  >
-                    <Compass className="w-3.5 h-3.5 text-blue-600" />
-                    <span className="hidden sm:inline">Bản đồ</span>
-                  </button>
-
-                  {/* Direct Google Maps Navigation */}
-                  <a
-                    href={getGoogleMapsDirectionsUrl({
-                      destLat: branch.coords?.lat,
-                      destLng: branch.coords?.lng,
-                      destAddress: branch.address,
-                      userLat: userCoords?.lat,
-                      userLng: userCoords?.lng,
-                    })}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="p-1.5 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors"
-                    title="Mở chỉ đường Google Maps"
-                  >
-                    <Navigation className="w-3.5 h-3.5" />
-                  </a>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
 

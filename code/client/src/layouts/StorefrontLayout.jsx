@@ -18,11 +18,21 @@ import {
   LogOut,
   Package,
   LayoutDashboard,
-  ArrowRight
+  ArrowRight,
+  Compass,
+  Navigation
 } from 'lucide-react';
 import { logout } from '../store/slices/authSlice.js';
 import axiosClient from '../services/axiosClient.js';
 import branchService from '../features/branches/services/branchService.js';
+import useUserLocation from '../features/branches/hooks/useUserLocation.js';
+import BranchMapModal from '../features/branches/components/BranchMapModal.jsx';
+import {
+  extractBranchCoordinates,
+  calculateDistanceKm,
+  formatDistance,
+  getGoogleMapsDirectionsUrl
+} from '../features/branches/utils/geoUtils.js';
 import categoryService from '../features/categories/services/categoryService.js';
 import productService from '../features/products/services/productService.js';
 
@@ -363,25 +373,109 @@ export const StorefrontLayout = () => {
               </button>
 
               {isBranchDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-100 p-2 z-50">
-                  <div className="text-xs font-bold text-slate-400 uppercase px-3 py-1.5 tracking-wider">
-                    Chọn chi nhánh gần bạn
-                  </div>
-                  <div className="divide-y divide-slate-100 max-h-60 overflow-y-auto">
-                    {branches.map((b) => (
+                <div className="absolute right-0 mt-2 w-96 sm:w-[460px] bg-white rounded-3xl shadow-2xl border border-slate-200/90 p-4 z-50 animate-in fade-in duration-150">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-2">
+                    <div className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Hệ thống Showroom TechOne</span>
+                    </div>
+
+                    {userCoords ? (
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Đã định vị
+                      </span>
+                    ) : (
                       <button
-                        key={b._id}
-                        onClick={() => handleSelectBranch(b)}
-                        className={`w-full text-left p-2.5 rounded-xl text-xs hover:bg-blue-50 transition-colors flex flex-col gap-0.5 cursor-pointer ${
-                          selectedBranch?._id === b._id ? 'bg-blue-50/70 border-l-3 border-blue-600' : ''
-                        }`}
+                        type="button"
+                        onClick={requestLocation}
+                        disabled={geoLoading}
+                        className="text-[10px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2.5 py-1 rounded-full flex items-center gap-1 transition-colors cursor-pointer"
                       >
-                        <span className="font-bold text-slate-900">{b.name}</span>
-                        <span className="text-slate-500 text-[11px] leading-relaxed line-clamp-1">
-                          {b.address}
-                        </span>
+                        <Compass className="w-3 h-3 text-blue-600" />
+                        <span>📍 Tìm gần tôi</span>
                       </button>
-                    ))}
+                    )}
+                  </div>
+
+                  <div className="space-y-2 max-h-80 overflow-y-auto pr-1 scrollbar-thin">
+                    {sortedBranches.map((b) => {
+                      const isSelected = selectedBranch?._id === b._id;
+                      return (
+                        <div
+                          key={b._id}
+                          onClick={() => handleSelectBranch(b)}
+                          className={`w-full text-left p-3 rounded-2xl text-xs transition-all flex flex-col gap-1.5 cursor-pointer border ${
+                            isSelected
+                              ? 'bg-blue-50/70 border-blue-600 ring-1 ring-blue-600/20'
+                              : 'bg-white border-slate-100 hover:border-slate-300 hover:bg-slate-50/70'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-900">{b.name}</span>
+                              {b.distanceKm !== null && (
+                                <span className="text-[10px] font-bold text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                  <Navigation className="w-2.5 h-2.5 rotate-45" />
+                                  {formatDistance(b.distanceKm)}
+                                </span>
+                              )}
+                            </div>
+                            {isSelected && (
+                              <span className="text-[10px] font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
+                                Đang chọn
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Full address - completely visible without line-clamp */}
+                          <div className="text-slate-600 text-[11px] leading-relaxed flex items-start gap-1.5 font-normal">
+                            <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
+                            <span>{b.address}</span>
+                          </div>
+
+                          {/* Action row: Bản đồ + Chỉ đường */}
+                          <div className="pt-1.5 border-t border-slate-100/80 flex items-center justify-between text-[11px] gap-2">
+                            {b.phone ? (
+                              <span className="text-slate-400">
+                                Hotline: <strong className="text-slate-600">{b.phone}</strong>
+                              </span>
+                            ) : <span />}
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveHeaderMapBranch(b);
+                                }}
+                                className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 hover:text-blue-600 font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                              >
+                                <Compass className="w-3 h-3 text-blue-600" />
+                                <span>Xem bản đồ</span>
+                              </button>
+
+                              <a
+                                href={getGoogleMapsDirectionsUrl({
+                                  destLat: b.coords?.lat,
+                                  destLng: b.coords?.lng,
+                                  destAddress: b.address,
+                                  userLat: userCoords?.lat,
+                                  userLng: userCoords?.lng,
+                                })}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="p-1 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors"
+                                title="Mở chỉ đường Google Maps"
+                              >
+                                <Navigation className="w-3.5 h-3.5" />
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -753,6 +847,17 @@ export const StorefrontLayout = () => {
           </div>
         </div>
       </footer>
+
+      {/* Header Branch Map Modal */}
+      <BranchMapModal
+        isOpen={Boolean(activeHeaderMapBranch)}
+        onClose={() => setActiveHeaderMapBranch(null)}
+        branch={activeHeaderMapBranch}
+        userCoords={userCoords}
+        onSelectBranch={(b) => {
+          handleSelectBranch(b);
+        }}
+      />
     </div>
   );
 };
