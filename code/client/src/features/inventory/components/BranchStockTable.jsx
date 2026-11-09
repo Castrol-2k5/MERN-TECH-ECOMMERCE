@@ -31,6 +31,7 @@ export const BranchStockTable = ({
   loading = false,
   canAdjust = true
 }) => {
+  const safeItems = Array.isArray(items) ? items : [];
   const [searchTerm, setSearchTerm] = useState('');
   const [crossBranchItem, setCrossBranchItem] = useState(null);
   const [crossBranchStocks, setCrossBranchStocks] = useState([]);
@@ -72,9 +73,9 @@ export const BranchStockTable = ({
     let lowStock = 0;
     let outOfStock = 0;
 
-    for (const it of items) {
-      const avail = it.quantityAvailable || 0;
-      const threshold = it.lowStockThreshold || 5;
+    for (const it of safeItems) {
+      const avail = it?.quantityAvailable || 0;
+      const threshold = it?.lowStockThreshold || 5;
       if (avail <= 0) {
         outOfStock++;
       } else if (avail <= threshold) {
@@ -85,11 +86,11 @@ export const BranchStockTable = ({
     }
 
     return { inStockCount: inStock, lowStockCount: lowStock, outOfStockCount: outOfStock };
-  }, [items]);
+  }, [safeItems]);
 
   // Client-side filtering & search if not handled by server
   const filteredItems = useMemo(() => {
-    return items.filter((it) => {
+    return safeItems.filter((it) => {
       // Search match
       const q = searchTerm.toLowerCase();
       const matchSearch =
@@ -117,7 +118,7 @@ export const BranchStockTable = ({
 
       return matchSearch && matchCategory && matchStatus;
     });
-  }, [items, searchTerm, selectedCategory, selectedStatus]);
+  }, [safeItems, searchTerm, selectedCategory, selectedStatus]);
 
   // Paginated items for current page
   const paginatedItems = useMemo(() => {
@@ -171,7 +172,7 @@ export const BranchStockTable = ({
           >
             <span>Tất cả</span>
             <span className="px-1.5 py-0.2 rounded-md bg-white/20 text-[10px]">
-              {items.length}
+              {safeItems.length}
             </span>
           </button>
 

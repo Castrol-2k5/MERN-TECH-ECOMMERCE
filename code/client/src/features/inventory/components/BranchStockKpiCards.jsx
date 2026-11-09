@@ -1,18 +1,19 @@
 import { Layers, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 
 export const BranchStockKpiCards = ({ items = [] }) => {
-  const totalSku = items.length;
-  const totalAvailable = items.reduce((sum, it) => sum + (it.quantityAvailable || 0), 0);
-  const lowStockCount = items.filter(
-    (it) => it.quantityAvailable > 0 && it.quantityAvailable <= it.lowStockThreshold
+  const safeItems = Array.isArray(items) ? items : [];
+  const totalSku = safeItems.length;
+  const totalAvailable = safeItems.reduce((sum, it) => sum + (it?.quantityAvailable || 0), 0);
+  const lowStockCount = safeItems.filter(
+    (it) => (it?.quantityAvailable || 0) > 0 && (it?.quantityAvailable || 0) <= (it?.lowStockThreshold || 5)
   ).length;
-  const outOfStockCount = items.filter((it) => it.quantityAvailable <= 0).length;
+  const outOfStockCount = safeItems.filter((it) => (it?.quantityAvailable || 0) <= 0).length;
 
   const kpis = [
     {
       title: 'TỔNG MẶT HÀNG (SKU)',
       value: totalSku,
-      subtitle: 'Chi nhánh Q1 - Trần Quang Khải',
+      subtitle: 'Chi nhánh TechOne đang chọn',
       icon: Layers,
       color: 'text-blue-400',
       bgColor: 'bg-blue-500/10',

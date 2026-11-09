@@ -24,6 +24,7 @@ import {
 import { logout } from '../store/slices/authSlice.js';
 import { clearCart } from '../store/slices/posCartSlice.js';
 import axiosClient from '../services/axiosClient.js';
+import ErrorBoundary from '../components/common/ErrorBoundary.jsx';
 
 export const PortalLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -383,7 +384,9 @@ export const PortalLayout = () => {
 
         {/* Content Outlet */}
         <main className="flex-1 p-4 lg:p-6 overflow-y-auto max-w-7xl w-full mx-auto">
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
     </div>

@@ -9,6 +9,8 @@ import { AppError } from '../../utils/appError.js';
 import { USER_ROLES } from '../users/user.model.js';
 import { VnpayService } from './vnpay.service.js';
 import { env } from '../../config/environment.js';
+import { PosShiftService } from '../shifts/posShift.service.js';
+import { SettlementService } from '../accounting/settlement.service.js';
 
 export class OrderService {
   /**

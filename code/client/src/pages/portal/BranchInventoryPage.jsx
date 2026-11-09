@@ -40,7 +40,11 @@ export const BranchInventoryPage = () => {
             ? authUser.branchId
             : hqBranch?._id || sortedList[0]._id;
         setSelectedBranchId(defaultBranchId);
+      } else if (!ignore) {
+        setLoading(false);
       }
+    }).catch(() => {
+      if (!ignore) setLoading(false);
     });
     return () => {
       ignore = true;
@@ -52,10 +56,12 @@ export const BranchInventoryPage = () => {
     authUser?.role === 'BRANCH_MANAGER' ||
     Boolean(selectedBranch?.isHeadquarter || selectedBranch?.branchCode === 'BR-HQ');
 
+  const safeItems = Array.isArray(items) ? items : [];
+
   const handleExportCsv = () => {
-    if (!items || items.length === 0) return;
+    if (!safeItems || safeItems.length === 0) return;
     const headers = ['SKU', 'Tên sản phẩm', 'Danh mục', 'Vị trí kệ', 'Tồn thực tế', 'Tồn khả dụng', 'Số Serial'];
-    const rows = items.map((it) => [
+    const rows = safeItems.map((it) => [
       `"${it.sku || ''}"`,
       `"${String(it.productName || '').replace(/"/g, '""')}"`,
       `"${it.category || ''}"`,
@@ -83,9 +89,9 @@ export const BranchInventoryPage = () => {
         category,
         status,
       });
-      setItems(data);
+      setItems(Array.isArray(data) ? data : []);
     } catch {
-      // ignore
+      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -103,10 +109,10 @@ export const BranchInventoryPage = () => {
           status,
         });
         if (active) {
-          setItems(data);
+          setItems(Array.isArray(data) ? data : []);
         }
       } catch {
-        // ignore
+        if (active) setItems([]);
       } finally {
         if (active) setLoading(false);
       }
@@ -183,7 +189,7 @@ export const BranchInventoryPage = () => {
           <button
             type="button"
             onClick={handleExportCsv}
-            disabled={items.length === 0}
+            disabled={safeItems.length === 0}
             className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-lg shadow-blue-600/20 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
@@ -201,11 +207,11 @@ export const BranchInventoryPage = () => {
       )}
 
       {/* 4 KPI Cards */}
-      <BranchStockKpiCards items={items} />
+      <BranchStockKpiCards items={safeItems} />
 
       {/* Branch Stock Table */}
       <BranchStockTable
-        items={items}
+        items={safeItems}
         loading={loading}
         canAdjust={canAdjustSelectedBranch}
         onOpenSerials={(item) => setActiveSerialItem(item)}

@@ -308,7 +308,7 @@ describe('Warranty Module Integration Tests', () => {
       const crossBranchRes = await request(app)
         .patch(`/api/v1/warranty/${ticketId}/status`)
         .set('Authorization', `Bearer ${staffBToken}`)
-        .send({ status: WARRANTY_STATUS.PROCESSING });
+        .send({ status: WARRANTY_STATUS.REPAIRING });
       expect(crossBranchRes.status).toBe(403);
 
       // Chi nhánh A chuyển sang RETURNED -> Serial tự động khôi phục về SOLD

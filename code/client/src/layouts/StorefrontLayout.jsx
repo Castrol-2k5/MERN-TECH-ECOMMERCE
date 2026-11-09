@@ -35,6 +35,7 @@ import {
 } from '../features/branches/utils/geoUtils.js';
 import categoryService from '../features/categories/services/categoryService.js';
 import productService from '../features/products/services/productService.js';
+import ErrorBoundary from '../components/common/ErrorBoundary.jsx';
 
 export const StorefrontLayout = () => {
   const navigate = useNavigate();
@@ -750,7 +751,9 @@ export const StorefrontLayout = () => {
 
       {/* 4. MAIN CONTENT AREA */}
       <main className="flex-1">
-        <Outlet />
+        <ErrorBoundary>
+          <Outlet />
+        </ErrorBoundary>
       </main>
 
       {/* 5. STOREFRONT FOOTER (FIGMA #11:1368 - #11:1436) */}
