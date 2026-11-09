@@ -7,8 +7,8 @@ export const fallbackBranches = [
     branchCode: 'BR-HQ',
     name: 'Kho Trung Tâm Trụ Sở Chính (HQ)',
     branchName: 'Kho Trung Tâm HQ',
-    address: 'Tòa nhà TechOne Tower, 01 Lê Duẩn, P. Bến Nghé, Q.1, TP.HCM',
-    phone: '02838226868',
+    address: 'Tòa nhà TechOne Tower, 01 Lê Duẩn, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh',
+    phone: '028 3822 6868',
     location: { type: 'Point', coordinates: [106.7009, 10.7829] },
     isHeadquarter: true,
     isActive: true
@@ -18,8 +18,8 @@ export const fallbackBranches = [
     branchCode: 'BR-Q1',
     name: 'Chi nhánh Quận 1 - Flagship Store',
     branchName: 'Chi nhánh Quận 1',
-    address: '123 Nguyễn Thị Minh Khai, P. Bến Thành, Q.1, TP.HCM',
-    phone: '02839250001',
+    address: '128 Nguyễn Thị Minh Khai, Phường Bến Thành, Quận 1, TP. Hồ Chí Minh',
+    phone: '028 3925 0001',
     location: { type: 'Point', coordinates: [106.6917, 10.7725] },
     isHeadquarter: false,
     isActive: true
@@ -29,9 +29,20 @@ export const fallbackBranches = [
     branchCode: 'BR-TDUC',
     name: 'Chi nhánh Thủ Đức - Tech Hub',
     branchName: 'Chi nhánh Thủ Đức',
-    address: '45 Võ Văn Ngân, P. Linh Chiểu, TP. Thủ Đức, TP.HCM',
-    phone: '02838960002',
+    address: '45 Võ Văn Ngân, Phường Linh Chiểu, TP. Thủ Đức, TP. Hồ Chí Minh',
+    phone: '028 3896 0002',
     location: { type: 'Point', coordinates: [106.7645, 10.8512] },
+    isHeadquarter: false,
+    isActive: true
+  },
+  {
+    _id: 'branch-03',
+    branchCode: 'BR-Q5',
+    name: 'Chi nhánh Quận 5 - Chợ Lớn Center',
+    branchName: 'Chi nhánh Quận 5',
+    address: '382 Trần Hưng Đạo, Phường 11, Quận 5, TP. Hồ Chí Minh',
+    phone: '028 3855 6868',
+    location: { type: 'Point', coordinates: [106.6662, 10.7538] },
     isHeadquarter: false,
     isActive: true
   }
@@ -50,6 +61,7 @@ const normalizeBranch = (b) => {
     code,
     address: b.address || '',
     phone: b.phone || '',
+    location: b.location || (b.longitude !== undefined && b.latitude !== undefined ? { type: 'Point', coordinates: [Number(b.longitude), Number(b.latitude)] } : null),
     isHeadquarter: isHq,
     managerName: b.managerName || (isHq ? 'Ban Quản Trị Trụ Sở (HQ)' : 'Chưa bổ nhiệm'),
     stockCount: b.stockCount ?? 0

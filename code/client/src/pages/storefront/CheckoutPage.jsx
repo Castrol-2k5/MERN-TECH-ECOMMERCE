@@ -1,4 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import useUserLocation from '../../features/branches/hooks/useUserLocation.js';
+import BranchMapModal from '../../features/branches/components/BranchMapModal.jsx';
+import {
+  extractBranchCoordinates,
+  calculateDistanceKm,
+  formatDistance,
+  getGoogleMapsDirectionsUrl
+} from '../../features/branches/utils/geoUtils.js';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
@@ -16,7 +24,9 @@ import {
   MapPin,
   Phone,
   User,
-  FileText
+  FileText,
+  Compass,
+  Navigation
 } from 'lucide-react';
 import { clearCart } from '../../store/slices/cartSlice.js';
 import { branchService } from '../../features/branches/services/branchService.js';
@@ -40,6 +50,39 @@ export const CheckoutPage = () => {
   );
   const [branches, setBranches] = useState([]);
   const [selectedBranchId, setSelectedBranchId] = useState(urlBranchId);
+  const [activeMapBranch, setActiveMapBranch] = useState(null);
+
+  // Geolocation auto-detection
+  const { userCoords, loading: geoLoading, requestLocation } = useUserLocation(true);
+
+  // Compute distance and sort branches
+  const sortedBranches = useMemo(() => {
+    const list = branches.map((b) => {
+      const coords = extractBranchCoordinates(b);
+      const distanceKm =
+        userCoords && coords
+          ? calculateDistanceKm(userCoords.lat, userCoords.lng, coords.lat, coords.lng)
+          : null;
+      return { ...b, coords, distanceKm };
+    });
+
+    if (userCoords) {
+      return list.sort((a, b) => {
+        if (a.distanceKm !== null && b.distanceKm !== null) {
+          return a.distanceKm - b.distanceKm;
+        }
+        return 0;
+      });
+    }
+    return list;
+  }, [branches, userCoords]);
+
+  // If user enters Click & Collect and no specific branch is selected yet, pick nearest
+  useEffect(() => {
+    if (deliveryType === 'CLICK_COLLECT' && !selectedBranchId && sortedBranches.length > 0) {
+      setSelectedBranchId(sortedBranches[0]._id);
+    }
+  }, [deliveryType, selectedBranchId, sortedBranches]);
 
   // Customer form inputs
   const [fullName, setFullName] = useState(authUser?.fullName || '');
@@ -304,47 +347,121 @@ export const CheckoutPage = () => {
 
               {/* Chi nhánh nhận máy (Khi chọn Click & Collect) */}
               {deliveryType === 'CLICK_COLLECT' && (
-                <div className="space-y-3 pt-2">
-                  <label className="block text-xs font-bold text-slate-700">
-                    Chọn chi nhánh TechOne gần bạn nhất
-                  </label>
-                  <div className="space-y-2">
-                    {branches.map((b) => (
-                      <label
+                <div className="space-y-3.5 pt-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <label className="block text-xs font-bold text-slate-700">
+                      Chọn chi nhánh TechOne nhận máy
+                    </label>
+
+                    {userCoords ? (
+                      <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 w-fit">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Đã định vị • Đang xếp chi nhánh gần bạn nhất
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={requestLocation}
+                        disabled={geoLoading}
+                        className="text-[11px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2.5 py-1 rounded-full flex items-center gap-1 w-fit cursor-pointer transition-colors"
+                      >
+                        {geoLoading ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            Đang định vị...
+                          </>
+                        ) : (
+                          <>
+                            <Compass className="w-3 h-3 text-blue-600" />
+                            📍 Tìm chi nhánh gần bạn nhất
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="space-y-2.5">
+                    {sortedBranches.map((b) => (
+                      <div
                         key={b._id}
-                        className={`p-3.5 rounded-2xl border flex items-start gap-3 cursor-pointer transition-all ${
+                        onClick={() => handleSelectBranch(b._id)}
+                        className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-start justify-between gap-3 cursor-pointer transition-all ${
                           selectedBranchId === b._id
-                            ? 'border-blue-600 bg-blue-50/40 text-blue-950 font-medium'
-                            : 'border-slate-200 text-slate-700 hover:border-slate-300'
+                            ? 'border-blue-600 bg-blue-50/40 text-blue-950 font-medium ring-1 ring-blue-600/20 shadow-xs'
+                            : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50/50'
                         }`}
                       >
-                        <input
-                          type="radio"
-                          name="branchSelection"
-                          value={b._id}
-                          checked={selectedBranchId === b._id}
-                          onChange={() => handleSelectBranch(b._id)}
-                          className="mt-1 text-blue-600 cursor-pointer"
-                        />
-                        <div className="flex-1 text-xs">
-                          <div className="font-bold flex items-center gap-2">
-                            <span>{b.name || b.branchName}</span>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
-                              Có sẵn hàng
-                            </span>
-                          </div>
-                          <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
-                            <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span>{b.address}</span>
-                          </div>
-                          {b.phone && (
-                            <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
-                              <Phone className="w-3 h-3 text-slate-400 shrink-0" />
-                              <span>Hotline: {b.phone}</span>
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <input
+                            type="radio"
+                            name="branchSelection"
+                            value={b._id}
+                            checked={selectedBranchId === b._id}
+                            onChange={() => handleSelectBranch(b._id)}
+                            className="mt-1 text-blue-600 cursor-pointer"
+                          />
+                          <div className="flex-1 text-xs space-y-1">
+                            <div className="font-bold flex flex-wrap items-center gap-2">
+                              <span>{b.name || b.branchName}</span>
+                              {b.distanceKm !== null && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 flex items-center gap-1">
+                                  <Navigation className="w-2.5 h-2.5 rotate-45" />
+                                  {formatDistance(b.distanceKm)}
+                                </span>
+                              )}
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
+                                Có sẵn hàng
+                              </span>
                             </div>
-                          )}
+
+                            {/* Full Address - Fully Visible */}
+                            <div className="text-[11px] text-slate-600 flex items-start gap-1.5 leading-relaxed">
+                              <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
+                              <span className="font-normal">{b.address}</span>
+                            </div>
+
+                            {b.phone && (
+                              <div className="text-[11px] text-slate-400 flex items-center gap-1 pl-5">
+                                <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                                <span>Hotline: {b.phone}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </label>
+
+                        {/* Map & Direction Actions */}
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center pl-7 sm:pl-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMapBranch(b);
+                            }}
+                            className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 hover:text-blue-600 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Xem vị trí trên bản đồ"
+                          >
+                            <Compass className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Bản đồ</span>
+                          </button>
+
+                          <a
+                            href={getGoogleMapsDirectionsUrl({
+                              destLat: b.coords?.lat,
+                              destLng: b.coords?.lng,
+                              destAddress: b.address,
+                              userLat: userCoords?.lat,
+                              userLng: userCoords?.lng,
+                            })}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-1.5 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors"
+                            title="Mở chỉ đường Google Maps"
+                          >
+                            <Navigation className="w-3.5 h-3.5" />
+                          </a>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
