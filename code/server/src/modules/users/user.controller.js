@@ -62,4 +62,31 @@ export class UserController {
       data: result
     });
   });
+
+  static getMyProfile = catchAsync(async (req, res) => {
+    const user = await UserService.getMyProfile(req.user.id);
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Lấy thông tin hồ sơ thành công',
+      data: { user }
+    });
+  });
+
+  static updateMyProfile = catchAsync(async (req, res) => {
+    const user = await UserService.updateMyProfile(req.user.id, req.body);
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Cập nhật hồ sơ thành công',
+      data: { user }
+    });
+  });
+
+  static changeMyPassword = catchAsync(async (req, res) => {
+    const result = await UserService.changeMyPassword(req.user.id, req.body);
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: result.message,
+      data: result
+    });
+  });
 }

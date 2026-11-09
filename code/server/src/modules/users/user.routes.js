@@ -4,7 +4,9 @@ import {
   createUserSchema,
   updateUserSchema,
   queryUsersSchema,
-  updateUserStatusSchema
+  updateUserStatusSchema,
+  updateProfileSchema,
+  changePasswordSchema
 } from './user.dto.js';
 import { validateDto } from '../../middlewares/validate.middleware.js';
 import { protect } from '../../middlewares/auth.middleware.js';
@@ -17,6 +19,11 @@ const router = Router();
 
 // Tất cả các route yêu cầu đăng nhập
 router.use(protect);
+
+// Customer & Self-service profile routes (Mọi user đăng nhập đều được dùng)
+router.get('/profile/me', UserController.getMyProfile);
+router.put('/profile/me', validateDto(updateProfileSchema), UserController.updateMyProfile);
+router.put('/profile/change-password', validateDto(changePasswordSchema), UserController.changeMyPassword);
 
 router.get(
   '/',

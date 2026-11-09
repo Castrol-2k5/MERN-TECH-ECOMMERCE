@@ -272,4 +272,67 @@ export class UserService {
 
     return { success: true, message: 'Đã vô hiệu hóa tài khoản người dùng thành công' };
   }
+
+  static async getMyProfile(userId) {
+    const user = await User.findById(userId)
+      .populate('branchId', BRANCH_POPULATE_FIELDS)
+      .lean();
+
+    if (!user) {
+      throw new AppError('Không tìm thấy tài khoản người dùng', 404, 'USER_NOT_FOUND');
+    }
+
+    return user;
+  }
+
+  static async updateMyProfile(userId, payload) {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new AppError('Không tìm thấy tài khoản người dùng', 404, 'USER_NOT_FOUND');
+    }
+
+    if (payload.fullName) user.fullName = payload.fullName.trim();
+    if (payload.phone && payload.phone !== user.phone) {
+      const existingPhone = await User.findOne({ phone: payload.phone, _id: { $ne: userId } });
+      if (existingPhone) {
+        throw new AppError('Số điện thoại đã được đăng ký bởi tài khoản khác', 409, 'PHONE_ALREADY_EXISTS');
+      }
+      user.phone = payload.phone;
+    }
+    if (payload.address !== undefined) {
+      user.address = payload.address.trim();
+    }
+    if (Array.isArray(payload.addresses)) {
+      user.addresses = payload.addresses;
+      const def = payload.addresses.find((a) => a.isDefault);
+      if (def) {
+        user.address = def.address;
+      }
+    }
+
+    await user.save();
+
+    const updated = await User.findById(userId)
+      .populate('branchId', BRANCH_POPULATE_FIELDS)
+      .lean();
+
+    return updated;
+  }
+
+  static async changeMyPassword(userId, { currentPassword, newPassword }) {
+    const user = await User.findById(userId).select('+passwordHash');
+    if (!user) {
+      throw new AppError('Không tìm thấy tài khoản người dùng', 404, 'USER_NOT_FOUND');
+    }
+
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      throw new AppError('Mật khẩu hiện tại không chính xác', 400, 'INVALID_PASSWORD');
+    }
+
+    user.passwordHash = newPassword;
+    await user.save();
+
+    return { success: true, message: 'Đổi mật khẩu thành công' };
+  }
 }

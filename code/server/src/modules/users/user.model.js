@@ -54,10 +54,24 @@ const userSchema = new Schema(
         message: 'Chi nhánh là bắt buộc đối với nhân viên (STAFF) và quản lý chi nhánh (BRANCH_MANAGER)'
       }
     },
-    isActive: {
+        isActive: {
       type: Boolean,
       default: true
     },
+    address: {
+      type: String,
+      default: '',
+      trim: true
+    },
+    addresses: [
+      {
+        label: { type: String, default: 'Nhà riêng', trim: true },
+        recipientName: { type: String, default: '', trim: true },
+        phone: { type: String, default: '', trim: true },
+        address: { type: String, required: true, trim: true },
+        isDefault: { type: Boolean, default: false }
+      }
+    ],
     passwordResetToken: {
       type: String,
       default: null,

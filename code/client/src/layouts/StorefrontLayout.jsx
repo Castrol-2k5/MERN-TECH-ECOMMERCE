@@ -446,6 +446,14 @@ export const StorefrontLayout = () => {
 
                     <div className="py-1">
                       <Link
+                        to="/account/profile"
+                        onClick={() => setIsUserDropdownOpen(false)}
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-slate-50 text-slate-700 font-semibold transition-colors"
+                      >
+                        <User className="w-4 h-4 text-blue-600" />
+                        <span>Hồ sơ & Sổ địa chỉ</span>
+                      </Link>
+                      <Link
                         to="/account/orders"
                         onClick={() => setIsUserDropdownOpen(false)}
                         className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-slate-50 text-slate-700 font-semibold transition-colors"

@@ -72,6 +72,31 @@ export const userService = {
     return response?.data?.user || response?.data;
   },
 
+  
+  getMyProfile: async () => {
+    if (isMockEnabled()) {
+      return fallbackUsers[0];
+    }
+    const response = await axiosClient.get('/users/profile/me');
+    return response?.data?.user || response?.data;
+  },
+
+  updateMyProfile: async (payload) => {
+    if (isMockEnabled()) {
+      return { ...fallbackUsers[0], ...payload };
+    }
+    const response = await axiosClient.put('/users/profile/me', payload);
+    return response?.data?.user || response?.data;
+  },
+
+  changePassword: async (payload) => {
+    if (isMockEnabled()) {
+      return { success: true, message: 'Đổi mật khẩu thành công (mock)' };
+    }
+    const response = await axiosClient.put('/users/profile/change-password', payload);
+    return response?.data || { success: true };
+  },
+
   deleteUser: async (id) => {
     if (isMockEnabled()) {
       return { success: true };

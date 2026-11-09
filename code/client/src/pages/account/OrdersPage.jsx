@@ -12,7 +12,8 @@ import {
   AlertCircle,
   ShoppingBag,
   ExternalLink,
-  ShieldCheck
+  ShieldCheck,
+  User
 } from 'lucide-react';
 import { orderService } from '../../features/orders/services/orderService.js';
 
@@ -158,13 +159,22 @@ export const OrdersPage = () => {
           </p>
         </div>
 
-        <Link
-          to="/warranty-check"
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs font-bold hover:bg-emerald-100 transition-colors shadow-xs"
-        >
-          <ShieldCheck className="w-4 h-4 text-emerald-600" />
-          <span>Tra cứu e-Warranty</span>
-        </Link>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Link
+            to="/account/profile"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-blue-200 bg-blue-50 text-blue-800 text-xs font-bold hover:bg-blue-100 transition-colors shadow-xs"
+          >
+            <User className="w-4 h-4 text-blue-600" />
+            <span>Hồ sơ & Sổ địa chỉ</span>
+          </Link>
+          <Link
+            to="/warranty-check"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs font-bold hover:bg-emerald-100 transition-colors shadow-xs"
+          >
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <span>Tra cứu e-Warranty</span>
+          </Link>
+        </div>
       </div>
 
       {/* Filter Tabs */}

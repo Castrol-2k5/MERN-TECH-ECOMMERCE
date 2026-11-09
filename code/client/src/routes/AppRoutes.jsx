@@ -23,6 +23,7 @@ import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage.jsx';
 import ResetPasswordPage from '../pages/auth/ResetPasswordPage.jsx';
 
 // Customer Account Pages (P-18)
+import ProfilePage from '../pages/account/ProfilePage.jsx';
 import OrdersPage from '../pages/account/OrdersPage.jsx';
 import OrderDetailPage from '../pages/account/OrderDetailPage.jsx';
 
@@ -99,6 +100,7 @@ export const AppRoutes = () => {
 
         {/* Customer Protected Account Routes (P-18) */}
         <Route element={<RoleProtectedRoute allowedRoles={['CUSTOMER', 'SUPER_ADMIN']} />}>
+          <Route path="/account/profile" element={<ProfilePage />} />
           <Route path="/account/orders" element={<OrdersPage />} />
           <Route path="/account/orders/:id" element={<OrderDetailPage />} />
         </Route>
