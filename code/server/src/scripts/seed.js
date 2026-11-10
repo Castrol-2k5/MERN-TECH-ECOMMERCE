@@ -16,7 +16,17 @@ import {
   ORDER_STATUS,
   WarrantyTicket,
   WARRANTY_STATUS,
-  Session
+  Session,
+  StockTransfer,
+  TRANSFER_STATUS,
+  PosShift,
+  SHIFT_STATUS,
+  InterBranchSettlement,
+  SETTLEMENT_TYPE,
+  SETTLEMENT_STATUS,
+  AuditLog,
+  AUDIT_ACTIONS,
+  AUDIT_SEVERITY
 } from '../models/index.js';
 
 dotenv.config();
@@ -30,17 +40,21 @@ async function seed() {
   await mongoose.connect(MONGODB_URI, { autoIndex: true });
   console.log(`✓ Connected to ${mongoose.connection.name}`);
 
-  console.log('🧹 Cleaning up existing data in core collections...');
+  console.log('🧹 Cleaning up existing data in all collections...');
   await Promise.all([
     User.deleteMany({}),
     Branch.deleteMany({}),
     Category.deleteMany({}),
     Product.deleteMany({}),
     BranchInventory.deleteMany({}),
+    StockTransfer.deleteMany({}),
     Serial.deleteMany({}),
     Order.deleteMany({}),
     WarrantyTicket.deleteMany({}),
-    Session.deleteMany({})
+    Session.deleteMany({}),
+    PosShift.deleteMany({}),
+    InterBranchSettlement.deleteMany({}),
+    AuditLog.collection.drop().catch(() => {})
   ]);
 
   // Ensure indexes are properly synced (especially 2dsphere and unique constraints)
@@ -50,10 +64,14 @@ async function seed() {
     Category.syncIndexes(),
     Product.syncIndexes(),
     BranchInventory.syncIndexes(),
+    StockTransfer.syncIndexes(),
     Serial.syncIndexes(),
     Order.syncIndexes(),
     WarrantyTicket.syncIndexes(),
-    Session.syncIndexes()
+    Session.syncIndexes(),
+    PosShift.syncIndexes(),
+    InterBranchSettlement.syncIndexes(),
+    AuditLog.syncIndexes()
   ]);
 
   // ==========================================
@@ -103,7 +121,7 @@ async function seed() {
   // Bước 2: Khởi tạo Tài khoản Người dùng Mẫu (users)
   // ==========================================
   console.log('👤 Seeding users...');
-  const [, , , staffQ1User, , customerUser] = await User.create([
+  const [adminUser, managerQ1User, managerTDucUser, staffQ1User, staffTDucUser, customerUser] = await User.create([
     {
       fullName: 'Nguyễn Văn Quản Trị',
       email: 'admin@techstore.com',
@@ -1669,12 +1687,218 @@ async function seed() {
     issueDescription: 'Máy không lên nguồn sau khi sấm sét, quạt tản nhiệt không quay',
     appearanceCondition: 'Máy trầy xước nhẹ ở mặt A, nguyên tem ốc đáy',
     accessories: ['Thân máy', 'Củ sạc zin 280W'],
-    status: WARRANTY_STATUS.COMPLETED,
-    receivedDate: oneMonthAgo,
-    estimatedReturnDate: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
-    resolvedDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
-    resolution: 'Đã thay thế tụ nguồn bo mạch chủ và vệ sinh tra keo tản nhiệt mới'
+    status: WARRANTY_STATUS.RETURNED,
+    estimatedReturnDate: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+    resolution: {
+      repairNotes: 'Đã thay thế tụ nguồn bo mạch chủ và vệ sinh tra keo tản nhiệt mới',
+      partsReplaced: ['Tụ nguồn bo mạch chủ', 'Keo tản nhiệt Thermal Grizzly'],
+      repairedBy: staffQ1User._id,
+      completedAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000)
+    }
   });
+
+  // ==========================================
+  // Bước 8: Khởi tạo Dữ liệu Chuyển kho, Ca POS, Đối soát & Audit Log Mẫu
+  // ==========================================
+  console.log('🚚 Seeding transfers, POS shifts, settlements & audit logs...');
+
+  const transferTransit = await StockTransfer.create({
+    transferCode: 'TRF-20261109-001',
+    sourceBranchId: branchQ1._id,
+    destinationBranchId: branchTDuc._id,
+    items: [
+      {
+        productId: pMap['iphone-15']._id,
+        productSkuId: p7Sku1Id,
+        sku: 'IP15-128GB-BLU',
+        productName: pMap['iphone-15'].name,
+        quantity: 1,
+        serialNumbers: ['IP15-TRANSIT-001']
+      }
+    ],
+    carrierInfo: {
+      carrierName: 'Giao hàng nội bộ TechOne Express',
+      driverName: 'Nguyễn Minh Tài',
+      driverPhone: '0909888777',
+      trackingNumber: 'TO-EXP-8891'
+    },
+    productId: pMap['iphone-15']._id,
+    productSkuId: p7Sku1Id,
+    sku: 'IP15-128GB-BLU',
+    productName: pMap['iphone-15'].name,
+    quantity: 1,
+    serialNumbers: ['IP15-TRANSIT-001'],
+    status: TRANSFER_STATUS.IN_TRANSIT,
+    createdById: managerQ1User._id,
+    notes: 'Điều chuyển bổ sung iPhone 15 Xanh sang chi nhánh Thủ Đức đang hết hàng'
+  });
+
+  const shiftYesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const shiftQ1 = await PosShift.create({
+    shiftCode: 'SHF-20261109-Q1',
+    branchId: branchQ1._id,
+    cashierId: staffQ1User._id,
+    openedAt: new Date(shiftYesterday.getTime() - 8 * 60 * 60 * 1000),
+    closedAt: shiftYesterday,
+    status: SHIFT_STATUS.CLOSED,
+    openingBalance: 2000000,
+    cashSales: 34990000,
+    cashRefunds: 0,
+    cashDrops: [
+      {
+        amount: 30000000,
+        reason: 'Nộp két sắt an toàn cuối ngày',
+        performedAt: new Date(shiftYesterday.getTime() - 60 * 60 * 1000),
+        performedById: staffQ1User._id
+      }
+    ],
+    expectedEndingBalance: 6990000,
+    actualEndingBalance: 6990000,
+    discrepancy: 0,
+    discrepancyNote: '',
+    approvedById: managerQ1User._id,
+    totalOrdersCount: 1
+  });
+
+  const shiftTDuc = await PosShift.create({
+    shiftCode: 'SHF-20261109-TD',
+    branchId: branchTDuc._id,
+    cashierId: staffTDucUser._id,
+    openedAt: new Date(shiftYesterday.getTime() - 8 * 60 * 60 * 1000),
+    closedAt: shiftYesterday,
+    status: SHIFT_STATUS.CLOSED,
+    openingBalance: 1500000,
+    cashSales: 4500000,
+    cashRefunds: 0,
+    cashDrops: [
+      {
+        amount: 4000000,
+        reason: 'Nộp tiền doanh thu ca chiều vào két',
+        performedAt: new Date(shiftYesterday.getTime() - 2 * 60 * 60 * 1000),
+        performedById: staffTDucUser._id
+      }
+    ],
+    expectedEndingBalance: 2000000,
+    actualEndingBalance: 1950000,
+    discrepancy: -50000,
+    discrepancyNote: 'Thối nhầm 50.000đ tiền lẻ cho khách mua phụ kiện',
+    approvedById: managerTDucUser._id,
+    totalOrdersCount: 2
+  });
+
+  const cogsAmt = Math.round(b2cOrder.totalAmount * 0.85);
+  const feeAmt = Math.round(b2cOrder.totalAmount * 0.03);
+  await InterBranchSettlement.create({
+    settlementCode: 'STL-20261109-001',
+    type: SETTLEMENT_TYPE.CROSS_BRANCH_DISPATCH,
+    orderId: b2cOrder._id,
+    orderCode: b2cOrder.orderCode,
+    sourceBranchId: branchHQ._id,
+    fulfillingBranchId: branchQ1._id,
+    orderAmount: b2cOrder.totalAmount,
+    cogsAmount: cogsAmt,
+    fulfillmentFee: feeAmt,
+    totalPayableToBranch: cogsAmt + feeAmt,
+    status: SETTLEMENT_STATUS.PENDING_CLEARING,
+    notes: 'Đơn online khách đã thanh toán VNPay về Trụ sở HQ, chi nhánh Q1 xuất kho giao hàng'
+  });
+
+  await AuditLog.create([
+    {
+      actor: {
+        userId: managerQ1User._id,
+        fullName: managerQ1User.fullName,
+        email: managerQ1User.email,
+        role: managerQ1User.role,
+        branchId: branchQ1._id,
+        branchCode: branchQ1.branchCode
+      },
+      action: AUDIT_ACTIONS.TRANSFER_CREATE,
+      severity: AUDIT_SEVERITY.INFO,
+      target: {
+        model: 'StockTransfer',
+        entityId: transferTransit._id,
+        code: transferTransit.transferCode,
+        name: `Phiếu chuyển kho ${transferTransit.transferCode}`
+      },
+      changes: {
+        after: {
+          transferCode: transferTransit.transferCode,
+          itemsCount: 1,
+          totalQuantity: 1,
+          status: TRANSFER_STATUS.IN_TRANSIT
+        }
+      },
+      context: {
+        ipAddress: '127.0.0.1',
+        notes: 'Từ chi nhánh BR-Q1 đến BR-TDUC'
+      },
+      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000)
+    },
+    {
+      actor: {
+        userId: staffTDucUser._id,
+        fullName: staffTDucUser.fullName,
+        email: staffTDucUser.email,
+        role: staffTDucUser.role,
+        branchId: branchTDuc._id,
+        branchCode: branchTDuc.branchCode
+      },
+      action: AUDIT_ACTIONS.POS_SHIFT_CLOSE,
+      severity: AUDIT_SEVERITY.CRITICAL,
+      target: {
+        model: 'PosShift',
+        entityId: shiftTDuc._id,
+        code: shiftTDuc.shiftCode,
+        name: `Ca thu ngân ${shiftTDuc.shiftCode}`
+      },
+      changes: {
+        before: { status: SHIFT_STATUS.OPEN },
+        after: {
+          status: SHIFT_STATUS.CLOSED,
+          expectedEndingBalance: 2000000,
+          actualEndingBalance: 1950000,
+          discrepancy: -50000
+        },
+        diff: { discrepancy: -50000 }
+      },
+      context: {
+        ipAddress: '127.0.0.1',
+        reason: 'Chốt ca cuối ngày Thủ Đức',
+        notes: 'Chốt ca lệch -50.000 đ: Thối nhầm 50.000đ tiền lẻ cho khách mua phụ kiện'
+      },
+      timestamp: shiftYesterday
+    },
+    {
+      actor: {
+        userId: adminUser._id,
+        fullName: adminUser.fullName,
+        email: adminUser.email,
+        role: adminUser.role,
+        branchId: null,
+        branchCode: 'BR-HQ'
+      },
+      action: AUDIT_ACTIONS.STOCK_ADJUST,
+      severity: AUDIT_SEVERITY.WARNING,
+      target: {
+        model: 'BranchInventory',
+        entityId: branchHQ._id,
+        code: 'IP16PM-256GB-DESERT',
+        name: `${pMap['iphone-16-pro-max'].name} (IP16PM-256GB-DESERT)`
+      },
+      changes: {
+        before: { quantity: 6 },
+        after: { quantity: 5 },
+        diff: { quantityPhysical: -1, quantityAvailable: -1 }
+      },
+      context: {
+        ipAddress: '127.0.0.1',
+        reason: 'Chuyển 1 máy làm hàng trưng bày tại Flagship Q1',
+        notes: 'Chi nhánh BR-HQ: delta -1'
+      },
+      timestamp: new Date(Date.now() - 45 * 60 * 1000)
+    }
+  ]);
 
   console.log('\n======================================================');
   console.log('🎉 SEEDING DATA HOÀN TẤT THÀNH CÔNG VỚI DỮ LIỆU ĐA DẠNG!');
@@ -1685,6 +1909,10 @@ async function seed() {
   console.log(`- Tồn kho: ${inventoryList.length} bản ghi tồn kho chi nhánh (có cả SKU hết hàng để test)`);
   console.log(`- Mã Serial/IMEI: ${createdSerials.length} mã máy (IN_STOCK, SOLD còn hạn, SOLD hết hạn, TRANSIT)`);
   console.log(`- Đơn hàng mẫu: POS Completed, B2C Online READY_FOR_SHIPPING`);
+  console.log(`- Phiếu chuyển kho: 1 phiếu IN_TRANSIT (BR-Q1 -> BR-TDUC, IP15-TRANSIT-001)`);
+  console.log(`- Ca thu ngân lịch sử: 2 ca CLOSED (Q1 cân đối, Thủ Đức lệch -50.000đ)`);
+  console.log(`- Đối soát công nợ: 1 phiếu PENDING_CLEARING (${b2cOrder.orderCode})`);
+  console.log(`- Audit Logs: 3 bản ghi mẫu (TRANSFER_CREATE, POS_SHIFT_CLOSE, STOCK_ADJUST)`);
   console.log(`- Tài khoản test:`);
   console.log(`  * Super Admin: admin@techstore.com / 123456`);
   console.log(`  * Branch Manager: manager.q1@techstore.com, manager.tduc@techstore.com / 123456`);
