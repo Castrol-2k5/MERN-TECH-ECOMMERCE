@@ -450,6 +450,93 @@ export class OrderService {
   }
 
   /**
+   * API nhẹ lấy cảnh báo đơn B2C Online mới/đang xử lý tại chi nhánh (UC-OMNI-01)
+   */
+  static async getBranchAlerts(targetBranchId) {
+    const baseFilter = {
+      orderType: ORDER_TYPES.B2C_ONLINE,
+      orderStatus: { $in: [ORDER_STATUS.PENDING, ORDER_STATUS.PROCESSING] }
+    };
+
+    if (targetBranchId) {
+      baseFilter.branchId = targetBranchId;
+    }
+
+    const [pendingCount, newCount, processingCount, alerts] = await Promise.all([
+      Order.countDocuments(baseFilter),
+      Order.countDocuments({ ...baseFilter, orderStatus: ORDER_STATUS.PENDING }),
+      Order.countDocuments({ ...baseFilter, orderStatus: ORDER_STATUS.PROCESSING }),
+      Order.find(baseFilter)
+        .select('orderCode orderStatus paymentStatus paymentMethod totalAmount customerInfo branchId items.productName items.quantity items.sku createdAt')
+        .populate('branchId', 'name branchCode')
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .lean()
+    ]);
+
+    return {
+      pendingCount,
+      newCount,
+      processingCount,
+      alerts
+    };
+  }
+
+  /**
+   * Lấy dữ liệu in Phiếu Nhặt Hàng & Đóng Gói kèm vị trí quầy kệ (UC-OMNI-02)
+   */
+  static async getPickPackSlip(orderId, currentUser) {
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      throw new AppError('Mã ID đơn hàng không hợp lệ.', 400, 'INVALID_ID');
+    }
+
+    const order = await Order.findById(orderId)
+      .populate('branchId', 'name branchCode address phone')
+      .populate('staffId', 'fullName phone')
+      .lean();
+
+    if (!order) {
+      throw new AppError('Không tìm thấy đơn hàng yêu cầu.', 404, 'ORDER_NOT_FOUND');
+    }
+
+    if (currentUser && (currentUser.role === USER_ROLES.STAFF || currentUser.role === USER_ROLES.BRANCH_MANAGER)) {
+      const orderBranchId = order.branchId?._id?.toString() || order.branchId?.toString();
+      if (orderBranchId !== currentUser.branchId?.toString()) {
+        throw new AppError('Bạn không có quyền truy cập phiếu nhặt hàng của chi nhánh khác.', 403, 'CROSS_BRANCH_ACCESS_DENIED');
+      }
+    }
+
+    const branchObjId = order.branchId?._id || order.branchId;
+    const skuIds = (order.items || []).map((it) => it.productSkuId).filter(Boolean);
+
+    let shelfMap = new Map();
+    if (branchObjId && skuIds.length > 0) {
+      const inventories = await BranchInventory.find({
+        branchId: branchObjId,
+        productSkuId: { $in: skuIds }
+      })
+        .select('productSkuId shelfLocation quantity')
+        .lean();
+
+      shelfMap = new Map(inventories.map((inv) => [inv.productSkuId.toString(), inv]));
+    }
+
+    const items = (order.items || []).map((item) => {
+      const inv = item.productSkuId ? shelfMap.get(item.productSkuId.toString()) : null;
+      return {
+        ...item,
+        shelfLocation: inv?.shelfLocation || 'Quầy / Kho chung',
+        branchStock: typeof inv?.quantity === 'number' ? inv.quantity : null
+      };
+    });
+
+    return {
+      ...order,
+      items
+    };
+  }
+
+  /**
    * Xem chi tiết đơn hàng qua orderCode kèm kiểm soát quyền truy cập
    */
   static async getOrderByCode(orderCode, currentUser) {

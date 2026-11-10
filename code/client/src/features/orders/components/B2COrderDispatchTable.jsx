@@ -6,7 +6,8 @@ import {
   Send, 
   Search, 
   QrCode,
-  Truck
+  Truck,
+  Printer
 } from 'lucide-react';
 
 export const B2COrderDispatchTable = ({
@@ -14,7 +15,8 @@ export const B2COrderDispatchTable = ({
   userRole = 'SUPER_ADMIN',
   onSelectOrder,
   onOpenAllocationModal,
-  onOpenSerialDrawer
+  onOpenSerialDrawer,
+  onOpenPickPackModal
 }) => {
   const [activeTab, setActiveTab] = useState('ALL'); // 'ALL' | 'PENDING' | 'PACKING' | 'READY'
   const [searchTerm, setSearchTerm] = useState('');
@@ -258,6 +260,21 @@ export const B2COrderDispatchTable = ({
                             >
                               <QrCode className="w-3 h-3" />
                               <span>Quét Serial &amp; Đóng gói</span>
+                            </button>
+                          )}
+
+                          {onOpenPickPackModal && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenPickPackModal(order);
+                              }}
+                              title="In phiếu nhặt hàng Pick & Pack"
+                              className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-[11px] font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                            >
+                              <Printer className="w-3 h-3 text-cyan-400" />
+                              <span className="hidden xl:inline">Pick &amp; Pack</span>
                             </button>
                           )}
 

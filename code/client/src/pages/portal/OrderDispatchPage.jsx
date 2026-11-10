@@ -4,6 +4,7 @@ import { Truck, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
 import B2COrderDispatchTable from '../../features/orders/components/B2COrderDispatchTable';
 import BranchAllocationModal from '../../features/orders/components/BranchAllocationModal';
 import OrderSerialAssignDrawer from '../../features/orders/components/OrderSerialAssignDrawer';
+import PickPackSlipModal from '../../features/orders/components/PickPackSlipModal';
 import { orderService } from '../../features/orders/services/orderService.js';
 import branchService from '../../features/branches/services/branchService.js';
 import inventoryService from '../../features/inventory/services/inventoryService.js';
@@ -79,6 +80,7 @@ export const OrderDispatchPage = () => {
   const [candidateBranches, setCandidateBranches] = useState([]);
   const [allocationOrder, setAllocationOrder] = useState(null);
   const [serialAssignOrder, setSerialAssignOrder] = useState(null);
+  const [pickPackOrder, setPickPackOrder] = useState(null);
   const [toastMsg, setToastMsg] = useState(null);
 
   const fetchLiveOrders = useCallback(async () => {
@@ -297,6 +299,7 @@ export const OrderDispatchPage = () => {
         userRole={authUser?.role}
         onOpenAllocationModal={(order) => setAllocationOrder(order)}
         onOpenSerialDrawer={(order) => setSerialAssignOrder(order)}
+        onOpenPickPackModal={(order) => setPickPackOrder(order)}
       />
 
       {/* Branch Allocation Modal */}
@@ -306,6 +309,12 @@ export const OrderDispatchPage = () => {
         order={allocationOrder}
         branches={candidateBranches.length > 0 ? candidateBranches : branches}
         onConfirmAllocation={handleConfirmAllocation}
+      />
+
+      <PickPackSlipModal
+        isOpen={Boolean(pickPackOrder)}
+        onClose={() => setPickPackOrder(null)}
+        order={pickPackOrder}
       />
 
       {/* Serial Assign Drawer */}

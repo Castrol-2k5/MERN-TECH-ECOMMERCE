@@ -78,6 +78,27 @@ export class OrderController {
     });
   });
 
+  static getBranchAlerts = catchAsync(async (req, res) => {
+    const targetBranchId = req.scopedBranchId || req.query.branchId || null;
+    const result = await OrderService.getBranchAlerts(targetBranchId);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Lấy thông báo đơn hàng Online chờ xử lý thành công',
+      data: result
+    });
+  });
+
+  static getPickPackSlip = catchAsync(async (req, res) => {
+    const order = await OrderService.getPickPackSlip(req.params.id, req.user);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Lấy thông tin phiếu nhặt hàng & đóng gói thành công',
+      data: { order }
+    });
+  });
+
   static getOrderByCode = catchAsync(async (req, res) => {
     const { orderCode } = req.params;
     const order = await OrderService.getOrderByCode(orderCode, req.user);

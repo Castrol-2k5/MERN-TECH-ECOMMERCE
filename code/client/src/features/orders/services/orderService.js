@@ -250,5 +250,41 @@ export const orderService = {
     }
     const response = await axiosClient.post(`/orders/${orderId}/return`, payload);
     return response?.data || response;
+  },
+
+  getBranchAlerts: async (params = {}) => {
+    if (isMockEnabled()) {
+      const pending = fallbackOrders.filter(
+        (o) => o.orderType === 'B2C_ONLINE' && ['PENDING', 'PROCESSING'].includes(o.orderStatus)
+      );
+      return {
+        pendingCount: pending.length,
+        newCount: pending.filter((o) => o.orderStatus === 'PENDING').length,
+        processingCount: pending.filter((o) => o.orderStatus === 'PROCESSING').length,
+        alerts: pending.slice(0, 5)
+      };
+    }
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
+    );
+    const queryString = new URLSearchParams(cleanParams).toString();
+    const endpoint = `/orders/branch/alerts${queryString ? `?${queryString}` : ''}`;
+    const response = await axiosClient.get(endpoint);
+    return response?.data || { pendingCount: 0, newCount: 0, processingCount: 0, alerts: [] };
+  },
+
+  getPickPackSlip: async (orderId) => {
+    if (isMockEnabled()) {
+      const match = fallbackOrders.find((o) => o._id === orderId || o.orderCode === orderId) || fallbackOrders[0];
+      return {
+        ...match,
+        items: (match.items || []).map((it) => ({
+          ...it,
+          shelfLocation: 'Kệ A1 - Khu trưng bày'
+        }))
+      };
+    }
+    const response = await axiosClient.get(`/orders/${orderId}/pick-pack`);
+    return response?.data?.order || null;
   }
 };

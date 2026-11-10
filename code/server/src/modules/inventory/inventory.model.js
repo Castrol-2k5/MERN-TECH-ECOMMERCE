@@ -23,6 +23,11 @@ const branchInventorySchema = new Schema(
       required: [true, 'Số lượng tồn kho là bắt buộc'],
       min: [0, 'Số lượng tồn kho không được âm'],
       default: 0
+    },
+    shelfLocation: {
+      type: String,
+      trim: true,
+      default: ''
     }
   },
   {

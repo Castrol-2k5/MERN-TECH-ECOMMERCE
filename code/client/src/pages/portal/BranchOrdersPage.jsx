@@ -35,6 +35,8 @@ import usePosAudio from '../../features/pos/hooks/usePosAudio';
 import Toast from '../../components/common/Toast';
 import DataTablePagination from '../../components/common/DataTablePagination';
 import ReturnOrderModal from '../../features/orders/components/ReturnOrderModal.jsx';
+import PickPackSlipModal from '../../features/orders/components/PickPackSlipModal.jsx';
+import { Printer } from 'lucide-react';
 
 const formatVND = (val) => `${Number(val || 0).toLocaleString('vi-VN')} ₫`;
 
@@ -106,6 +108,7 @@ export const BranchOrdersPage = () => {
   // Modal state
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [returnTargetOrder, setReturnTargetOrder] = useState(null);
+  const [pickPackOrder, setPickPackOrder] = useState(null);
   const [verifiedSerialInfo, setVerifiedSerialInfo] = useState(null);
   const [verifyingSerial, setVerifyingSerial] = useState('');
 
@@ -1187,6 +1190,18 @@ export const BranchOrdersPage = () => {
                   </button>
                 )}
 
+                {/* Pick & Pack Slip Print button (UC-OMNI-02) */}
+                {selectedOrder.orderStatus !== 'CANCELLED' && (
+                  <button
+                    type="button"
+                    onClick={() => setPickPackOrder(selectedOrder)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 px-3.5 py-2 text-xs font-semibold text-cyan-300 transition-colors cursor-pointer"
+                  >
+                    <Printer className="h-4 w-4 text-cyan-400" />
+                    In phiếu Pick &amp; Pack
+                  </button>
+                )}
+
                 {/* Counter SKU Exchange button for Processing or Ready orders */}
                 {['PROCESSING', 'READY_FOR_SHIPPING'].includes(selectedOrder.orderStatus) && canComplete && (
                   <button
@@ -1546,6 +1561,12 @@ export const BranchOrdersPage = () => {
       )}
 
       {/* Return & Refund Modal (UC-ORD-12) */}
+      <PickPackSlipModal
+        isOpen={Boolean(pickPackOrder)}
+        onClose={() => setPickPackOrder(null)}
+        order={pickPackOrder}
+      />
+
       <ReturnOrderModal
         isOpen={Boolean(returnTargetOrder)}
         onClose={() => setReturnTargetOrder(null)}

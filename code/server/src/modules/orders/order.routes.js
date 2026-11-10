@@ -65,6 +65,15 @@ router.get(
   OrderController.getBranchOrders
 );
 
+// 4.1. API nhẹ cảnh báo đơn B2C Online mới trên Header POS & Portal (UC-OMNI-01)
+router.get(
+  '/branch/alerts',
+  protect,
+  authorize(USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER, USER_ROLES.STAFF),
+  scopeBranch,
+  OrderController.getBranchAlerts
+);
+
 // 5. Điều phối đơn hàng sang chi nhánh (SUPER_ADMIN, BRANCH_MANAGER)
 router.patch(
   '/:id/allocate',
@@ -117,6 +126,14 @@ router.post(
   authorize(USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER, USER_ROLES.STAFF),
   validateDto(returnOrderSchema),
   OrderController.returnOrder
+);
+
+// 6.5. Lấy dữ liệu Phiếu Nhặt Hàng & Đóng Gói Pick & Pack (UC-OMNI-02)
+router.get(
+  '/:id/pick-pack',
+  protect,
+  authorize(USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER, USER_ROLES.STAFF),
+  OrderController.getPickPackSlip
 );
 
 // 7. Cổng thanh toán VNPay (Sandbox)

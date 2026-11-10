@@ -9,7 +9,6 @@ import {
   Menu, 
   X, 
   LogOut, 
-  Bell, 
   ShoppingBag,
   Box,
   Barcode,
@@ -25,6 +24,7 @@ import { logout } from '../store/slices/authSlice.js';
 import { clearCart } from '../store/slices/posCartSlice.js';
 import axiosClient from '../services/axiosClient.js';
 import ErrorBoundary from '../components/common/ErrorBoundary.jsx';
+import OrderAlertBell from '../features/orders/components/OrderAlertBell.jsx';
 
 export const PortalLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -379,13 +379,7 @@ export const PortalLayout = () => {
               <ShoppingBag className="w-3.5 h-3.5" />
               <span>Mở Màn Hình POS</span>
             </NavLink>
-            <button
-              type="button"
-              className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors relative"
-            >
-              <Bell className="w-4 h-4" />
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 absolute top-2 right-2"></span>
-            </button>
+            <OrderAlertBell compact />
           </div>
         </header>
 
