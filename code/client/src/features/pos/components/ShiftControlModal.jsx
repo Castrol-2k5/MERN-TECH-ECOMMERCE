@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import {
   X,
   Lock,
@@ -10,10 +11,12 @@ import {
   Coins,
   Calculator,
   Printer,
-  Receipt
+  Receipt,
+  ShieldCheck
 } from 'lucide-react';
 import posShiftService from '../services/posShiftService.js';
 import ShiftHandoverPrintModal from './ShiftHandoverPrintModal.jsx';
+import approvalService, { LARGE_CASH_OUT_THRESHOLD } from '../../approvals/services/approvalService.js';
 
 const DENOMINATIONS = [
   500000, 200000, 100000, 50000, 20000, 10000, 5000, 2000, 1000
@@ -43,6 +46,7 @@ export const ShiftControlModal = ({
   onShiftUpdated,
   branchName = 'Showroom'
 }) => {
+  const authUser = useSelector((state) => state.auth?.user);
   const [activeTab, setActiveTab] = useState(currentShift ? 'close' : 'open');
   const [openingBalance, setOpeningBalance] = useState(1000000);
   const [dropAmount, setDropAmount] = useState(500000);
@@ -150,12 +154,35 @@ export const ShiftControlModal = ({
     }
   };
 
+  const needsVoucherApproval =
+    authUser?.role === 'STAFF' &&
+    voucherType === 'OUT' &&
+    Number(voucherAmount) > LARGE_CASH_OUT_THRESHOLD;
+
   const handleCreateVoucher = async (e) => {
     e.preventDefault();
     if (!currentShift) return;
     setIsSubmitting(true);
     setErrorMsg('');
     try {
+      if (needsVoucherApproval) {
+        const req = await approvalService.createRequest({
+          type: 'LARGE_CASH_OUT',
+          targetId: currentShift._id,
+          reason: voucherReason.trim(),
+          payload: {
+            category: voucherCategory,
+            amount: Number(voucherAmount)
+          }
+        });
+        setSuccessMsg(
+          `Đã gửi yêu cầu duyệt phiếu chi ${req?.requestCode || ''} (${formatVND(voucherAmount)}) tới Quản lý Chi nhánh!`
+        );
+        setVoucherReason('');
+        setTimeout(() => setSuccessMsg(''), 3000);
+        return;
+      }
+
       const shift = await posShiftService.recordCashVoucher(currentShift._id, {
         type: voucherType,
         category: voucherCategory,
@@ -446,17 +473,30 @@ export const ShiftControlModal = ({
                     />
                   </div>
 
+                  {needsVoucherApproval && (
+                    <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-200 text-[11px] flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>
+                        Phiếu chi vượt ngưỡng {formatVND(LARGE_CASH_OUT_THRESHOLD)} sẽ được gửi Quản lý Chi nhánh phê duyệt trước khi trừ két.
+                      </span>
+                    </div>
+                  )}
+
                   <button
                     type="submit"
                     disabled={isSubmitting || (voucherType === 'OUT' && Number(voucherAmount) > expectedEndingBalance)}
                     className={`w-full py-2.5 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer disabled:opacity-50 ${
-                      voucherType === 'OUT'
+                      needsVoucherApproval
+                        ? 'bg-amber-600 hover:bg-amber-500'
+                        : voucherType === 'OUT'
                         ? 'bg-rose-600 hover:bg-rose-500'
                         : 'bg-emerald-600 hover:bg-emerald-500'
                     }`}
                   >
                     {isSubmitting
-                      ? 'Đang lưu phiếu...'
+                      ? 'Đang xử lý...'
+                      : needsVoucherApproval
+                      ? 'Gửi Quản Lý Duyệt Phiếu Chi'
                       : voucherType === 'OUT'
                       ? 'Xác Nhận Lập Phiếu Chi'
                       : 'Xác Nhận Lập Phiếu Thu'}

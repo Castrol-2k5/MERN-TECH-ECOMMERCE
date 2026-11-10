@@ -18,6 +18,7 @@ import { logout } from '../../../store/slices/authSlice.js';
 import { clearCart } from '../../../store/slices/posCartSlice.js';
 import axiosClient from '../../../services/axiosClient.js';
 import OrderAlertBell from '../../orders/components/OrderAlertBell.jsx';
+import ApprovalAlertBell from '../../approvals/components/ApprovalAlertBell.jsx';
 
 export const PosHeader = ({
   activeCartCount = 0,
@@ -198,6 +199,9 @@ export const PosHeader = ({
           <span className="text-slate-300 font-medium">In K80:</span>
           <span className="text-emerald-400 font-semibold">Sẵn sàng</span>
         </div>
+
+        {/* Privilege Approval Alert Bell (UC-BM-04 - only shown to Managers/Admin) */}
+        <ApprovalAlertBell />
 
         {/* Online / Click & Collect Order Alert Bell (UC-OMNI-01) */}
         <OrderAlertBell branchId={selectedBranchId} />

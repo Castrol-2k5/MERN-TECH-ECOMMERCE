@@ -36,7 +36,8 @@ import Toast from '../../components/common/Toast';
 import DataTablePagination from '../../components/common/DataTablePagination';
 import ReturnOrderModal from '../../features/orders/components/ReturnOrderModal.jsx';
 import PickPackSlipModal from '../../features/orders/components/PickPackSlipModal.jsx';
-import { Printer } from 'lucide-react';
+import approvalService from '../../features/approvals/services/approvalService.js';
+import { Printer, Ban } from 'lucide-react';
 
 const formatVND = (val) => `${Number(val || 0).toLocaleString('vi-VN')} ₫`;
 
@@ -109,6 +110,8 @@ export const BranchOrdersPage = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [returnTargetOrder, setReturnTargetOrder] = useState(null);
   const [pickPackOrder, setPickPackOrder] = useState(null);
+  const [voidTargetOrder, setVoidTargetOrder] = useState(null);
+  const [voidReason, setVoidReason] = useState('');
   const [verifiedSerialInfo, setVerifiedSerialInfo] = useState(null);
   const [verifyingSerial, setVerifyingSerial] = useState('');
 
@@ -1215,6 +1218,22 @@ export const BranchOrdersPage = () => {
                   </button>
                 )}
 
+                {/* Request Void POS Order button (UC-BM-04) */}
+                {selectedOrder.orderType === 'POS_STORE' && selectedOrder.orderStatus === 'COMPLETED' && canComplete && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVoidTargetOrder(selectedOrder);
+                      setVoidReason('');
+                    }}
+                    disabled={actionLoading}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 px-3.5 py-2 text-xs font-semibold text-amber-300 transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    <Ban className="h-4 w-4 text-amber-400" />
+                    Xin hủy hóa đơn POS
+                  </button>
+                )}
+
                 {/* Return & Refund button for COMPLETED or PARTIALLY_RETURNED orders */}
                 {['COMPLETED', 'PARTIALLY_RETURNED'].includes(selectedOrder.orderStatus) && canComplete && (
                   <button
@@ -1572,6 +1591,14 @@ export const BranchOrdersPage = () => {
         onClose={() => setReturnTargetOrder(null)}
         order={returnTargetOrder}
         onReturnSuccess={(result) => {
+          if (result?.approvalPending) {
+            showToast(
+              'success',
+              'Đã gửi yêu cầu phê duyệt',
+              `Yêu cầu ${result?.request?.requestCode || ''} đã gửi tới Quản lý Chi nhánh duyệt trước khi hoàn tiền.`
+            );
+            return;
+          }
           const updatedOrder = result?.order;
           const returnCode = result?.returnRecord?.returnCode || 'RTN';
           const refundAmt = result?.returnRecord?.refundAmount || 0;
@@ -1586,6 +1613,76 @@ export const BranchOrdersPage = () => {
           fetchOrders();
         }}
       />
+
+      {/* Request Void POS Order Modal */}
+      {voidTargetOrder && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-5 space-y-4">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Ban className="w-4 h-4 text-amber-400" />
+              Gửi yêu cầu hủy hóa đơn POS {voidTargetOrder.orderCode}
+            </h3>
+            <p className="text-xs text-slate-400">
+              Hóa đơn POS đã hoàn tất ({formatVND(voidTargetOrder.totalAmount)}) cần Quản lý Chi nhánh phê duyệt trước khi hủy &amp; hoàn kho/Serial.
+            </p>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setActionLoading(true);
+                try {
+                  const req = await approvalService.createRequest({
+                    type: 'VOID_POS_ORDER',
+                    targetId: voidTargetOrder._id,
+                    reason: voidReason.trim()
+                  });
+                  showToast(
+                    'success',
+                    'Đã gửi yêu cầu hủy hóa đơn',
+                    `Mã yêu cầu ${req?.requestCode || ''} đang chờ Quản lý phê duyệt.`
+                  );
+                  setVoidTargetOrder(null);
+                  setVoidReason('');
+                } catch (err) {
+                  showToast(
+                    'error',
+                    'Không thể gửi yêu cầu',
+                    err?.response?.data?.message || err?.message || 'Lỗi gửi phê duyệt'
+                  );
+                } finally {
+                  setActionLoading(false);
+                }
+              }}
+              className="space-y-3"
+            >
+              <textarea
+                rows={3}
+                required
+                minLength={2}
+                value={voidReason}
+                onChange={(e) => setVoidReason(e.target.value)}
+                placeholder="Nhập lý do chi tiết (VD: Xuất nhầm hình thức thanh toán / Khách đổi ý tại quầy)..."
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setVoidTargetOrder(null)}
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold cursor-pointer"
+                >
+                  Đóng
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
+                >
+                  {actionLoading ? 'Đang gửi...' : 'Gửi Quản Lý Duyệt'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Floating System Toast Notification */}
       <Toast toast={toast} onClose={() => setToast(null)} />

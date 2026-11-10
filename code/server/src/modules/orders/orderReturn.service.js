@@ -8,14 +8,15 @@ import { USER_ROLES } from '../users/user.model.js';
 import { PosShiftService } from '../shifts/posShift.service.js';
 import { AuditLogService } from '../audit/auditLog.service.js';
 import { AUDIT_ACTIONS } from '../audit/auditLog.model.js';
+import { APPROVAL_THRESHOLDS } from '../approvals/approval.model.js';
 
 export class OrderReturnService {
   /**
-   * Xử lý Trả hàng & Hoàn tiền tại quầy (UC-ORD-12)
+   * Xử lý Trả hàng & Hoàn tiền tại quầy (UC-ORD-12 & UC-BM-04)
    * Tự động kiểm tra Serial, hoàn kho (nếu GOOD) hoặc chuyển Serial sang DEFECTIVE (nếu hàng lỗi),
    * cập nhật trạng thái đơn hàng, cập nhật cashRefunds trong Ca POS và ghi Audit Log.
    */
-  static async processReturn(orderId, payload, currentUser) {
+  static async processReturn(orderId, payload, currentUser, options = {}) {
     if (!mongoose.Types.ObjectId.isValid(orderId)) {
       throw new AppError('Mã đơn hàng không hợp lệ.', 400, 'INVALID_ORDER_ID');
     }
@@ -147,6 +148,18 @@ export class OrderReturnService {
         cleanSerials,
         subtotalRefund
       });
+    }
+
+    if (
+      !options.bypassApproval &&
+      currentUser?.role === USER_ROLES.STAFF &&
+      totalRefundAmount > APPROVAL_THRESHOLDS.HIGH_VALUE_RETURN_VND
+    ) {
+      throw new AppError(
+        `Yêu cầu hoàn tiền ${totalRefundAmount.toLocaleString('vi-VN')} ₫ vượt ngưỡng ${APPROVAL_THRESHOLDS.HIGH_VALUE_RETURN_VND.toLocaleString('vi-VN')} ₫, cần Quản lý Chi nhánh phê duyệt.`,
+        403,
+        'APPROVAL_REQUIRED'
+      );
     }
 
     // 4. Thực thi hoàn kho & cập nhật trạng thái Serial

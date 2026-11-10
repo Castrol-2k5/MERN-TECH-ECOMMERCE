@@ -26,6 +26,7 @@ import { clearCart } from '../store/slices/posCartSlice.js';
 import axiosClient from '../services/axiosClient.js';
 import ErrorBoundary from '../components/common/ErrorBoundary.jsx';
 import OrderAlertBell from '../features/orders/components/OrderAlertBell.jsx';
+import ApprovalAlertBell from '../features/approvals/components/ApprovalAlertBell.jsx';
 
 export const PortalLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -141,6 +142,13 @@ export const PortalLayout = () => {
       label: 'Doanh Số Cá Nhân',
       badge: 'KPI',
       icon: BarChart3,
+      roles: ['STAFF', 'BRANCH_MANAGER', 'SUPER_ADMIN']
+    },
+    {
+      to: '/portal/manager/approvals',
+      label: userRole === 'STAFF' ? 'Yêu Cầu Đã Gửi' : 'Phê Duyệt Đặc Quyền',
+      badge: 'Duyệt',
+      icon: ShieldCheck,
       roles: ['STAFF', 'BRANCH_MANAGER', 'SUPER_ADMIN']
     }
   ].filter((item) => item.roles.includes(userRole));
@@ -394,6 +402,7 @@ export const PortalLayout = () => {
               <ShoppingBag className="w-3.5 h-3.5" />
               <span>Mở Màn Hình POS</span>
             </NavLink>
+            <ApprovalAlertBell />
             <OrderAlertBell compact />
           </div>
         </header>

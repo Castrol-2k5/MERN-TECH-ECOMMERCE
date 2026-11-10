@@ -49,3 +49,14 @@ export const cashVoucherSchema = z.object({
     .min(2, 'Vui lòng nhập lý do thu/chi (tối thiểu 2 ký tự)')
     .max(300, 'Lý do tối đa 300 ký tự')
 });
+
+export const resolveDiscrepancySchema = z.object({
+  resolutionType: z.enum(['DEDUCT_STAFF', 'BRANCH_EXPENSE', 'FOUND_LATER', 'CONFIRMED'], {
+    required_error: 'Hình thức xử lý chênh lệch là bắt buộc'
+  }),
+  note: z
+    .string({ required_error: 'Ghi chú xử lý chênh lệch là bắt buộc' })
+    .trim()
+    .min(3, 'Vui lòng nhập ghi chú xử lý (tối thiểu 3 ký tự)')
+    .max(500, 'Ghi chú tối đa 500 ký tự')
+});

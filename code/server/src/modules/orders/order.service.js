@@ -977,6 +977,113 @@ export class OrderService {
   }
 
   /**
+   * Hủy hóa đơn POS đã COMPLETED (Chỉ thực thi qua Quản lý duyệt hoặc Admin/Manager trực tiếp) (UC-BM-04)
+   */
+  static async voidCompletedPosOrder(orderId, payload, currentUser, options = {}) {
+    const order = await Order.findById(orderId);
+    if (!order) {
+      throw new AppError('Không tìm thấy đơn hàng cần hủy.', 404, 'ORDER_NOT_FOUND');
+    }
+
+    if (
+      !options.bypassApproval &&
+      (!currentUser || ![USER_ROLES.BRANCH_MANAGER, USER_ROLES.SUPER_ADMIN].includes(currentUser.role))
+    ) {
+      throw new AppError(
+        'Hủy hóa đơn POS đã hoàn tất bắt buộc phải có Quản lý Chi nhánh phê duyệt.',
+        403,
+        'APPROVAL_REQUIRED'
+      );
+    }
+
+    if (currentUser?.role === USER_ROLES.BRANCH_MANAGER) {
+      const orderBranchId = order.branchId?.toString();
+      if (orderBranchId && orderBranchId !== currentUser.branchId?.toString()) {
+        throw new AppError('Bạn không có quyền hủy hóa đơn của chi nhánh khác.', 403, 'CROSS_BRANCH_ACCESS_DENIED');
+      }
+    }
+
+    if (order.orderType !== ORDER_TYPES.POS_STORE) {
+      throw new AppError('Chỉ áp dụng hủy hóa đơn POS cho đơn bán tại quầy.', 400, 'INVALID_ORDER_TYPE');
+    }
+
+    if (order.orderStatus !== ORDER_STATUS.COMPLETED) {
+      throw new AppError(
+        `Chỉ có thể hủy hóa đơn POS đang ở trạng thái COMPLETED (hiện tại: ${order.orderStatus}).`,
+        400,
+        'INVALID_ORDER_STATUS'
+      );
+    }
+
+    for (const item of order.items || []) {
+      await BranchInventory.updateOne(
+        { branchId: order.branchId, productSkuId: item.productSkuId },
+        { $inc: { quantity: item.quantity } }
+      );
+    }
+
+    const allAssignedSerials = (order.items || []).flatMap((it) => it.serialsAssigned || []);
+    if (allAssignedSerials.length > 0) {
+      await Serial.updateMany(
+        { serialNumber: { $in: allAssignedSerials } },
+        {
+          $set: {
+            status: SERIAL_STATUS.IN_STOCK,
+            soldAt: null,
+            warrantyEndDate: null,
+            orderId: null,
+            orderItemId: null
+          }
+        }
+      );
+    }
+
+    let shiftAdjusted = false;
+    if (order.paymentMethod === PAYMENT_METHODS.CASH && order.totalAmount > 0) {
+      const actorId = currentUser?.id || currentUser?._id || order.staffId;
+      const updatedShift = await PosShiftService.recordCashRefund(
+        order.branchId,
+        actorId,
+        Number(order.totalAmount)
+      );
+      shiftAdjusted = Boolean(updatedShift);
+    }
+
+    order.orderStatus = ORDER_STATUS.CANCELLED;
+    order.paymentStatus = PAYMENT_STATUS.REFUNDED;
+    order.refundedAmount = Number(order.totalAmount || 0);
+    order.cancellationReason = payload.reason || 'Hủy hóa đơn POS đã hoàn tất theo phê duyệt Quản lý';
+    order.cancelledBy = currentUser?.id || currentUser?._id || null;
+    order.cancelledAt = new Date();
+    await order.save();
+
+    AuditLogService.record({
+      actor: currentUser,
+      action: AUDIT_ACTIONS.ORDER_VOID,
+      target: {
+        model: 'Order',
+        entityId: order._id,
+        code: order.orderCode,
+        name: `Hủy hóa đơn POS ${order.orderCode}`
+      },
+      changes: {
+        before: { orderStatus: ORDER_STATUS.COMPLETED, paymentStatus: PAYMENT_STATUS.PAID },
+        after: {
+          orderStatus: ORDER_STATUS.CANCELLED,
+          paymentStatus: PAYMENT_STATUS.REFUNDED,
+          refundedAmount: order.refundedAmount
+        }
+      },
+      context: {
+        reason: order.cancellationReason,
+        notes: `Hoàn kho ${order.items?.length || 0} dòng sản phẩm & ${allAssignedSerials.length} Serial${shiftAdjusted ? ' | Đã trừ quỹ tiền mặt ca POS' : ''}`
+      }
+    });
+
+    return { order, shiftAdjusted };
+  }
+
+  /**
    * Đổi SKU / Đổi máy tại quầy cho đơn hàng Click & Collect hoặc đơn chi nhánh
    * Quyền: STAFF, BRANCH_MANAGER, SUPER_ADMIN
    */

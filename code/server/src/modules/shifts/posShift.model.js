@@ -148,6 +148,37 @@ const posShiftSchema = new Schema(
       ref: 'User',
       default: null
     },
+    // Biên bản xử lý chênh lệch két tiền cuối ca (UC-BM-03)
+    discrepancyResolution: {
+      status: {
+        type: String,
+        enum: ['UNRESOLVED', 'RESOLVED'],
+        default: 'UNRESOLVED'
+      },
+      resolutionType: {
+        type: String,
+        enum: ['DEDUCT_STAFF', 'BRANCH_EXPENSE', 'FOUND_LATER', 'CONFIRMED', ''],
+        default: ''
+      },
+      note: {
+        type: String,
+        trim: true,
+        default: ''
+      },
+      resolvedById: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+      },
+      resolvedByName: {
+        type: String,
+        default: ''
+      },
+      resolvedAt: {
+        type: Date,
+        default: null
+      }
+    },
     totalOrdersCount: {
       type: Number,
       default: 0

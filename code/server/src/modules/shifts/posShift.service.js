@@ -6,6 +6,7 @@ import { AppError } from '../../utils/appError.js';
 import { USER_ROLES } from '../users/user.model.js';
 import { AuditLogService } from '../audit/auditLog.service.js';
 import { AUDIT_ACTIONS } from '../audit/auditLog.model.js';
+import { APPROVAL_THRESHOLDS } from '../approvals/approval.model.js';
 
 export class PosShiftService {
   /**
@@ -242,9 +243,9 @@ export class PosShiftService {
   }
 
   /**
-   * Ghi nhận Phiếu Thu / Phiếu Chi tiền mặt nội bộ trong ca POS (UC-POS-10)
+   * Ghi nhận Phiếu Thu / Phiếu Chi tiền mặt nội bộ trong ca POS (UC-POS-10 & UC-BM-04)
    */
-  static async recordCashVoucher(shiftId, payload, currentUser) {
+  static async recordCashVoucher(shiftId, payload, currentUser, options = {}) {
     const shift = await PosShift.findById(shiftId);
     if (!shift) {
       throw new AppError('Không tìm thấy ca làm việc.', 404, 'SHIFT_NOT_FOUND');
@@ -264,6 +265,18 @@ export class PosShiftService {
     }
 
     const amount = Number(payload.amount);
+    if (
+      !options.bypassApproval &&
+      currentUser.role === USER_ROLES.STAFF &&
+      payload.type === VOUCHER_TYPES.OUT &&
+      amount > APPROVAL_THRESHOLDS.LARGE_CASH_OUT_VND
+    ) {
+      throw new AppError(
+        `Phiếu chi vượt ngưỡng ${APPROVAL_THRESHOLDS.LARGE_CASH_OUT_VND.toLocaleString('vi-VN')} ₫ cần gửi Quản lý Chi nhánh phê duyệt.`,
+        403,
+        'APPROVAL_REQUIRED'
+      );
+    }
     const currentExpected = PosShiftService.recalculateExpectedBalance(shift);
 
     if (payload.type === VOUCHER_TYPES.OUT && amount > currentExpected) {
@@ -458,5 +471,121 @@ export class PosShiftService {
         totalPages: Math.ceil(total / limitNum) || 1
       }
     };
+  }
+
+  /**
+   * Giám sát két tiền mặt trực tiếp theo thời gian thực & cảnh báo ca lệch tiền (UC-BM-03)
+   */
+  static async getLiveCashMonitor(query = {}, currentUser) {
+    const filter = {};
+    if (currentUser.role === USER_ROLES.BRANCH_MANAGER) {
+      filter.branchId = currentUser.branchId;
+    } else if (currentUser.role === USER_ROLES.SUPER_ADMIN && query.branchId && query.branchId !== 'ALL') {
+      filter.branchId = query.branchId;
+    }
+
+    const [openShifts, unresolvedShifts] = await Promise.all([
+      PosShift.find({ ...filter, status: SHIFT_STATUS.OPEN })
+        .sort({ openedAt: -1 })
+        .populate('branchId', 'name branchCode')
+        .populate('cashierId', 'fullName email phone')
+        .lean(),
+      PosShift.find({
+        ...filter,
+        status: SHIFT_STATUS.CLOSED,
+        discrepancy: { $ne: 0 },
+        'discrepancyResolution.status': { $ne: 'RESOLVED' }
+      })
+        .sort({ closedAt: -1 })
+        .limit(10)
+        .populate('branchId', 'name branchCode')
+        .populate('cashierId', 'fullName email phone')
+        .lean()
+    ]);
+
+    const totalLiveCashInDrawers = openShifts.reduce(
+      (sum, sh) => sum + (Number(sh.expectedEndingBalance) || 0),
+      0
+    );
+
+    return {
+      openShiftsCount: openShifts.length,
+      totalLiveCashInDrawers,
+      openShifts,
+      unresolvedDiscrepancyCount: unresolvedShifts.length,
+      unresolvedShifts
+    };
+  }
+
+  /**
+   * Quản lý chi nhánh lập biên bản xử lý lệch tiền cuối ca (UC-BM-03)
+   */
+  static async resolveDiscrepancy(shiftId, payload, currentUser) {
+    if (!mongoose.Types.ObjectId.isValid(shiftId)) {
+      throw new AppError('Mã ca làm việc không hợp lệ.', 400, 'INVALID_SHIFT_ID');
+    }
+
+    const shift = await PosShift.findById(shiftId);
+    if (!shift) {
+      throw new AppError('Không tìm thấy ca làm việc.', 404, 'SHIFT_NOT_FOUND');
+    }
+
+    if (
+      currentUser.role !== USER_ROLES.SUPER_ADMIN &&
+      shift.branchId.toString() !== currentUser.branchId?.toString()
+    ) {
+      throw new AppError(
+        'Bạn không có quyền xử lý lệch ca của chi nhánh khác.',
+        403,
+        'CROSS_BRANCH_ACCESS_DENIED'
+      );
+    }
+
+    if (shift.status !== SHIFT_STATUS.CLOSED) {
+      throw new AppError('Chỉ có thể lập biên bản xử lý lệch tiền cho ca đã chốt.', 400, 'SHIFT_NOT_CLOSED');
+    }
+
+    if (!shift.discrepancy || shift.discrepancy === 0) {
+      throw new AppError('Ca làm việc này cân đối (không có chênh lệch két).', 400, 'NO_DISCREPANCY_TO_RESOLVE');
+    }
+
+    shift.discrepancyResolution = {
+      status: 'RESOLVED',
+      resolutionType: payload.resolutionType,
+      note: payload.note,
+      resolvedById: currentUser.id,
+      resolvedByName: currentUser.fullName || 'Quản lý chi nhánh',
+      resolvedAt: new Date()
+    };
+
+    if (!shift.approvedById) {
+      shift.approvedById = currentUser.id;
+    }
+
+    await shift.save();
+
+    AuditLogService.record({
+      actor: currentUser,
+      action: AUDIT_ACTIONS.POS_SHIFT_DISCREPANCY_RESOLVE,
+      target: {
+        model: 'PosShift',
+        entityId: shift._id,
+        code: shift.shiftCode,
+        name: `Xử lý lệch ca ${shift.shiftCode}`
+      },
+      changes: {
+        after: {
+          discrepancy: shift.discrepancy,
+          resolutionType: payload.resolutionType,
+          status: 'RESOLVED'
+        }
+      },
+      context: {
+        reason: payload.note,
+        notes: `Xử lý chênh lệch ${shift.discrepancy.toLocaleString('vi-VN')} ₫ theo hình thức ${payload.resolutionType}`
+      }
+    });
+
+    return shift;
   }
 }

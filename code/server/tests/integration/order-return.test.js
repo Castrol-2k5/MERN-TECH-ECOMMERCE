@@ -17,6 +17,7 @@ setupTestDB();
 
 describe('Order Return & Refund Integration Tests (Gói 2 - UC-ORD-12)', () => {
   let staffQ1Token;
+  let managerQ1Token;
   let staffTdToken;
   let branchQ1;
   let branchTD;
@@ -57,6 +58,21 @@ describe('Order Return & Refund Integration Tests (Gói 2 - UC-ORD-12)', () => {
     staffQ1Token = generateAccessToken({
       id: staffQ1._id.toString(),
       role: staffQ1.role,
+      branchId: branchQ1._id.toString()
+    });
+
+    const managerQ1 = await User.create({
+      fullName: 'Quản Lý Q1 Return',
+      email: 'mgr.rtn.q1@techone.vn',
+      phone: '0909111999',
+      passwordHash: 'Pass@123',
+      role: USER_ROLES.BRANCH_MANAGER,
+      branchId: branchQ1._id,
+      isActive: true
+    });
+    managerQ1Token = generateAccessToken({
+      id: managerQ1._id.toString(),
+      role: managerQ1.role,
       branchId: branchQ1._id.toString()
     });
 
@@ -172,7 +188,7 @@ describe('Order Return & Refund Integration Tests (Gói 2 - UC-ORD-12)', () => {
   it('Trả hàng 1 phần (GOOD) -> Hoàn kho, Serial về IN_STOCK, trừ quỹ ca PosShift và ghi AuditLog', async () => {
     const res = await request(app)
       .post(`/api/v1/orders/${completedOrder._id}/return`)
-      .set('Authorization', `Bearer ${staffQ1Token}`)
+      .set('Authorization', `Bearer ${managerQ1Token}`)
       .send({
         items: [
           {
@@ -218,7 +234,7 @@ describe('Order Return & Refund Integration Tests (Gói 2 - UC-ORD-12)', () => {
     // Trả máy 1 GOOD trước
     await request(app)
       .post(`/api/v1/orders/${completedOrder._id}/return`)
-      .set('Authorization', `Bearer ${staffQ1Token}`)
+      .set('Authorization', `Bearer ${managerQ1Token}`)
       .send({
         items: [{ productSkuId: testSkuId.toString(), quantity: 1, condition: 'GOOD', serialsReturned: ['SN-RTN-001'] }],
         refundMethod: 'CASH',
@@ -228,7 +244,7 @@ describe('Order Return & Refund Integration Tests (Gói 2 - UC-ORD-12)', () => {
     // Trả máy 2 DEFECTIVE bằng TRANSFER
     const res2 = await request(app)
       .post(`/api/v1/orders/${completedOrder._id}/return`)
-      .set('Authorization', `Bearer ${staffQ1Token}`)
+      .set('Authorization', `Bearer ${managerQ1Token}`)
       .send({
         items: [{ productSkuId: testSkuId.toString(), quantity: 1, condition: 'DEFECTIVE', serialsReturned: ['SN-RTN-002'] }],
         refundMethod: 'TRANSFER',

@@ -1,5 +1,11 @@
 import { PosShiftService } from './posShift.service.js';
-import { openShiftSchema, closeShiftSchema, cashDropSchema, cashVoucherSchema } from './posShift.dto.js';
+import {
+  openShiftSchema,
+  closeShiftSchema,
+  cashDropSchema,
+  cashVoucherSchema,
+  resolveDiscrepancySchema
+} from './posShift.dto.js';
 import { catchAsync } from '../../utils/catchAsync.js';
 import { sendSuccess } from '../../utils/response.js';
 
@@ -65,6 +71,27 @@ export class PosShiftController {
       statusCode: 200,
       message: 'Lấy lịch sử ca thu ngân thành công',
       data: result
+    });
+  });
+
+  static getLiveCashMonitor = catchAsync(async (req, res) => {
+    const data = await PosShiftService.getLiveCashMonitor(req.query, req.user);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Lấy dữ liệu giám sát két tiền trực tiếp thành công',
+      data
+    });
+  });
+
+  static resolveDiscrepancy = catchAsync(async (req, res) => {
+    const validated = resolveDiscrepancySchema.parse(req.body);
+    const shift = await PosShiftService.resolveDiscrepancy(req.params.id, validated, req.user);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Đã lưu biên bản xử lý chênh lệch két tiền cuối ca',
+      data: { shift }
     });
   });
 }

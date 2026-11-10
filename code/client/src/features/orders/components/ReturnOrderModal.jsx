@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import {
   X,
   RotateCcw,
@@ -8,13 +9,16 @@ import {
   Banknote,
   Landmark,
   AlertTriangle,
-  Cpu
+  Cpu,
+  ShieldCheck
 } from 'lucide-react';
 import { orderService } from '../services/orderService.js';
+import approvalService, { HIGH_VALUE_RETURN_THRESHOLD } from '../../approvals/services/approvalService.js';
 
 const formatVND = (val) => `${Number(val || 0).toLocaleString('vi-VN')} ₫`;
 
 export const ReturnOrderModal = ({ isOpen, onClose, order, onReturnSuccess }) => {
+  const authUser = useSelector((state) => state.auth?.user);
   const [selectedMap, setSelectedMap] = useState({});
   const [refundMethod, setRefundMethod] = useState('CASH');
   const [reason, setReason] = useState('');
@@ -115,6 +119,9 @@ export const ReturnOrderModal = ({ isOpen, onClose, order, onReturnSuccess }) =>
     return selectedItemsList.reduce((sum, it) => sum + it.unitPrice * it.quantity, 0);
   }, [selectedItemsList]);
 
+  const needsManagerApproval =
+    authUser?.role === 'STAFF' && totalRefundAmount > HIGH_VALUE_RETURN_THRESHOLD;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (selectedItemsList.length === 0) {
@@ -147,6 +154,23 @@ export const ReturnOrderModal = ({ isOpen, onClose, order, onReturnSuccess }) =>
         refundMethod,
         reason: reason.trim()
       };
+
+      if (needsManagerApproval) {
+        const request = await approvalService.createRequest({
+          type: 'HIGH_VALUE_RETURN',
+          targetId: order._id,
+          reason: payload.reason,
+          payload: {
+            items: payload.items,
+            refundMethod: payload.refundMethod
+          }
+        });
+        if (onReturnSuccess) {
+          onReturnSuccess({ approvalPending: true, request });
+        }
+        onClose();
+        return;
+      }
 
       const result = await orderService.returnOrder(order._id, payload);
       if (onReturnSuccess) {
@@ -391,6 +415,21 @@ export const ReturnOrderModal = ({ isOpen, onClose, order, onReturnSuccess }) =>
             </span>
           </div>
 
+          {/* Cảnh báo vượt ngưỡng phê duyệt cho STAFF */}
+          {needsManagerApproval && (
+            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/40 flex items-start gap-2.5 text-amber-200 text-xs">
+              <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-amber-300">
+                  Khoản hoàn tiền vượt ngưỡng {formatVND(HIGH_VALUE_RETURN_THRESHOLD)}
+                </p>
+                <p className="text-[11px] text-amber-200/80 mt-0.5">
+                  Hệ thống sẽ gửi yêu cầu tới Quản lý Chi nhánh. Ngay khi Quản lý bấm Duyệt, kho/Serial và quỹ ca sẽ tự động được cập nhật.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Footer Buttons */}
           <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-800">
             <button
@@ -403,10 +442,20 @@ export const ReturnOrderModal = ({ isOpen, onClose, order, onReturnSuccess }) =>
             <button
               type="submit"
               disabled={isSubmitting || selectedItemsList.length === 0}
-              className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold flex items-center gap-1.5 shadow-lg shadow-rose-600/20 cursor-pointer"
+              className={`px-5 py-2.5 rounded-xl disabled:opacity-50 text-white font-bold flex items-center gap-1.5 shadow-lg cursor-pointer ${
+                needsManagerApproval
+                  ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/20'
+                  : 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/20'
+              }`}
             >
-              <RotateCcw className="w-4 h-4" />
-              <span>{isSubmitting ? 'Đang xử lý hoàn kho...' : 'Xác Nhận Trả Hàng & Hoàn Tiền'}</span>
+              {needsManagerApproval ? <ShieldCheck className="w-4 h-4" /> : <RotateCcw className="w-4 h-4" />}
+              <span>
+                {isSubmitting
+                  ? 'Đang xử lý...'
+                  : needsManagerApproval
+                  ? 'Gửi Quản Lý Phê Duyệt'
+                  : 'Xác Nhận Trả Hàng & Hoàn Tiền'}
+              </span>
             </button>
           </div>
         </form>

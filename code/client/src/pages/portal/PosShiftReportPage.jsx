@@ -15,7 +15,9 @@ import {
   Eye,
   X,
   Printer,
-  FileSpreadsheet
+  FileSpreadsheet,
+  ShieldCheck,
+  Activity
 } from 'lucide-react';
 import posShiftService from '../../features/pos/services/posShiftService.js';
 import { branchService } from '../../features/branches/services/branchService.js';
@@ -27,8 +29,13 @@ const formatVND = (val) => `${Number(val || 0).toLocaleString('vi-VN')} ₫`;
 export const PosShiftReportPage = () => {
   const authUser = useSelector((state) => state.auth?.user);
   const isSuperAdmin = authUser?.role === 'SUPER_ADMIN';
+  const isManagerOrAdmin = ['BRANCH_MANAGER', 'SUPER_ADMIN'].includes(authUser?.role);
 
   const [shifts, setShifts] = useState([]);
+  const [monitorData, setMonitorData] = useState(null);
+  const [resolutionType, setResolutionType] = useState('CONFIRMED');
+  const [resolutionNote, setResolutionNote] = useState('');
+  const [resolving, setResolving] = useState(false);
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -73,12 +80,18 @@ export const PosShiftReportPage = () => {
       setShifts(data?.shifts || []);
       setTotalItems(data?.pagination?.total || 0);
       setTotalPages(data?.pagination?.totalPages || 1);
+
+      if (isManagerOrAdmin) {
+        const monParams = selectedBranchId !== 'ALL' ? { branchId: selectedBranchId } : {};
+        const mon = await posShiftService.getLiveCashMonitor(monParams).catch(() => null);
+        setMonitorData(mon);
+      }
     } catch (err) {
       setError(err?.response?.data?.error?.message || err?.message || 'Không thể tải lịch sử ca thu ngân');
     } finally {
       setLoading(false);
     }
-  }, [currentPage, pageSize, selectedBranchId, statusFilter]);
+  }, [currentPage, pageSize, selectedBranchId, statusFilter, isManagerOrAdmin]);
 
   useEffect(() => {
     loadShifts();
@@ -125,6 +138,54 @@ export const PosShiftReportPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Filter Bar */}
+      {isManagerOrAdmin && monitorData && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="p-4 rounded-2xl bg-slate-900 border border-emerald-500/30 flex items-center justify-between">
+            <div>
+              <span className="text-[11px] font-semibold text-emerald-300 uppercase flex items-center gap-1.5">
+                <Activity className="w-3.5 h-3.5" />
+                Két tiền đang mở (Live)
+              </span>
+              <p className="text-xl font-black font-mono text-emerald-400 mt-1">
+                {formatVND(monitorData.totalLiveCashInDrawers)}
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                {monitorData.openShiftsCount} ca đang hoạt động tại quầy
+              </p>
+            </div>
+            <Unlock className="w-6 h-6 text-emerald-400/70" />
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-900 border border-amber-500/30 md:col-span-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <span className="text-[11px] font-semibold text-amber-300 uppercase flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5" />
+                Ca lệch tiền chưa lập biên bản xử lý
+              </span>
+              <p className="text-sm font-bold text-white mt-1">
+                {monitorData.unresolvedDiscrepancyCount > 0
+                  ? `${monitorData.unresolvedDiscrepancyCount} ca đóng quỹ có chênh lệch cần Quản lý xác nhận`
+                  : 'Tất cả ca có chênh lệch đều đã được đối soát xong'}
+              </p>
+            </div>
+            {monitorData.unresolvedShifts?.[0] && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedShift(monitorData.unresolvedShifts[0]);
+                  setResolutionType('CONFIRMED');
+                  setResolutionNote('');
+                }}
+                className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shrink-0 cursor-pointer"
+              >
+                Xử lý ca {monitorData.unresolvedShifts[0].shiftCode}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Filter Bar */}
       <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-xs">
@@ -410,6 +471,75 @@ export const PosShiftReportPage = () => {
                 <div className="mt-2 p-2.5 rounded-xl bg-slate-900 border border-slate-800">
                   <span className="text-slate-400 block text-[10px] mb-0.5">Lý do giải trình chênh lệch:</span>
                   <p className="text-amber-300 italic">{selectedShift.discrepancyNote}</p>
+                </div>
+              )}
+
+              {/* Biên bản xử lý chênh lệch của Quản lý (UC-BM-03) */}
+              {selectedShift.status === 'CLOSED' && Number(selectedShift.discrepancy) !== 0 && (
+                <div className="mt-2 pt-2 border-t border-slate-800">
+                  {selectedShift.discrepancyResolution?.status === 'RESOLVED' ? (
+                    <div className="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 space-y-1">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-bold text-emerald-300 flex items-center gap-1">
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                          Đã lập biên bản xử lý ({selectedShift.discrepancyResolution.resolutionType})
+                        </span>
+                        <span className="text-slate-400">{selectedShift.discrepancyResolution.resolvedByName}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-200">{selectedShift.discrepancyResolution.note}</p>
+                    </div>
+                  ) : isManagerOrAdmin ? (
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        setResolving(true);
+                        try {
+                          const updated = await posShiftService.resolveDiscrepancy(selectedShift._id, {
+                            resolutionType,
+                            note: resolutionNote.trim()
+                          });
+                          if (updated) setSelectedShift(updated);
+                          setResolutionNote('');
+                          await loadShifts();
+                        } catch (err) {
+                          setError(err?.response?.data?.message || err?.message || 'Lỗi lưu biên bản xử lý lệch ca');
+                        } finally {
+                          setResolving(false);
+                        }
+                      }}
+                      className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/30 space-y-2"
+                    >
+                      <p className="text-[11px] font-bold text-amber-300">
+                        Lập biên bản xử lý lệch tiền cuối ca (Quản lý):
+                      </p>
+                      <select
+                        value={resolutionType}
+                        onChange={(e) => setResolutionType(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100"
+                      >
+                        <option value="CONFIRMED">Xác nhận khớp sau kiểm tra</option>
+                        <option value="DEDUCT_STAFF">Khấu trừ vào trách nhiệm thu ngân</option>
+                        <option value="BRANCH_EXPENSE">Hạch toán chi phí/hao hụt chi nhánh</option>
+                        <option value="FOUND_LATER">Đã tìm lại tiền / điều chỉnh bổ sung</option>
+                      </select>
+                      <input
+                        type="text"
+                        required
+                        minLength={3}
+                        value={resolutionNote}
+                        onChange={(e) => setResolutionNote(e.target.value)}
+                        placeholder="Nhập kết luận đối soát camera / biên bản xử lý..."
+                        className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100"
+                      />
+                      <button
+                        type="submit"
+                        disabled={resolving}
+                        className="w-full py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-lg text-xs cursor-pointer disabled:opacity-50"
+                      >
+                        {resolving ? 'Đang lưu...' : 'Xác nhận Đã Xử Lý Lệch Ca'}
+                      </button>
+                    </form>
+                  ) : null}
                 </div>
               )}
             </div>

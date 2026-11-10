@@ -35,6 +35,26 @@ export const posShiftService = {
   getShiftHistory: async (params = {}) => {
     const res = await axiosClient.get('/shifts/history', { params });
     return res?.data || { shifts: [], pagination: {} };
+  },
+
+  // Giám sát két tiền mặt trực tiếp & cảnh báo lệch ca (UC-BM-03)
+  getLiveCashMonitor: async (params = {}) => {
+    const res = await axiosClient.get('/shifts/monitor', { params });
+    return (
+      res?.data || {
+        openShiftsCount: 0,
+        totalLiveCashInDrawers: 0,
+        openShifts: [],
+        unresolvedDiscrepancyCount: 0,
+        unresolvedShifts: []
+      }
+    );
+  },
+
+  // Lập biên bản xử lý lệch tiền cuối ca (UC-BM-03)
+  resolveDiscrepancy: async (shiftId, data) => {
+    const res = await axiosClient.patch(`/shifts/${shiftId}/resolve-discrepancy`, data);
+    return res?.data?.shift || null;
   }
 };
 
