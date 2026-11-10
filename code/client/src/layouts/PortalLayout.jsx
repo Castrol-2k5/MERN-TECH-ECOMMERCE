@@ -134,6 +134,13 @@ export const PortalLayout = () => {
       badge: 'Kiểm quỹ',
       icon: Coins,
       roles: ['STAFF', 'BRANCH_MANAGER', 'SUPER_ADMIN']
+    },
+    {
+      to: '/portal/my-performance',
+      label: 'Doanh Số Cá Nhân',
+      badge: 'KPI',
+      icon: BarChart3,
+      roles: ['STAFF', 'BRANCH_MANAGER', 'SUPER_ADMIN']
     }
   ].filter((item) => item.roles.includes(userRole));
 

@@ -43,6 +43,7 @@ import AdminAnalyticsPage from '../pages/portal/AdminAnalyticsPage.jsx';
 import PosShiftReportPage from '../pages/portal/PosShiftReportPage.jsx';
 import InterBranchSettlementPage from '../pages/portal/InterBranchSettlementPage.jsx';
 import AuditTrailPage from '../pages/portal/AuditTrailPage.jsx';
+import MyPerformancePage from '../pages/portal/MyPerformancePage.jsx';
 
 const PortalIndexRedirect = () => {
   const user = useSelector((state) => state.auth?.user);
@@ -67,6 +68,7 @@ export const AppRoutes = () => {
           <Route path="branch/orders" element={<BranchOrdersPage />} />
           <Route path="branch/transfers" element={<StockTransferPage />} />
           <Route path="shifts" element={<PosShiftReportPage />} />
+          <Route path="my-performance" element={<MyPerformancePage />} />
           <Route path="admin/orders-dispatch" element={<OrderDispatchPage />} />
 
           {/* Branch Manager & Super Admin Operations */}

@@ -65,6 +65,63 @@ export const emptyAnalyticsOverview = {
 };
 
 export const analyticsService = {
+  getMyPerformance: async (range = '7d') => {
+    const emptyPerformance = {
+      range,
+      kpis: {
+        totalRevenue: 0,
+        completedOrders: 0,
+        posOrdersCount: 0,
+        avgOrderValue: 0,
+        shiftCount: 0,
+        warrantyCount: 0
+      },
+      dailyChart: [],
+      categoryBreakdown: [],
+      recentOrders: []
+    };
+
+    if (isMockEnabled()) {
+      return {
+        range,
+        kpis: {
+          totalRevenue: 96470000,
+          completedOrders: 4,
+          posOrdersCount: 3,
+          avgOrderValue: 24117500,
+          shiftCount: 3,
+          warrantyCount: 2
+        },
+        dailyChart: [
+          { day: '06/11', revenue: 34990000, ordersCount: 1 },
+          { day: '08/11', revenue: 28990000, ordersCount: 2 },
+          { day: '10/11', revenue: 32490000, ordersCount: 1 }
+        ],
+        categoryBreakdown: [
+          { name: 'Điện thoại', revenue: 60480000, units: 2, percentage: 63 },
+          { name: 'Laptop Gaming', revenue: 34990000, units: 1, percentage: 36 },
+          { name: 'Phụ kiện', revenue: 1000000, units: 2, percentage: 1 }
+        ],
+        recentOrders: [
+          {
+            _id: 'mock-perf-1',
+            orderCode: 'ORD-POS-261110-001',
+            orderType: 'POS_STORE',
+            orderStatus: 'COMPLETED',
+            paymentMethod: 'CASH',
+            totalAmount: 32490000,
+            refundedAmount: 0,
+            customerInfo: { fullName: 'Hoàng Khách Hàng', phone: '0909000005' },
+            items: [{ productName: 'iPhone 16 Pro Max', quantity: 1 }],
+            createdAt: new Date().toISOString()
+          }
+        ]
+      };
+    }
+
+    const res = await axiosClient.get(`/analytics/my-performance?range=${encodeURIComponent(range)}`);
+    return res?.data || emptyPerformance;
+  },
   getOverview: async (params = {}) => {
     if (isMockEnabled()) {
       return fallbackAnalyticsOverview;
