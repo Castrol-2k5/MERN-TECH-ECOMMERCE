@@ -1,11 +1,13 @@
 import { AnalyticsService } from './analytics.service.js';
 import { StaffAnalyticsService } from './staffAnalytics.service.js';
+import { BranchStrategyAnalyticsService } from './branchStrategyAnalytics.service.js';
 import { catchAsync } from '../../utils/catchAsync.js';
 import { sendSuccess } from '../../utils/response.js';
 
 export class AnalyticsController {
   static getOverview = catchAsync(async (req, res) => {
-    const { branchId, startDate, endDate } = req.query;
+    const { startDate, endDate } = req.query;
+    const branchId = req.scopedBranchId || req.query.branchId;
     const overview = await AnalyticsService.getOverview({ branchId, startDate, endDate });
 
     return sendSuccess(res, {
@@ -35,6 +37,18 @@ export class AnalyticsController {
       statusCode: 200,
       message: 'Lấy bảng xếp hạng KPI nhân sự chi nhánh thành công',
       data: report
+    });
+  });
+
+  static getBranchStrategy = catchAsync(async (req, res) => {
+    const targetBranchId = req.scopedBranchId || req.query.branchId || null;
+    const { days } = req.query;
+    const strategy = await BranchStrategyAnalyticsService.getBranchStrategy(targetBranchId, days);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Lấy báo cáo chiến lược chi nhánh thành công',
+      data: strategy
     });
   });
 }

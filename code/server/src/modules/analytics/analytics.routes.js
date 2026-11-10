@@ -23,11 +23,21 @@ router.get(
   AnalyticsController.getBranchStaffKpi
 );
 
-// Protected: View Business Intelligence Overview (SUPER_ADMIN, BRANCH_MANAGER)
+// Protected: Branch Strategic BI - Peak Hours, Sales Velocity & Aging Stock (UC-BM-07)
+router.get(
+  '/branch-strategy',
+  protect,
+  authorize(USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER),
+  scopeBranch,
+  AnalyticsController.getBranchStrategy
+);
+
+// Protected: View Business Intelligence Overview (SUPER_ADMIN, BRANCH_MANAGER - scoped by branch)
 router.get(
   '/overview',
   protect,
   authorize(USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER),
+  scopeBranch,
   AnalyticsController.getOverview
 );
 

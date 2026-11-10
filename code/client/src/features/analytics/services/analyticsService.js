@@ -188,6 +188,30 @@ export const analyticsService = {
     const res = await axiosClient.get(`/analytics/branch-staff-kpi?${query.toString()}`);
     return res?.data || emptyReport;
   },
+
+  getBranchStrategy: async ({ days = 30, branchId = '' } = {}) => {
+    const query = new URLSearchParams({ days: String(days) });
+    if (branchId) query.set('branchId', branchId);
+    const res = await axiosClient.get(`/analytics/branch-strategy?${query.toString()}`);
+    return (
+      res?.data || {
+        days,
+        omnichannel: {
+          totalRevenue: 0,
+          posRevenue: 0,
+          onlineRevenue: 0,
+          posOrders: 0,
+          onlineOrders: 0,
+          posSharePercent: 0,
+          onlineSharePercent: 0
+        },
+        peakHourSlot: null,
+        peakHours: [],
+        salesVelocity: [],
+        agingStock: []
+      }
+    );
+  },
   getOverview: async (params = {}) => {
     if (isMockEnabled()) {
       return fallbackAnalyticsOverview;

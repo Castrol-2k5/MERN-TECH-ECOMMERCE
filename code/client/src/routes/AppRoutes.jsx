@@ -47,6 +47,8 @@ import MyPerformancePage from '../pages/portal/MyPerformancePage.jsx';
 import BranchStaffPage from '../pages/portal/BranchStaffPage.jsx';
 import ManagerApprovalsPage from '../pages/portal/ManagerApprovalsPage.jsx';
 import BranchStocktakePage from '../pages/portal/BranchStocktakePage.jsx';
+import BranchAnalyticsPage from '../pages/portal/BranchAnalyticsPage.jsx';
+import BranchComplaintsPage from '../pages/portal/BranchComplaintsPage.jsx';
 
 const PortalIndexRedirect = () => {
   const user = useSelector((state) => state.auth?.user);
@@ -74,6 +76,7 @@ export const AppRoutes = () => {
           <Route path="my-performance" element={<MyPerformancePage />} />
           <Route path="manager/approvals" element={<ManagerApprovalsPage />} />
           <Route path="branch/stocktaking" element={<BranchStocktakePage />} />
+          <Route path="branch/complaints" element={<BranchComplaintsPage />} />
           <Route path="admin/orders-dispatch" element={<OrderDispatchPage />} />
 
           {/* Branch Manager & Super Admin Operations */}
@@ -81,6 +84,7 @@ export const AppRoutes = () => {
             <Route path="admin/import-serials" element={<SerialImportPage />} />
             <Route path="settlements" element={<InterBranchSettlementPage />} />
             <Route path="branch/staff" element={<BranchStaffPage />} />
+            <Route path="branch/analytics" element={<BranchAnalyticsPage />} />
           </Route>
 
           {/* HQ Administration & Operations (SUPER_ADMIN Only) */}

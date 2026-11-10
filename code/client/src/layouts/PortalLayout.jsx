@@ -20,7 +20,8 @@ import {
   Coins,
   CreditCard,
   Users,
-  ClipboardCheck
+  ClipboardCheck,
+  AlertTriangle
 } from 'lucide-react';
 import { logout } from '../store/slices/authSlice.js';
 import { clearCart } from '../store/slices/posCartSlice.js';
@@ -163,10 +164,24 @@ export const PortalLayout = () => {
       roles: ['BRANCH_MANAGER', 'SUPER_ADMIN']
     },
     {
+      to: '/portal/branch/analytics',
+      label: 'Chiến Lược Chi Nhánh',
+      badge: 'BI+',
+      icon: BarChart3,
+      roles: ['BRANCH_MANAGER', 'SUPER_ADMIN']
+    },
+    {
       to: '/portal/branch/stocktaking',
       label: 'Kiểm Kho & RMA',
       badge: 'IMEI',
       icon: ClipboardCheck,
+      roles: ['STAFF', 'BRANCH_MANAGER', 'SUPER_ADMIN']
+    },
+    {
+      to: '/portal/branch/complaints',
+      label: 'Khiếu Nại & Chăm Sóc',
+      badge: 'SLA',
+      icon: AlertTriangle,
       roles: ['STAFF', 'BRANCH_MANAGER', 'SUPER_ADMIN']
     },
     {
