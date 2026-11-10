@@ -1,4 +1,5 @@
 import { UserService } from './user.service.js';
+import { CustomerLookupService } from './customerLookup.service.js';
 import { catchAsync } from '../../utils/catchAsync.js';
 import { sendSuccess } from '../../utils/response.js';
 
@@ -86,6 +87,15 @@ export class UserController {
     return sendSuccess(res, {
       statusCode: 200,
       message: result.message,
+      data: result
+    });
+  });
+
+  static lookupCustomerByPhone = catchAsync(async (req, res) => {
+    const result = await CustomerLookupService.lookupByPhone(req.query.phone);
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: result.found ? 'Tìm thấy hồ sơ khách hàng' : 'Chưa có lịch sử khách hàng với SĐT này',
       data: result
     });
   });

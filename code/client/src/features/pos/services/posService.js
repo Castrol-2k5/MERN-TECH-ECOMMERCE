@@ -255,6 +255,9 @@ export const posService = {
                     ? p.categoryId?.name || 'Thiết bị'
                     : p.category || 'Thiết bị',
                 brand: p.brand || '',
+                attributes: Array.isArray(p.attributes) ? p.attributes : [],
+                description: p.description || '',
+                categorySlug: typeof p.categoryId === 'object' ? p.categoryId?.slug || '' : '',
                 image: matchedSku.images?.[0] || p.images?.[0] || '',
                 availableSerials: inStockSerials
               };
@@ -364,6 +367,41 @@ export const posService = {
       customerInfo: payload.customerInfo,
       createdAt: new Date().toISOString()
     };
+  },
+
+  // Tra cứu nhanh CRM khách hàng qua SĐT tại quầy POS (UC-POS-12)
+  lookupCustomerByPhone: async (phone) => {
+    const cleanPhone = String(phone || '').trim();
+    if (isMockEnabled()) {
+      if (cleanPhone === '0909000005') {
+        return {
+          found: true,
+          customer: {
+            fullName: 'Hoàng Khách Hàng',
+            phone: '0909000005',
+            address: '45 Võ Văn Ngân, TP. Thủ Đức, TP.HCM',
+            isRegisteredAccount: true
+          },
+          summary: { totalCompletedOrders: 2, totalSpent: 34480000, warrantyCount: 1 },
+          recentOrders: [
+            {
+              orderCode: 'ORD-B2C-261028-088',
+              totalAmount: 34480000,
+              orderStatus: 'READY_FOR_SHIPPING',
+              createdAt: new Date().toISOString(),
+              firstItemName: 'iPhone 16 Pro Max'
+            }
+          ],
+          recentWarranties: []
+        };
+      }
+      return { found: false, customer: null, summary: { totalCompletedOrders: 0, totalSpent: 0, warrantyCount: 0 }, recentOrders: [], recentWarranties: [] };
+    }
+
+    const res = await apiClient.get('/users/lookup-customer', {
+      params: { phone: cleanPhone }
+    });
+    return res?.data || { found: false };
   }
 };
 

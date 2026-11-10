@@ -4,8 +4,12 @@ import {
   Banknote, 
   QrCode, 
   Tag, 
-  AlertTriangle
+  AlertTriangle,
+  Search,
+  History,
+  ShieldCheck
 } from 'lucide-react';
+import posService from '../services/posService.js';
 
 const VN_PHONE_REGEX = /^(0|\+84)(3|5|7|8|9)[0-9]{8}$/;
 
@@ -32,15 +36,42 @@ export const PosCheckoutPanel = ({
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [phoneInput, setPhoneInput] = useState(customerInfo?.phone || '');
   const [nameInput, setNameInput] = useState(customerInfo?.fullName || '');
+  const [addressInput, setAddressInput] = useState(customerInfo?.address || '');
   const [customerError, setCustomerError] = useState('');
+  const [crmResult, setCrmResult] = useState(null);
+  const [isLookingUpCrm, setIsLookingUpCrm] = useState(false);
 
   useEffect(() => {
     if (showCustomerModal) {
       setPhoneInput(customerInfo?.phone || '');
       setNameInput(customerInfo?.fullName || '');
+      setAddressInput(customerInfo?.address || '');
       setCustomerError('');
+      setCrmResult(null);
     }
   }, [showCustomerModal, customerInfo]);
+
+  const handleLookupCustomer = async () => {
+    const cleanPhone = phoneInput.trim();
+    if (!cleanPhone || !VN_PHONE_REGEX.test(cleanPhone)) {
+      setCustomerError('Vui lòng nhập đủ SĐT hợp lệ (10 số) để tra cứu CRM.');
+      return;
+    }
+    setIsLookingUpCrm(true);
+    setCustomerError('');
+    try {
+      const data = await posService.lookupCustomerByPhone(cleanPhone);
+      setCrmResult(data);
+      if (data?.found && data.customer) {
+        if (data.customer.fullName) setNameInput(data.customer.fullName);
+        if (data.customer.address) setAddressInput(data.customer.address);
+      }
+    } catch (err) {
+      setCustomerError(err?.response?.data?.message || err?.message || 'Không thể tra cứu thông tin khách hàng.');
+    } finally {
+      setIsLookingUpCrm(false);
+    }
+  };
 
   const formatVnd = (num) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num || 0);
 
@@ -65,7 +96,8 @@ export const PosCheckoutPanel = ({
 
     onUpdateCustomer({
       fullName: cleanName || (cleanPhone ? 'Khách hàng tại quầy' : 'Khách vãng lai'),
-      phone: cleanPhone
+      phone: cleanPhone,
+      address: addressInput.trim()
     });
     setCustomerError('');
     setShowCustomerModal(false);
@@ -272,26 +304,77 @@ export const PosCheckoutPanel = ({
       {/* Customer Modal */}
       {showCustomerModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm p-5 space-y-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-5 space-y-4 max-h-[90vh] overflow-y-auto">
             <h4 className="font-bold text-sm text-slate-100 flex items-center gap-2">
               <User className="w-4 h-4 text-blue-400" />
-              Thông tin khách hàng & Kích hoạt E-Warranty
+              Thông tin khách hàng & Tra cứu CRM
             </h4>
             <form onSubmit={handleSaveCustomer} className="space-y-3">
               <div>
                 <label className="text-xs text-slate-400 block mb-1">Số điện thoại (Tùy chọn cho khách lẻ):</label>
-                <input
-                  type="text"
-                  value={phoneInput}
-                  onChange={(e) => {
-                    setPhoneInput(e.target.value);
-                    if (customerError) setCustomerError('');
-                  }}
-                  placeholder="Để trống nếu khách vãng lai không cung cấp"
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-blue-500 font-mono"
-                  autoFocus
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={phoneInput}
+                    onChange={(e) => {
+                      setPhoneInput(e.target.value);
+                      setCrmResult(null);
+                      if (customerError) setCustomerError('');
+                    }}
+                    placeholder="VD: 0909000005"
+                    className="flex-1 px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-blue-500 font-mono"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={handleLookupCustomer}
+                    disabled={isLookingUpCrm}
+                    className="px-3 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                  >
+                    <Search className="w-3.5 h-3.5" />
+                    {isLookingUpCrm ? 'Đang tìm...' : 'Tra cứu'}
+                  </button>
+                </div>
               </div>
+
+              {/* CRM Lookup Result */}
+              {crmResult?.found && (
+                <div className="p-3 bg-emerald-950/30 border border-emerald-500/30 rounded-xl space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-emerald-300 flex items-center gap-1.5">
+                      <History className="w-3.5 h-3.5" />
+                      Khách hàng quen ({crmResult.summary?.totalCompletedOrders || 0} đơn hoàn tất)
+                    </span>
+                    <span className="font-mono font-bold text-emerald-400">
+                      {formatCurrency(crmResult.summary?.totalSpent || 0)}
+                    </span>
+                  </div>
+                  {crmResult.summary?.warrantyCount > 0 && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-amber-300">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>Có {crmResult.summary.warrantyCount} phiếu bảo hành ghi nhận trên hệ thống</span>
+                    </div>
+                  )}
+                  {Array.isArray(crmResult.recentOrders) && crmResult.recentOrders.length > 0 && (
+                    <div className="space-y-1 pt-1 border-t border-emerald-500/20 max-h-28 overflow-y-auto">
+                      <p className="text-[11px] text-slate-400">Lịch sử gần nhất:</p>
+                      {crmResult.recentOrders.slice(0, 5).map((ord, idx) => (
+                        <div key={ord._id || ord.orderCode || idx} className="flex items-center justify-between gap-2 text-[11px] text-slate-300">
+                          <span className="font-mono text-slate-200 shrink-0">{ord.orderCode}</span>
+                          <span className="text-slate-400 truncate flex-1">{ord.firstItemName || ord.orderStatus}</span>
+                          <span className="font-mono text-emerald-300 shrink-0">{formatCurrency(ord.totalAmount || 0)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {crmResult && !crmResult.found && (
+                <div className="p-2.5 bg-slate-950/70 border border-slate-800 rounded-xl text-[11px] text-slate-400">
+                  Chưa có lịch sử mua hàng với số điện thoại này — thu ngân nhập tên bên dưới để lưu thông tin kích hoạt E-Warranty.
+                </div>
+              )}
+
               <div>
                 <label className="text-xs text-slate-400 block mb-1">Họ và tên khách:</label>
                 <input
@@ -299,6 +382,16 @@ export const PosCheckoutPanel = ({
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
                   placeholder="Khách vãng lai"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Địa chỉ (Tùy chọn):</label>
+                <input
+                  type="text"
+                  value={addressInput}
+                  onChange={(e) => setAddressInput(e.target.value)}
+                  placeholder="Số nhà, đường, quận/huyện..."
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-blue-500"
                 />
               </div>

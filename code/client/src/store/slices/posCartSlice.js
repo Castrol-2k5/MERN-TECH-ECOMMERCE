@@ -1,4 +1,4 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, createSelector } from '@reduxjs/toolkit';
 
 const getCleanSkuId = (id) => String(id?._id || id || '');
 
@@ -155,8 +155,8 @@ export const {
 // Selectors
 export const selectPosCart = (state) => state.posCart;
 
-export const selectPosCartTotals = (state) => {
-  const { items, discount, customerPaid } = state.posCart;
+export const selectPosCartTotals = createSelector([selectPosCart], (posCart) => {
+  const { items, discount, customerPaid } = posCart;
   const subtotal = items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
   const effectiveDiscount = Math.min(subtotal, Math.max(0, discount || 0));
   const tax = Math.round((subtotal - effectiveDiscount) * 0.1);
@@ -171,7 +171,7 @@ export const selectPosCartTotals = (state) => {
     customerPaid,
     change
   };
-};
+});
 
 export const selectMissingSerialsCount = (state) => {
   return state.posCart.items.reduce((count, item) => {

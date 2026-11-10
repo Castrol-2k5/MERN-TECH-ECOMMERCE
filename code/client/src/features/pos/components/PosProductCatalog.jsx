@@ -1,6 +1,6 @@
-import { Package, Hash, AlertTriangle } from 'lucide-react';
+import { Package, Hash, AlertTriangle, Info } from 'lucide-react';
 
-export const PosProductCatalog = ({ products = [], onSelectProduct, loading = false }) => {
+export const PosProductCatalog = ({ products = [], onSelectProduct, onViewSpec, loading = false }) => {
   const formatPrice = (p) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(p || 0);
 
   if (loading) {
@@ -39,7 +39,7 @@ export const PosProductCatalog = ({ products = [], onSelectProduct, loading = fa
                 : 'border-slate-800 hover:border-blue-500/80 hover:bg-slate-850 hover:shadow-lg hover:shadow-blue-500/5 cursor-pointer active:scale-[0.98]'
             }`}
           >
-            {/* Top info: Badge Serial & Tồn kho */}
+            {/* Top info: Badge Serial, Tồn kho & Nút Spec Sheet */}
             <div className="flex items-center justify-between gap-1 mb-2">
               {product.hasSerial ? (
                 <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center gap-1">
@@ -52,18 +52,34 @@ export const PosProductCatalog = ({ products = [], onSelectProduct, loading = fa
                 </span>
               )}
 
-              <span
-                className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
-                  isOutOfStock
-                    ? 'bg-rose-500/20 text-rose-400'
-                    : isLowStock
-                    ? 'bg-amber-500/20 text-amber-400 flex items-center gap-0.5'
-                    : 'bg-emerald-500/20 text-emerald-400'
-                }`}
-              >
-                {isLowStock && <AlertTriangle className="w-2.5 h-2.5" />}
-                Kho: {product.stock}
-              </span>
+              <div className="flex items-center gap-1">
+                <span
+                  className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
+                    isOutOfStock
+                      ? 'bg-rose-500/20 text-rose-400'
+                      : isLowStock
+                      ? 'bg-amber-500/20 text-amber-400 flex items-center gap-0.5'
+                      : 'bg-emerald-500/20 text-emerald-400'
+                  }`}
+                >
+                  {isLowStock && <AlertTriangle className="w-2.5 h-2.5" />}
+                  Kho: {product.stock}
+                </span>
+
+                {onViewSpec && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onViewSpec(product);
+                    }}
+                    title="Xem nhanh thông số kỹ thuật (Spec Sheet)"
+                    className="p-1 rounded-md bg-slate-800 hover:bg-blue-600 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  >
+                    <Info className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Thumbnail + Details */}

@@ -30,7 +30,7 @@ export class InventoryService {
       BranchInventory.find({ branchId })
         .populate({
           path: 'productId',
-          select: 'name slug images brand categoryId skus isActive isSerialManaged',
+          select: 'name slug images brand categoryId skus attributes description isActive isSerialManaged',
           populate: { path: 'categoryId', select: 'name slug' }
         })
         .lean(),

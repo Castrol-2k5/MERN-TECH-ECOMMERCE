@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { 
   addItem, 
@@ -28,6 +28,8 @@ import PosCheckoutPanel from '../../features/pos/components/PosCheckoutPanel';
 import SerialAssignmentModal from '../../features/pos/components/SerialAssignmentModal';
 import InvoiceK80Modal from '../../features/pos/components/InvoiceK80Modal';
 import ShiftControlModal from '../../features/pos/components/ShiftControlModal';
+import ProductSpecModal from '../../features/pos/components/ProductSpecModal';
+import CrossSellStrip from '../../features/pos/components/CrossSellStrip';
 import posShiftService from '../../features/pos/services/posShiftService';
 import { toPosCheckoutPayload } from '../../features/orders/services/orderAdapter';
 
@@ -149,6 +151,22 @@ export const PosPage = () => {
   const [activeSerialModalItem, setActiveSerialModalItem] = useState(null);
   const [completedOrder, setCompletedOrder] = useState(null);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [specProduct, setSpecProduct] = useState(null);
+  const [crossSellTrigger, setCrossSellTrigger] = useState(null);
+
+  const crossSellSuggestions = useMemo(() => {
+    if (!crossSellTrigger || !cart?.items?.length) return [];
+    const cartSkuSet = new Set(cart.items.map((item) => String(item.productSkuId || item._id)));
+    const accessoryPattern = /(phụ kiện|phu kien|âm thanh|am thanh|tai nghe|loa|gear|chuột|chuot|bàn phím|ban phim|sạc|sac|cáp|cap|ốp|op|cường lực|cuong luc)/i;
+    return products
+      .filter((p) => {
+        const skuKey = String(p.skuId || p._id);
+        if (skuKey === crossSellTrigger.skuId || cartSkuSet.has(skuKey)) return false;
+        if (Number(p.stock ?? 0) <= 0) return false;
+        return accessoryPattern.test(`${p.category || ''} ${p.categorySlug || ''} ${p.name || ''}`);
+      })
+      .slice(0, 4);
+  }, [crossSellTrigger, products, cart?.items]);
 
   // Refs for hotkeys
   const barcodeInputRef = useRef(null);
@@ -221,6 +239,10 @@ export const PosPage = () => {
       availableSerials: Array.isArray(product.availableSerials) ? product.availableSerials : []
     }));
     playSuccessBeep();
+    const mainDevicePattern = /(điện thoại|dien thoai|iphone|android|smartphone|laptop|macbook|tablet|ipad|màn hình|man hinh)/i;
+    if (mainDevicePattern.test(`${product.category || ''} ${product.categorySlug || ''} ${product.name || ''}`)) {
+      setCrossSellTrigger({ skuId, name: product.name });
+    }
   };
 
   // Perform POS Checkout
@@ -336,11 +358,20 @@ export const PosPage = () => {
             </div>
           )}
 
+          {/* Cross-sell accessory suggestion strip */}
+          <CrossSellStrip
+            suggestions={crossSellSuggestions}
+            triggerProductName={crossSellTrigger?.name || ''}
+            onAddAccessory={handleSelectProduct}
+            onDismiss={() => setCrossSellTrigger(null)}
+          />
+
           {/* Product Catalog Grid */}
           <div className="flex-1 overflow-y-auto">
             <PosProductCatalog
               products={products}
               onSelectProduct={handleSelectProduct}
+              onViewSpec={(p) => setSpecProduct(p)}
               loading={isSearching}
             />
           </div>
@@ -419,6 +450,17 @@ export const PosPage = () => {
           reloadShift();
         }}
         branchName={branches.find((b) => String(b._id) === String(activeBranchId))?.name || 'Showroom'}
+      />
+
+      {/* Quick Product Spec Sheet Modal */}
+      <ProductSpecModal
+        isOpen={Boolean(specProduct)}
+        onClose={() => setSpecProduct(null)}
+        product={specProduct}
+        onAddToCart={(p) => {
+          handleSelectProduct(p);
+          setSpecProduct(null);
+        }}
       />
     </div>
   );

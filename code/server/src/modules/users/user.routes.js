@@ -25,6 +25,13 @@ router.get('/profile/me', UserController.getMyProfile);
 router.put('/profile/me', validateDto(updateProfileSchema), UserController.updateMyProfile);
 router.put('/profile/change-password', validateDto(changePasswordSchema), UserController.changeMyPassword);
 
+// POS Staff & Managers: Tra cứu nhanh CRM khách hàng theo SĐT (phải đặt trước /:id)
+router.get(
+  '/lookup-customer',
+  authorize(USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER, USER_ROLES.STAFF),
+  UserController.lookupCustomerByPhone
+);
+
 router.get(
   '/',
   authorize(USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER),
