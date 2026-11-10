@@ -19,7 +19,8 @@ import {
   ShieldAlert,
   Coins,
   CreditCard,
-  Users
+  Users,
+  ClipboardCheck
 } from 'lucide-react';
 import { logout } from '../store/slices/authSlice.js';
 import { clearCart } from '../store/slices/posCartSlice.js';
@@ -160,6 +161,13 @@ export const PortalLayout = () => {
       badge: 'Team',
       icon: Users,
       roles: ['BRANCH_MANAGER', 'SUPER_ADMIN']
+    },
+    {
+      to: '/portal/branch/stocktaking',
+      label: 'Kiểm Kho & RMA',
+      badge: 'IMEI',
+      icon: ClipboardCheck,
+      roles: ['STAFF', 'BRANCH_MANAGER', 'SUPER_ADMIN']
     },
     {
       to: '/portal/settlements',

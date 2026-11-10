@@ -360,6 +360,70 @@ export const inventoryService = {
     }
   },
 
+  getStocktakes: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    const res = await apiClient.get(`/inventory/stocktakes${query ? `?${query}` : ''}`);
+    return res?.data?.stocktakes || [];
+  },
+
+  createStocktake: async (payload = {}) => {
+    const res = await apiClient.post('/inventory/stocktakes', payload);
+    return res?.data?.stocktake || null;
+  },
+
+  getStocktakeDetail: async (id) => {
+    const res = await apiClient.get(`/inventory/stocktakes/${id}`);
+    return res?.data?.stocktake || null;
+  },
+
+  scanStocktakeSerials: async (id, payload) => {
+    const res = await apiClient.post(`/inventory/stocktakes/${id}/scan`, payload);
+    return res?.data || null;
+  },
+
+  completeStocktake: async (id, payload = {}) => {
+    const res = await apiClient.patch(`/inventory/stocktakes/${id}/complete`, payload);
+    return res?.data?.stocktake || null;
+  },
+
+  getTransferRequests: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    const res = await apiClient.get(`/inventory/transfer-requests${query ? `?${query}` : ''}`);
+    return res?.data?.requests || [];
+  },
+
+  createTransferRequest: async (payload) => {
+    const res = await apiClient.post('/inventory/transfer-requests', payload);
+    return res?.data?.request || null;
+  },
+
+  approveTransferRequest: async (id, payload = {}) => {
+    const res = await apiClient.patch(`/inventory/transfer-requests/${id}/approve`, payload);
+    return res?.data || null;
+  },
+
+  rejectTransferRequest: async (id, payload = {}) => {
+    const res = await apiClient.patch(`/inventory/transfer-requests/${id}/reject`, payload);
+    return res?.data?.request || null;
+  },
+
+  getDefectiveSerials: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    const res = await apiClient.get(`/inventory/rma-outbound/defective-serials${query ? `?${query}` : ''}`);
+    return res?.data?.serials || [];
+  },
+
+  getRmaOutbounds: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    const res = await apiClient.get(`/inventory/rma-outbound${query ? `?${query}` : ''}`);
+    return res?.data?.rmaOutbounds || [];
+  },
+
+  createRmaOutbound: async (payload) => {
+    const res = await apiClient.post('/inventory/rma-outbound', payload);
+    return res?.data?.rmaOutbound || null;
+  },
+
   adjustStock: async (payload) => {
     if (isMockEnabled()) {
       return {
