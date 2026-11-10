@@ -154,9 +154,10 @@ export const PosPage = () => {
   const [specProduct, setSpecProduct] = useState(null);
   const [crossSellTrigger, setCrossSellTrigger] = useState(null);
 
+  const cartItems = cart.items;
   const crossSellSuggestions = useMemo(() => {
-    if (!crossSellTrigger || !cart?.items?.length) return [];
-    const cartSkuSet = new Set(cart.items.map((item) => String(item.productSkuId || item._id)));
+    if (!crossSellTrigger || !cartItems.length) return [];
+    const cartSkuSet = new Set(cartItems.map((item) => String(item.productSkuId || item._id)));
     const accessoryPattern = /(phụ kiện|phu kien|âm thanh|am thanh|tai nghe|loa|gear|chuột|chuot|bàn phím|ban phim|sạc|sac|cáp|cap|ốp|op|cường lực|cuong luc)/i;
     return products
       .filter((p) => {
@@ -166,7 +167,7 @@ export const PosPage = () => {
         return accessoryPattern.test(`${p.category || ''} ${p.categorySlug || ''} ${p.name || ''}`);
       })
       .slice(0, 4);
-  }, [crossSellTrigger, products, cart?.items]);
+  }, [crossSellTrigger, products, cartItems]);
 
   // Refs for hotkeys
   const barcodeInputRef = useRef(null);

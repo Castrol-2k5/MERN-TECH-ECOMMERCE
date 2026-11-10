@@ -346,7 +346,7 @@ export const PosCheckoutPanel = ({
                       Khách hàng quen ({crmResult.summary?.totalCompletedOrders || 0} đơn hoàn tất)
                     </span>
                     <span className="font-mono font-bold text-emerald-400">
-                      {formatCurrency(crmResult.summary?.totalSpent || 0)}
+                      {formatVnd(crmResult.summary?.totalSpent || 0)}
                     </span>
                   </div>
                   {crmResult.summary?.warrantyCount > 0 && (
@@ -362,7 +362,7 @@ export const PosCheckoutPanel = ({
                         <div key={ord._id || ord.orderCode || idx} className="flex items-center justify-between gap-2 text-[11px] text-slate-300">
                           <span className="font-mono text-slate-200 shrink-0">{ord.orderCode}</span>
                           <span className="text-slate-400 truncate flex-1">{ord.firstItemName || ord.orderStatus}</span>
-                          <span className="font-mono text-emerald-300 shrink-0">{formatCurrency(ord.totalAmount || 0)}</span>
+                          <span className="font-mono text-emerald-300 shrink-0">{formatVnd(ord.totalAmount || 0)}</span>
                         </div>
                       ))}
                     </div>
