@@ -24,6 +24,7 @@ import settlementRoutes from './modules/accounting/settlement.routes.js';
 import auditLogRoutes from './modules/audit/auditLog.routes.js';
 import approvalRoutes from './modules/approvals/approval.routes.js';
 import complaintRoutes from './modules/complaints/complaint.routes.js';
+import rosterRoutes from './modules/roster/roster.routes.js';
 
 const app = express();
 
@@ -76,6 +77,7 @@ app.use(`${env.API_PREFIX}/settlements`, settlementRoutes);
 app.use(`${env.API_PREFIX}/audit-logs`, auditLogRoutes);
 app.use(`${env.API_PREFIX}/approvals`, approvalRoutes);
 app.use(`${env.API_PREFIX}/complaints`, complaintRoutes);
+app.use(`${env.API_PREFIX}/roster`, rosterRoutes);
 
 // Internal routes for integration testing RBAC and data scoping
 app.get(`${env.API_PREFIX}/test/admin-only`, protect, authorize('SUPER_ADMIN'), (req, res) => {

@@ -21,7 +21,8 @@ import {
   CreditCard,
   Users,
   ClipboardCheck,
-  AlertTriangle
+  AlertTriangle,
+  Calendar
 } from 'lucide-react';
 import { logout } from '../store/slices/authSlice.js';
 import { clearCart } from '../store/slices/posCartSlice.js';
@@ -182,6 +183,13 @@ export const PortalLayout = () => {
       label: 'Khiếu Nại & Chăm Sóc',
       badge: 'SLA',
       icon: AlertTriangle,
+      roles: ['STAFF', 'BRANCH_MANAGER', 'SUPER_ADMIN']
+    },
+    {
+      to: '/portal/branch/roster',
+      label: 'Lịch Ca & Chấm Công',
+      badge: 'Ca tuần',
+      icon: Calendar,
       roles: ['STAFF', 'BRANCH_MANAGER', 'SUPER_ADMIN']
     },
     {

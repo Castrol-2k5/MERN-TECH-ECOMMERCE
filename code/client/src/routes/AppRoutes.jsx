@@ -49,6 +49,7 @@ import ManagerApprovalsPage from '../pages/portal/ManagerApprovalsPage.jsx';
 import BranchStocktakePage from '../pages/portal/BranchStocktakePage.jsx';
 import BranchAnalyticsPage from '../pages/portal/BranchAnalyticsPage.jsx';
 import BranchComplaintsPage from '../pages/portal/BranchComplaintsPage.jsx';
+import BranchRosterPage from '../pages/portal/BranchRosterPage.jsx';
 
 const PortalIndexRedirect = () => {
   const user = useSelector((state) => state.auth?.user);
@@ -77,6 +78,7 @@ export const AppRoutes = () => {
           <Route path="manager/approvals" element={<ManagerApprovalsPage />} />
           <Route path="branch/stocktaking" element={<BranchStocktakePage />} />
           <Route path="branch/complaints" element={<BranchComplaintsPage />} />
+          <Route path="branch/roster" element={<BranchRosterPage />} />
           <Route path="admin/orders-dispatch" element={<OrderDispatchPage />} />
 
           {/* Branch Manager & Super Admin Operations */}
