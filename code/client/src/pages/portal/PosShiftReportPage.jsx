@@ -14,11 +14,13 @@ import {
   User,
   Eye,
   X,
+  Printer,
   FileSpreadsheet
 } from 'lucide-react';
 import posShiftService from '../../features/pos/services/posShiftService.js';
 import { branchService } from '../../features/branches/services/branchService.js';
 import DataTablePagination from '../../components/common/DataTablePagination.jsx';
+import ShiftHandoverPrintModal from '../../features/pos/components/ShiftHandoverPrintModal.jsx';
 
 const formatVND = (val) => `${Number(val || 0).toLocaleString('vi-VN')} ₫`;
 
@@ -37,9 +39,11 @@ export const PosShiftReportPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
-  // Detail Modal
+  // Detail & Print Modals
   const [selectedShift, setSelectedShift] = useState(null);
+  const [printShift, setPrintShift] = useState(null);
 
   // Load branches
   useEffect(() => {
@@ -68,6 +72,7 @@ export const PosShiftReportPage = () => {
       const data = await posShiftService.getShiftHistory(params);
       setShifts(data?.shifts || []);
       setTotalItems(data?.pagination?.total || 0);
+      setTotalPages(data?.pagination?.totalPages || 1);
     } catch (err) {
       setError(err?.response?.data?.error?.message || err?.message || 'Không thể tải lịch sử ca thu ngân');
     } finally {
@@ -284,14 +289,25 @@ export const PosShiftReportPage = () => {
                         )}
                       </td>
                       <td className="py-3.5 px-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedShift(shift)}
-                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Chi tiết</span>
-                        </button>
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setPrintShift(shift)}
+                            className="px-2.5 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                            title="In biên bản bàn giao ca"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            <span>In</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedShift(shift)}
+                            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Chi tiết</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -304,6 +320,7 @@ export const PosShiftReportPage = () => {
         {/* Pagination */}
         <DataTablePagination
           currentPage={currentPage}
+          totalPages={totalPages}
           pageSize={pageSize}
           totalItems={totalItems}
           onPageChange={setCurrentPage}
@@ -312,14 +329,14 @@ export const PosShiftReportPage = () => {
             setCurrentPage(1);
           }}
           variant="dark"
-          itemLabel="ca thu ngân"
+          itemName="ca thu ngân"
         />
       </div>
 
       {/* Shift Detail Modal */}
       {selectedShift && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl text-xs space-y-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl text-xs space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">
                 <Coins className="w-4 h-4 text-amber-400" />
@@ -327,12 +344,25 @@ export const PosShiftReportPage = () => {
                   Chi Tiết Ca: {selectedShift.shiftCode}
                 </h3>
               </div>
-              <button
-                onClick={() => setSelectedShift(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPrintShift(selectedShift);
+                    setSelectedShift(null);
+                  }}
+                  className="px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>In Biên Bản</span>
+                </button>
+                <button
+                  onClick={() => setSelectedShift(null)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             <div className="space-y-2 bg-slate-950 p-4 rounded-2xl border border-slate-800">
@@ -355,6 +385,14 @@ export const PosShiftReportPage = () => {
                 </div>
               )}
               <div className="flex justify-between border-t border-slate-800 pt-2">
+                <span className="text-slate-400">Thu / Chi nội bộ:</span>
+                <span className="font-mono font-bold">
+                  <span className="text-emerald-400">+{formatVND(selectedShift.cashInTotal || 0)}</span>
+                  {' / '}
+                  <span className="text-rose-400">-{formatVND(selectedShift.cashOutTotal || 0)}</span>
+                </span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-slate-400">Tiền lý thuyết trong két:</span>
                 <span className="font-mono font-bold text-blue-400">{formatVND(selectedShift.expectedEndingBalance)}</span>
               </div>
@@ -376,6 +414,28 @@ export const PosShiftReportPage = () => {
               )}
             </div>
 
+            {/* Phiếu thu / chi nội bộ trong ca */}
+            {Array.isArray(selectedShift.cashVouchers) && selectedShift.cashVouchers.length > 0 && (
+              <div>
+                <h4 className="font-bold text-slate-300 mb-2">Phiếu Thu / Chi nội bộ ({selectedShift.cashVouchers.length}):</h4>
+                <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                  {selectedShift.cashVouchers.map((v, i) => (
+                    <div key={v._id || i} className="flex items-center justify-between p-2 rounded-xl bg-slate-950 border border-slate-800">
+                      <div className="min-w-0">
+                        <span className={`font-bold mr-1.5 ${v.type === 'IN' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          [{v.type === 'IN' ? 'THU' : 'CHI'}]
+                        </span>
+                        <span className="text-slate-200">{v.reason}</span>
+                      </div>
+                      <span className={`font-mono font-bold shrink-0 ${v.type === 'IN' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {v.type === 'IN' ? '+' : '-'}{formatVND(v.amount)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Chi tiết từng mệnh giá đã đếm */}
             {selectedShift.denominations && selectedShift.denominations.length > 0 && (
               <div>
@@ -393,6 +453,13 @@ export const PosShiftReportPage = () => {
           </div>
         </div>
       )}
+
+      {/* Handover Print Modal */}
+      <ShiftHandoverPrintModal
+        isOpen={Boolean(printShift)}
+        onClose={() => setPrintShift(null)}
+        shift={printShift}
+      />
     </div>
   );
 };

@@ -30,6 +30,7 @@ const ACTION_LABELS = {
   TRANSFER_RECEIVE: 'Nhập hàng chuyển kho',
   POS_SHIFT_OPEN: 'Mở ca thu ngân',
   POS_SHIFT_CASH_DROP: 'Rút tiền nộp két',
+  POS_SHIFT_VOUCHER: 'Phiếu Thu/Chi két ca POS',
   POS_SHIFT_CLOSE: 'Chốt ca kiểm đếm két',
   ORDER_POS_CHECKOUT: 'Thanh toán tại quầy',
   ORDER_CANCEL: 'Hủy đơn hàng',

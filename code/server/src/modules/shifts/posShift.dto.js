@@ -34,3 +34,18 @@ export const cashDropSchema = z.object({
     .positive('Số tiền rút phải lớn hơn 0'),
   reason: z.string().trim().optional().default('Nộp két an toàn giữa ca')
 });
+
+export const cashVoucherSchema = z.object({
+  type: z.enum(['IN', 'OUT'], {
+    required_error: 'Loại phiếu thu/chi (IN hoặc OUT) là bắt buộc'
+  }),
+  category: z.string().trim().min(1).max(100).optional().default('Chi phí vận hành quầy'),
+  amount: z.coerce
+    .number({ required_error: 'Số tiền phiếu thu/chi là bắt buộc' })
+    .min(1000, 'Số tiền phiếu thu/chi tối thiểu 1.000 ₫'),
+  reason: z
+    .string({ required_error: 'Lý do thu/chi là bắt buộc' })
+    .trim()
+    .min(2, 'Vui lòng nhập lý do thu/chi (tối thiểu 2 ký tự)')
+    .max(300, 'Lý do tối đa 300 ký tự')
+});

@@ -13,6 +13,7 @@ router.use(authorize(USER_ROLES.STAFF, USER_ROLES.BRANCH_MANAGER, USER_ROLES.SUP
 router.post('/open', PosShiftController.openShift);
 router.get('/current', PosShiftController.getCurrentShift);
 router.post('/:id/drop', PosShiftController.recordCashDrop);
+router.post('/:id/vouchers', PosShiftController.recordCashVoucher);
 router.post('/:id/close', PosShiftController.closeShift);
 router.get('/history', PosShiftController.getShiftHistory);
 

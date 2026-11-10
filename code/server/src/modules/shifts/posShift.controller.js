@@ -1,5 +1,5 @@
 import { PosShiftService } from './posShift.service.js';
-import { openShiftSchema, closeShiftSchema, cashDropSchema } from './posShift.dto.js';
+import { openShiftSchema, closeShiftSchema, cashDropSchema, cashVoucherSchema } from './posShift.dto.js';
 import { catchAsync } from '../../utils/catchAsync.js';
 import { sendSuccess } from '../../utils/response.js';
 
@@ -32,6 +32,17 @@ export class PosShiftController {
     return sendSuccess(res, {
       statusCode: 200,
       message: 'Ghi nhận rút tiền mặt nộp két an toàn thành công',
+      data: { shift }
+    });
+  });
+
+  static recordCashVoucher = catchAsync(async (req, res) => {
+    const validated = cashVoucherSchema.parse(req.body);
+    const shift = await PosShiftService.recordCashVoucher(req.params.id, validated, req.user);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: `Lập phiếu ${validated.type === 'IN' ? 'thu' : 'chi'} nội bộ thành công`,
       data: { shift }
     });
   });

@@ -25,6 +25,25 @@ const cashDropSchema = new Schema(
   { _id: false }
 );
 
+export const VOUCHER_TYPES = {
+  IN: 'IN',
+  OUT: 'OUT'
+};
+
+const cashVoucherSchema = new Schema(
+  {
+    voucherCode: { type: String, required: true, uppercase: true, trim: true },
+    type: { type: String, enum: Object.values(VOUCHER_TYPES), required: true },
+    category: { type: String, trim: true, default: 'Chi phí vận hành quầy' },
+    amount: { type: Number, required: true, min: [1000, 'Số tiền phiếu thu/chi tối thiểu 1.000 ₫'] },
+    reason: { type: String, required: true, trim: true },
+    performedAt: { type: Date, default: Date.now },
+    performedById: { type: Schema.Types.ObjectId, ref: 'User' },
+    performedByName: { type: String, default: '' }
+  },
+  { _id: true }
+);
+
 const posShiftSchema = new Schema(
   {
     shiftCode: {
@@ -82,7 +101,22 @@ const posShiftSchema = new Schema(
       type: [cashDropSchema],
       default: []
     },
-    // Tiền lý thuyết trong két = openingBalance + cashSales - cashRefunds - sum(cashDrops)
+    // Các phiếu thu/chi tiền mặt nội bộ phát sinh trong ca
+    cashVouchers: {
+      type: [cashVoucherSchema],
+      default: []
+    },
+    cashInTotal: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    cashOutTotal: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    // Tiền lý thuyết trong két = openingBalance + cashSales + cashInTotal - cashRefunds - cashOutTotal - sum(cashDrops)
     expectedEndingBalance: {
       type: Number,
       default: 0

@@ -140,6 +140,59 @@ describe('POS Shifts & Inter-Branch Settlement Integration Tests', () => {
       expect(closeRes.body.data.shift.discrepancy).toBe(-20000);
       expect(closeRes.body.data.shift.discrepancyNote).toBe('Thối nhầm tiền lẻ cho khách đơn lẻ');
     });
+
+    it('Lập Phiếu Thu / Chi nội bộ (UC-POS-10) tính lại số dư két và chặn chi vượt mức', async () => {
+      const openRes = await request(app)
+        .post('/api/v1/shifts/open')
+        .set('Authorization', `Bearer ${cashierToken}`)
+        .send({ openingBalance: 500000 });
+      const shiftId = openRes.body.data.shift._id;
+
+      // 1. Lập phiếu chi 100.000đ mua nước
+      const outRes = await request(app)
+        .post(`/api/v1/shifts/${shiftId}/vouchers`)
+        .set('Authorization', `Bearer ${cashierToken}`)
+        .send({
+          type: 'OUT',
+          category: 'Văn phòng phẩm / Tiếp khách',
+          amount: 100000,
+          reason: 'Mua 2 thùng nước suối tiếp khách'
+        });
+
+      expect(outRes.status).toBe(200);
+      expect(outRes.body.data.shift.cashOutTotal).toBe(100000);
+      expect(outRes.body.data.shift.expectedEndingBalance).toBe(400000);
+      expect(outRes.body.data.shift.cashVouchers.length).toBe(1);
+
+      // 2. Lập phiếu thu 250.000đ bồi thường
+      const inRes = await request(app)
+        .post(`/api/v1/shifts/${shiftId}/vouchers`)
+        .set('Authorization', `Bearer ${cashierToken}`)
+        .send({
+          type: 'IN',
+          category: 'Thu tiền bồi thường / Đền bù',
+          amount: 250000,
+          reason: 'Thu bồi thường làm trầy phụ kiện mẫu'
+        });
+
+      expect(inRes.status).toBe(200);
+      expect(inRes.body.data.shift.cashInTotal).toBe(250000);
+      expect(inRes.body.data.shift.expectedEndingBalance).toBe(650000);
+
+      // 3. Chặn lập phiếu chi 700.000đ (> 650.000đ hiện có trong két)
+      const failRes = await request(app)
+        .post(`/api/v1/shifts/${shiftId}/vouchers`)
+        .set('Authorization', `Bearer ${cashierToken}`)
+        .send({
+          type: 'OUT',
+          category: 'Chi phí khác',
+          amount: 700000,
+          reason: 'Chi vượt số dư két'
+        });
+
+      expect(failRes.status).toBe(400);
+      expect(failRes.body.errorCode).toBe('INSUFFICIENT_DRAWER_CASH');
+    });
   });
 
   describe('2. Inter-Branch Settlement & Clearing', () => {

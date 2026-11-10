@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import mongoose from 'mongoose';
-import { PosShift, SHIFT_STATUS } from './posShift.model.js';
+import { PosShift, SHIFT_STATUS, VOUCHER_TYPES } from './posShift.model.js';
 import { Branch } from '../branches/branch.model.js';
 import { AppError } from '../../utils/appError.js';
 import { USER_ROLES } from '../users/user.model.js';
@@ -91,7 +91,7 @@ export class PosShiftService {
       cashierId: currentUser.id,
       status: SHIFT_STATUS.OPEN
     })
-      .populate('branchId', 'name code address phone')
+      .populate('branchId', 'name branchCode address phone')
       .populate('cashierId', 'fullName email phone role');
 
     // Nếu không thấy và user là quản lý/super admin, tìm ca mở mới nhất của chi nhánh
@@ -101,11 +101,36 @@ export class PosShiftService {
         status: SHIFT_STATUS.OPEN
       })
         .sort({ createdAt: -1 })
-        .populate('branchId', 'name code address phone')
+        .populate('branchId', 'name branchCode address phone')
         .populate('cashierId', 'fullName email phone role');
     }
 
     return currentShift;
+  }
+
+  /**
+   * Tính lại tổng thu/chi nội bộ và số dư tiền mặt lý thuyết trong két (DRY helper)
+   */
+  static recalculateExpectedBalance(shift) {
+    const totalDrops = (shift.cashDrops || []).reduce((s, d) => s + (Number(d.amount) || 0), 0);
+    const cashInTotal = (shift.cashVouchers || [])
+      .filter((v) => v.type === VOUCHER_TYPES.IN)
+      .reduce((s, v) => s + (Number(v.amount) || 0), 0);
+    const cashOutTotal = (shift.cashVouchers || [])
+      .filter((v) => v.type === VOUCHER_TYPES.OUT)
+      .reduce((s, v) => s + (Number(v.amount) || 0), 0);
+
+    shift.cashInTotal = cashInTotal;
+    shift.cashOutTotal = cashOutTotal;
+    shift.expectedEndingBalance =
+      Number(shift.openingBalance || 0) +
+      Number(shift.cashSales || 0) +
+      cashInTotal -
+      Number(shift.cashRefunds || 0) -
+      cashOutTotal -
+      totalDrops;
+
+    return shift.expectedEndingBalance;
   }
 
   /**
@@ -132,13 +157,7 @@ export class PosShiftService {
 
     shift.cashSales = (shift.cashSales || 0) + Number(amount);
     shift.totalOrdersCount = (shift.totalOrdersCount || 0) + 1;
-
-    const totalDrops = (shift.cashDrops || []).reduce((s, d) => s + (Number(d.amount) || 0), 0);
-    shift.expectedEndingBalance =
-      Number(shift.openingBalance || 0) +
-      Number(shift.cashSales || 0) -
-      Number(shift.cashRefunds || 0) -
-      totalDrops;
+    PosShiftService.recalculateExpectedBalance(shift);
 
     await shift.save();
     return shift;
@@ -169,12 +188,7 @@ export class PosShiftService {
       performedById: currentUser.id
     });
 
-    const totalDrops = (shift.cashDrops || []).reduce((s, d) => s + (Number(d.amount) || 0), 0);
-    shift.expectedEndingBalance =
-      Number(shift.openingBalance || 0) +
-      Number(shift.cashSales || 0) -
-      Number(shift.cashRefunds || 0) -
-      totalDrops;
+    PosShiftService.recalculateExpectedBalance(shift);
 
     await shift.save();
 
@@ -194,6 +208,87 @@ export class PosShiftService {
       },
       context: {
         reason: payload.reason || 'Nộp két sắt an toàn giữa ca'
+      }
+    });
+
+    return shift;
+  }
+
+  /**
+   * Ghi nhận Phiếu Thu / Phiếu Chi tiền mặt nội bộ trong ca POS (UC-POS-10)
+   */
+  static async recordCashVoucher(shiftId, payload, currentUser) {
+    const shift = await PosShift.findById(shiftId);
+    if (!shift) {
+      throw new AppError('Không tìm thấy ca làm việc.', 404, 'SHIFT_NOT_FOUND');
+    }
+
+    if (shift.status !== SHIFT_STATUS.OPEN) {
+      throw new AppError('Ca làm việc này đã chốt, không thể lập phiếu thu/chi.', 400, 'SHIFT_ALREADY_CLOSED');
+    }
+
+    // Kiểm tra quyền chi nhánh nếu là nhân sự chi nhánh
+    if (
+      currentUser.role !== USER_ROLES.SUPER_ADMIN &&
+      currentUser.branchId &&
+      shift.branchId.toString() !== currentUser.branchId.toString()
+    ) {
+      throw new AppError('Bạn không có quyền lập phiếu cho ca của chi nhánh khác.', 403, 'CROSS_BRANCH_ACCESS_DENIED');
+    }
+
+    const amount = Number(payload.amount);
+    const currentExpected = PosShiftService.recalculateExpectedBalance(shift);
+
+    if (payload.type === VOUCHER_TYPES.OUT && amount > currentExpected) {
+      throw new AppError(
+        `Số tiền mặt hiện có trong két (${currentExpected.toLocaleString('vi-VN')} ₫) không đủ để chi ${amount.toLocaleString('vi-VN')} ₫.`,
+        400,
+        'INSUFFICIENT_DRAWER_CASH'
+      );
+    }
+
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    const voucherCode = `VCH-${dateStr}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+
+    shift.cashVouchers.push({
+      voucherCode,
+      type: payload.type,
+      category: payload.category || 'Chi phí vận hành quầy',
+      amount,
+      reason: payload.reason,
+      performedAt: now,
+      performedById: currentUser.id,
+      performedByName: currentUser.fullName || 'Nhân sự TechOne'
+    });
+
+    const newExpected = PosShiftService.recalculateExpectedBalance(shift);
+    await shift.save();
+
+    AuditLogService.record({
+      actor: currentUser,
+      action: AUDIT_ACTIONS.POS_SHIFT_VOUCHER,
+      target: {
+        model: 'PosShift',
+        entityId: shift._id,
+        code: voucherCode,
+        name: `${payload.type === VOUCHER_TYPES.IN ? 'Phiếu thu' : 'Phiếu chi'} ${voucherCode} (${shift.shiftCode})`
+      },
+      changes: {
+        before: { expectedEndingBalance: currentExpected },
+        after: {
+          voucherCode,
+          voucherType: payload.type,
+          amount,
+          expectedEndingBalance: newExpected
+        },
+        diff: {
+          expectedEndingBalance: payload.type === VOUCHER_TYPES.IN ? amount : -amount
+        }
+      },
+      context: {
+        reason: payload.reason,
+        notes: `Danh mục: ${payload.category || 'Khác'} | Số tiền: ${amount.toLocaleString('vi-VN')} ₫`
       }
     });
 
@@ -225,12 +320,7 @@ export class PosShiftService {
     }
 
     const actualEndingBalance = Number(payload.actualEndingBalance) || 0;
-    const totalDrops = (shift.cashDrops || []).reduce((s, d) => s + (Number(d.amount) || 0), 0);
-    const expected =
-      Number(shift.openingBalance || 0) +
-      Number(shift.cashSales || 0) -
-      Number(shift.cashRefunds || 0) -
-      totalDrops;
+    const expected = PosShiftService.recalculateExpectedBalance(shift);
 
     shift.expectedEndingBalance = expected;
     shift.actualEndingBalance = actualEndingBalance;
