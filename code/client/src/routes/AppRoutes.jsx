@@ -44,6 +44,7 @@ import PosShiftReportPage from '../pages/portal/PosShiftReportPage.jsx';
 import InterBranchSettlementPage from '../pages/portal/InterBranchSettlementPage.jsx';
 import AuditTrailPage from '../pages/portal/AuditTrailPage.jsx';
 import MyPerformancePage from '../pages/portal/MyPerformancePage.jsx';
+import BranchStaffPage from '../pages/portal/BranchStaffPage.jsx';
 
 const PortalIndexRedirect = () => {
   const user = useSelector((state) => state.auth?.user);
@@ -75,6 +76,7 @@ export const AppRoutes = () => {
           <Route element={<RoleProtectedRoute allowedRoles={['BRANCH_MANAGER', 'SUPER_ADMIN']} />}>
             <Route path="admin/import-serials" element={<SerialImportPage />} />
             <Route path="settlements" element={<InterBranchSettlementPage />} />
+            <Route path="branch/staff" element={<BranchStaffPage />} />
           </Route>
 
           {/* HQ Administration & Operations (SUPER_ADMIN Only) */}

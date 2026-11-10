@@ -18,7 +18,8 @@ import {
   ArrowLeftRight,
   ShieldAlert,
   Coins,
-  CreditCard
+  CreditCard,
+  Users
 } from 'lucide-react';
 import { logout } from '../store/slices/authSlice.js';
 import { clearCart } from '../store/slices/posCartSlice.js';
@@ -145,6 +146,13 @@ export const PortalLayout = () => {
   ].filter((item) => item.roles.includes(userRole));
 
   const hqAdminLinks = [
+    {
+      to: '/portal/branch/staff',
+      label: 'Nhân Sự & KPI Đội Ngũ',
+      badge: 'Team',
+      icon: Users,
+      roles: ['BRANCH_MANAGER', 'SUPER_ADMIN']
+    },
     {
       to: '/portal/settlements',
       label: 'Đối Soát & Bù Trừ Chuỗi',

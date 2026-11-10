@@ -38,7 +38,7 @@ export class UserController {
   });
 
   static updateUser = catchAsync(async (req, res) => {
-    const user = await UserService.updateUser(req.params.id, req.body);
+    const user = await UserService.updateUser(req.params.id, req.body, req.user);
     return sendSuccess(res, {
       statusCode: 200,
       message: 'Cập nhật thông tin tài khoản thành công',
@@ -47,7 +47,7 @@ export class UserController {
   });
 
   static toggleUserStatus = catchAsync(async (req, res) => {
-    const user = await UserService.toggleUserStatus(req.params.id, req.body.isActive);
+    const user = await UserService.toggleUserStatus(req.params.id, req.body.isActive, req.user);
     return sendSuccess(res, {
       statusCode: 200,
       message: `Đã ${req.body.isActive ? 'kích hoạt' : 'tạm khóa'} tài khoản thành công`,

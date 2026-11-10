@@ -10,10 +10,8 @@ import {
 } from './user.dto.js';
 import { validateDto } from '../../middlewares/validate.middleware.js';
 import { protect } from '../../middlewares/auth.middleware.js';
-import { authorize } from '../../middlewares/rbac.middleware.js';
+import { authorize, scopeBranch } from '../../middlewares/rbac.middleware.js';
 import { USER_ROLES } from './user.model.js';
-
-import { scopeBranch } from '../../middlewares/rbac.middleware.js';
 
 const router = Router();
 
@@ -55,14 +53,14 @@ router.post(
 
 router.put(
   '/:id',
-  authorize(USER_ROLES.SUPER_ADMIN),
+  authorize(USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER),
   validateDto(updateUserSchema),
   UserController.updateUser
 );
 
 router.patch(
   '/:id/status',
-  authorize(USER_ROLES.SUPER_ADMIN),
+  authorize(USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER),
   validateDto(updateUserStatusSchema),
   UserController.toggleUserStatus
 );

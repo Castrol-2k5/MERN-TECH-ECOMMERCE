@@ -8,6 +8,35 @@ import { AUDIT_ACTIONS } from '../audit/auditLog.model.js';
 const BRANCH_POPULATE_FIELDS = 'name branchCode address phone isHeadquarter';
 
 export class UserService {
+  /**
+   * Guard DRY: Đảm bảo BRANCH_MANAGER chỉ thao tác được lên STAFF thuộc đúng chi nhánh mình
+   */
+  static assertManagerStaffScope(targetUser, currentUser) {
+    if (!currentUser || currentUser.role !== USER_ROLES.BRANCH_MANAGER) {
+      return;
+    }
+
+    if (targetUser.role !== USER_ROLES.STAFF) {
+      throw new AppError(
+        'Quản lý chi nhánh chỉ được phép quản lý tài khoản nhân viên (STAFF)',
+        403,
+        'FORBIDDEN'
+      );
+    }
+
+    const managerBranchId =
+      currentUser.branchId?._id?.toString() || currentUser.branchId?.toString();
+    const targetBranchId =
+      targetUser.branchId?._id?.toString() || targetUser.branchId?.toString();
+
+    if (!managerBranchId || targetBranchId !== managerBranchId) {
+      throw new AppError(
+        'Bạn chỉ có quyền thao tác trên nhân sự thuộc chi nhánh của mình',
+        403,
+        'CROSS_BRANCH_FORBIDDEN'
+      );
+    }
+  }
   static async getUsers(query = {}) {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
     const limit = Math.max(1, Math.min(100, parseInt(query.limit, 10) || 50));
@@ -150,10 +179,31 @@ export class UserService {
     return createdUser;
   }
 
-  static async updateUser(id, payload) {
+  static async updateUser(id, payload, currentUser = null) {
     const user = await User.findById(id);
     if (!user) {
       throw new AppError('Không tìm thấy tài khoản người dùng', 404, 'USER_NOT_FOUND');
+    }
+
+    this.assertManagerStaffScope(user, currentUser);
+
+    if (currentUser?.role === USER_ROLES.BRANCH_MANAGER) {
+      if (payload.role && payload.role !== USER_ROLES.STAFF) {
+        throw new AppError(
+          'Quản lý chi nhánh không có quyền thay đổi vai trò nhân viên',
+          403,
+          'FORBIDDEN'
+        );
+      }
+      const managerBranchId =
+        currentUser.branchId?._id?.toString() || currentUser.branchId?.toString();
+      if (payload.branchId && payload.branchId.toString() !== managerBranchId) {
+        throw new AppError(
+          'Không thể chuyển nhân viên sang chi nhánh khác',
+          403,
+          'CROSS_BRANCH_FORBIDDEN'
+        );
+      }
     }
 
     // 1. Kiểm tra trùng lặp email / phone nếu có cập nhật
@@ -261,11 +311,13 @@ export class UserService {
     return updatedUser;
   }
 
-  static async toggleUserStatus(id, isActive) {
+  static async toggleUserStatus(id, isActive, currentUser = null) {
     const user = await User.findById(id);
     if (!user) {
       throw new AppError('Không tìm thấy tài khoản người dùng', 404, 'USER_NOT_FOUND');
     }
+
+    this.assertManagerStaffScope(user, currentUser);
 
     user.isActive = isActive;
     await user.save();

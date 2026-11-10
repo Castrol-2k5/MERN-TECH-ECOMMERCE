@@ -25,4 +25,16 @@ export class AnalyticsController {
       data: performance
     });
   });
+
+  static getBranchStaffKpi = catchAsync(async (req, res) => {
+    const targetBranchId = req.scopedBranchId || req.query.branchId || null;
+    const { range } = req.query;
+    const report = await StaffAnalyticsService.getBranchStaffKpi(targetBranchId, range);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Lấy bảng xếp hạng KPI nhân sự chi nhánh thành công',
+      data: report
+    });
+  });
 }

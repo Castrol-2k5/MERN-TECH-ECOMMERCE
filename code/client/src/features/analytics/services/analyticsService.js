@@ -122,6 +122,72 @@ export const analyticsService = {
     const res = await axiosClient.get(`/analytics/my-performance?range=${encodeURIComponent(range)}`);
     return res?.data || emptyPerformance;
   },
+
+  getBranchStaffKpi: async ({ range = '7d', branchId = '' } = {}) => {
+    const emptyReport = {
+      range,
+      summary: {
+        totalTeamRevenue: 0,
+        totalTeamOrders: 0,
+        activeStaffCount: 0,
+        totalStaffCount: 0,
+        topPerformer: null
+      },
+      ranking: []
+    };
+
+    if (isMockEnabled()) {
+      return {
+        range,
+        summary: {
+          totalTeamRevenue: 185420000,
+          totalTeamOrders: 9,
+          activeStaffCount: 3,
+          totalStaffCount: 3,
+          topPerformer: { fullName: 'Lê Thu Ngân Q1', netRevenue: 98450000 }
+        },
+        ranking: [
+          {
+            rank: 1,
+            staffId: 'staff-1',
+            fullName: 'Lê Thu Ngân Q1',
+            email: 'staff.q1@techstore.com',
+            phone: '0909000003',
+            role: 'STAFF',
+            isActive: true,
+            netRevenue: 98450000,
+            completedOrders: 5,
+            posOrdersCount: 4,
+            avgOrderValue: 19690000,
+            shiftCount: 4,
+            warrantyCount: 2,
+            returnRate: 0
+          },
+          {
+            rank: 2,
+            staffId: 'staff-2',
+            fullName: 'Nguyễn Minh Tư Vấn',
+            email: 'tuvan.q1@techstore.com',
+            phone: '0909000013',
+            role: 'STAFF',
+            isActive: true,
+            netRevenue: 86970000,
+            completedOrders: 4,
+            posOrdersCount: 4,
+            avgOrderValue: 21742500,
+            shiftCount: 3,
+            warrantyCount: 1,
+            returnRate: 0
+          }
+        ]
+      };
+    }
+
+    const query = new URLSearchParams({ range });
+    if (branchId) query.set('branchId', branchId);
+    const res = await axiosClient.get(`/analytics/branch-staff-kpi?${query.toString()}`);
+    return res?.data || emptyReport;
+  },
   getOverview: async (params = {}) => {
     if (isMockEnabled()) {
       return fallbackAnalyticsOverview;

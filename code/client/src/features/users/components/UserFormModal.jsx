@@ -1,45 +1,53 @@
-import { useState, useEffect } from 'react';
-import { X, UserPlus, Check, Eye, EyeOff } from 'lucide-react';
+import { useState } from 'react';
+import { X, UserPlus, Check, Eye, EyeOff, Edit2 } from 'lucide-react';
 
 export const UserFormModal = ({
   isOpen,
   onClose,
   branches = [],
-  onCreateUser
+  onCreateUser,
+  onUpdateUser,
+  editingUser = null,
+  restrictedToStaff = false,
+  fixedBranchId = ''
 }) => {
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState('STAFF');
-  const [branchId, setBranchId] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
-  const [loading, setLoading] = useState(false);
+  const isEditing = Boolean(editingUser);
 
   const retailBranches = branches.filter(
     (b) => !b.isHeadquarter && b.branchCode !== 'BR-HQ'
   );
   const selectableBranches = retailBranches.length > 0 ? retailBranches : branches;
 
-  useEffect(() => {
-    if (!isOpen) return;
-    setErrorMsg('');
-    if (!branchId && selectableBranches.length > 0) {
-      setBranchId(selectableBranches[0]._id);
-    }
-  }, [isOpen, selectableBranches, branchId]);
+  const initialBranchId =
+    fixedBranchId ||
+    editingUser?.branchId?._id ||
+    editingUser?.branchId ||
+    selectableBranches[0]?._id ||
+    '';
+
+  const [fullName, setFullName] = useState(() => editingUser?.fullName || '');
+  const [email, setEmail] = useState(() => editingUser?.email || '');
+  const [phone, setPhone] = useState(() => editingUser?.phone || '');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState(() =>
+    restrictedToStaff ? 'STAFF' : editingUser?.role || 'STAFF'
+  );
+  const [branchId, setBranchId] = useState(() => initialBranchId);
+  const [showPassword, setShowPassword] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
 
-  const isBranchRequired = role === 'STAFF' || role === 'BRANCH_MANAGER';
+  const effectiveRole = restrictedToStaff ? 'STAFF' : role;
+  const isBranchRequired = effectiveRole === 'STAFF' || effectiveRole === 'BRANCH_MANAGER';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
     const targetBranchId = isBranchRequired
-      ? branchId || selectableBranches[0]?._id || ''
+      ? fixedBranchId || branchId || selectableBranches[0]?._id || ''
       : null;
 
     if (isBranchRequired && !targetBranchId) {
@@ -49,26 +57,42 @@ export const UserFormModal = ({
 
     setLoading(true);
     try {
-      await onCreateUser({
-        fullName: fullName.trim(),
-        email: email.trim(),
-        phone: phone.trim(),
-        password,
-        role,
-        branchId: targetBranchId
-      });
+      if (isEditing && onUpdateUser) {
+        const updatePayload = {
+          fullName: fullName.trim(),
+          phone: phone.trim()
+        };
+        if (!restrictedToStaff) {
+          updatePayload.email = email.trim();
+          updatePayload.role = effectiveRole;
+          updatePayload.branchId = targetBranchId;
+        }
+        if (password.trim()) {
+          updatePayload.password = password;
+        }
+        await onUpdateUser(editingUser._id, updatePayload);
+      } else {
+        await onCreateUser({
+          fullName: fullName.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          password,
+          role: effectiveRole,
+          branchId: targetBranchId
+        });
+        setFullName('');
+        setEmail('');
+        setPhone('');
+        setPassword('');
+        setRole('STAFF');
+      }
       onClose();
-      setFullName('');
-      setEmail('');
-      setPhone('');
-      setPassword('');
-      setRole('STAFF');
     } catch (err) {
       setErrorMsg(
         err.response?.data?.errors?.[0]?.message ||
           err.response?.data?.message ||
           err.message ||
-          'Lỗi khi tạo tài khoản nhân sự'
+          'Lỗi khi lưu tài khoản nhân sự'
       );
     } finally {
       setLoading(false);
@@ -82,16 +106,20 @@ export const UserFormModal = ({
         <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center">
-              <UserPlus className="w-4 h-4" />
+              {isEditing ? <Edit2 className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
             </div>
             <h3 className="font-bold text-sm text-slate-100">
-              Thêm mới tài khoản nhân sự (RBAC)
+              {isEditing
+                ? `Cập nhật nhân sự: ${editingUser.fullName}`
+                : restrictedToStaff
+                ? 'Thêm nhân viên mới vào chi nhánh'
+                : 'Thêm mới tài khoản nhân sự (RBAC)'}
             </h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -127,10 +155,11 @@ export const UserFormModal = ({
               <input
                 type="email"
                 required
+                disabled={isEditing && restrictedToStaff}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="thungan.q1@techstore.com"
-                className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-blue-500"
+                className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-blue-500 disabled:opacity-60"
               />
             </div>
             <div>
@@ -150,22 +179,22 @@ export const UserFormModal = ({
 
           <div>
             <label className="text-[11px] font-semibold text-slate-300 block mb-1">
-              Mật khẩu khởi tạo:
+              {isEditing ? 'Mật khẩu mới (Để trống nếu giữ nguyên):' : 'Mật khẩu khởi tạo:'}
             </label>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
-                required
+                required={!isEditing}
                 minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Tối thiểu 6 ký tự"
+                placeholder={isEditing ? 'Nhập mật khẩu mới nếu muốn đặt lại' : 'Tối thiểu 6 ký tự'}
                 className="w-full px-3 py-1.5 pr-8 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-blue-500"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2.5 top-2 text-slate-400 hover:text-white"
+                className="absolute right-2.5 top-2 text-slate-400 hover:text-white cursor-pointer"
               >
                 {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
               </button>
@@ -178,13 +207,18 @@ export const UserFormModal = ({
                 Vai trò hệ thống:
               </label>
               <select
-                value={role}
+                value={effectiveRole}
+                disabled={restrictedToStaff}
                 onChange={(e) => setRole(e.target.value)}
-                className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-blue-500 cursor-pointer"
+                className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-blue-500 cursor-pointer disabled:opacity-60"
               >
                 <option value="STAFF">STAFF (Nhân viên)</option>
-                <option value="BRANCH_MANAGER">BRANCH_MANAGER (Cửa hàng trưởng)</option>
-                <option value="SUPER_ADMIN">SUPER_ADMIN (Quản trị HQ)</option>
+                {!restrictedToStaff && (
+                  <>
+                    <option value="BRANCH_MANAGER">BRANCH_MANAGER (Cửa hàng trưởng)</option>
+                    <option value="SUPER_ADMIN">SUPER_ADMIN (Quản trị HQ)</option>
+                  </>
+                )}
               </select>
             </div>
 
@@ -193,10 +227,10 @@ export const UserFormModal = ({
                 Chi nhánh công tác:
               </label>
               <select
-                value={isBranchRequired ? branchId : ''}
-                disabled={!isBranchRequired}
+                value={isBranchRequired ? fixedBranchId || branchId : ''}
+                disabled={!isBranchRequired || Boolean(fixedBranchId)}
                 onChange={(e) => setBranchId(e.target.value)}
-                className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-blue-500 cursor-pointer disabled:opacity-50"
+                className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-blue-500 cursor-pointer disabled:opacity-60"
               >
                 {!isBranchRequired ? (
                   <option value="">-- Toàn chuỗi (HQ) --</option>
@@ -216,7 +250,7 @@ export const UserFormModal = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl"
+              className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl cursor-pointer"
             >
               Hủy
             </button>
@@ -226,7 +260,7 @@ export const UserFormModal = ({
               className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-md shadow-blue-600/20 cursor-pointer"
             >
               <Check className="w-3.5 h-3.5" />
-              <span>{loading ? 'Đang khởi tạo...' : 'Khởi tạo tài khoản'}</span>
+              <span>{loading ? 'Đang lưu...' : isEditing ? 'Lưu cập nhật' : 'Khởi tạo tài khoản'}</span>
             </button>
           </div>
         </form>
