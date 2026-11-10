@@ -7,7 +7,8 @@ export const SERIAL_STATUS = {
   RESERVED: 'RESERVED',
   SOLD: 'SOLD',
   WARRANTY: 'WARRANTY',
-  TRANSIT: 'TRANSIT'
+  TRANSIT: 'TRANSIT',
+  DEFECTIVE: 'DEFECTIVE'
 };
 
 const serialSchema = new Schema(

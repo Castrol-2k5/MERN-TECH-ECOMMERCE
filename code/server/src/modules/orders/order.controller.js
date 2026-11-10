@@ -1,4 +1,5 @@
 import { OrderService } from './order.service.js';
+import { OrderReturnService } from './orderReturn.service.js';
 import { catchAsync } from '../../utils/catchAsync.js';
 import { sendSuccess } from '../../utils/response.js';
 
@@ -140,6 +141,17 @@ export class OrderController {
     return sendSuccess(res, {
       statusCode: 200,
       message: 'Đổi SKU tại quầy và điều chỉnh tồn kho thành công',
+      data: result
+    });
+  });
+
+  static returnOrder = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const result = await OrderReturnService.processReturn(id, req.body, req.user);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Xử lý trả hàng và hoàn tiền thành công',
       data: result
     });
   });

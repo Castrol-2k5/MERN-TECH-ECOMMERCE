@@ -164,6 +164,33 @@ export class PosShiftService {
   }
 
   /**
+   * Tự động ghi nhận hoàn tiền mặt trả hàng vào ca đang mở (dùng nội bộ khi xử lý Return/Refund)
+   */
+  static async recordCashRefund(branchId, cashierId, amount) {
+    if (!amount || amount <= 0) return null;
+
+    let shift = await PosShift.findOne({
+      cashierId,
+      status: SHIFT_STATUS.OPEN
+    });
+
+    if (!shift && branchId) {
+      shift = await PosShift.findOne({
+        branchId,
+        status: SHIFT_STATUS.OPEN
+      }).sort({ createdAt: -1 });
+    }
+
+    if (!shift) return null;
+
+    shift.cashRefunds = (shift.cashRefunds || 0) + Number(amount);
+    PosShiftService.recalculateExpectedBalance(shift);
+
+    await shift.save();
+    return shift;
+  }
+
+  /**
    * Ghi nhận rút tiền mặt nộp két sắt giữa ca (Cash Drop)
    */
   static async recordCashDrop(shiftId, payload, currentUser) {

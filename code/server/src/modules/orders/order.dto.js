@@ -193,3 +193,41 @@ export const exchangeOrderSkuSchema = z
     note: z.string().trim().optional().default('Đổi SKU theo yêu cầu của khách tại quầy')
   })
   .strict();
+
+const returnOrderItemSchema = z
+  .object({
+    orderItemId: z
+      .string()
+      .trim()
+      .regex(OBJECT_ID_REGEX, 'Mã orderItemId không hợp lệ')
+      .optional(),
+    productSkuId: z
+      .string()
+      .trim()
+      .regex(OBJECT_ID_REGEX, 'Mã SKU (productSkuId) không hợp lệ')
+      .optional(),
+    quantity: z.coerce
+      .number({ required_error: 'Số lượng trả là bắt buộc' })
+      .int('Số lượng trả phải là số nguyên')
+      .min(1, 'Số lượng trả tối thiểu là 1'),
+    condition: z.enum(['GOOD', 'DEFECTIVE']).optional().default('GOOD'),
+    serialsReturned: z.array(z.string().trim().min(1)).optional().default([])
+  })
+  .strict()
+  .refine((it) => Boolean(it.orderItemId || it.productSkuId), {
+    message: 'Cần cung cấp orderItemId hoặc productSkuId cho sản phẩm trả hàng'
+  });
+
+export const returnOrderSchema = z
+  .object({
+    items: z
+      .array(returnOrderItemSchema, { required_error: 'Danh sách sản phẩm trả lại là bắt buộc' })
+      .min(1, 'Phải chọn ít nhất 1 sản phẩm để trả hàng'),
+    refundMethod: z.enum(['CASH', 'TRANSFER']).optional().default('CASH'),
+    reason: z
+      .string({ required_error: 'Lý do trả hàng là bắt buộc' })
+      .trim()
+      .min(2, 'Vui lòng nhập lý do trả hàng (tối thiểu 2 ký tự)')
+      .max(300, 'Lý do tối đa 300 ký tự')
+  })
+  .strict();

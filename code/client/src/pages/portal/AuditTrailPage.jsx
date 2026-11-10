@@ -34,6 +34,7 @@ const ACTION_LABELS = {
   POS_SHIFT_CLOSE: 'Chốt ca kiểm đếm két',
   ORDER_POS_CHECKOUT: 'Thanh toán tại quầy',
   ORDER_CANCEL: 'Hủy đơn hàng',
+  ORDER_RETURN: 'Trả hàng & Hoàn tiền',
   USER_ROLE_CHANGE: 'Thay đổi quyền nhân sự',
   USER_STATUS_TOGGLE: 'Khóa / Mở tài khoản',
   AUTH_LOGIN_FAILED: 'Đăng nhập thất bại'

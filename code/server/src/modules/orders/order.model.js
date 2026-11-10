@@ -26,6 +26,8 @@ export const ORDER_STATUS = {
   READY_FOR_SHIPPING: 'READY_FOR_SHIPPING',
   SHIPPING: 'SHIPPING',
   COMPLETED: 'COMPLETED',
+  PARTIALLY_RETURNED: 'PARTIALLY_RETURNED',
+  RETURNED: 'RETURNED',
   CANCELLED: 'CANCELLED'
 };
 
@@ -67,6 +69,15 @@ const orderItemSchema = new Schema({
     min: [0, 'Thành tiền không được âm']
   },
   serialsAssigned: {
+    type: [String],
+    default: []
+  },
+  returnedQuantity: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  returnedSerials: {
     type: [String],
     default: []
   }
@@ -174,6 +185,35 @@ const orderSchema = new Schema(
       type: Date,
       default: null
     },
+    refundedAmount: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    returnHistory: [
+      {
+        returnCode: { type: String, required: true, uppercase: true, trim: true },
+        returnedAt: { type: Date, default: Date.now },
+        processedById: { type: Schema.Types.ObjectId, ref: 'User' },
+        processedByName: { type: String, default: '' },
+        refundMethod: { type: String, enum: ['CASH', 'TRANSFER'], default: 'CASH' },
+        refundAmount: { type: Number, required: true, min: 0 },
+        reason: { type: String, default: '' },
+        items: [
+          {
+            orderItemId: Schema.Types.ObjectId,
+            productSkuId: Schema.Types.ObjectId,
+            sku: String,
+            productName: String,
+            quantity: Number,
+            unitPrice: Number,
+            subtotalRefund: Number,
+            condition: { type: String, enum: ['GOOD', 'DEFECTIVE'], default: 'GOOD' },
+            serialsReturned: [String]
+          }
+        ]
+      }
+    ],
     exchangeHistory: [
       {
         exchangedAt: { type: Date, default: Date.now },

@@ -8,7 +8,8 @@ import {
   trackOrderSchema,
   completeOrderSchema,
   cancelOrderSchema,
-  exchangeOrderSkuSchema
+  exchangeOrderSkuSchema,
+  returnOrderSchema
 } from './order.dto.js';
 import { validateDto } from '../../middlewares/validate.middleware.js';
 import { protect, optionalProtect } from '../../middlewares/auth.middleware.js';
@@ -107,6 +108,15 @@ router.patch(
   authorize(USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER, USER_ROLES.STAFF),
   validateDto(exchangeOrderSkuSchema),
   OrderController.exchangeSku
+);
+
+// 6.4. Xử lý Trả hàng & Hoàn tiền hoàn kho/Serial (UC-ORD-12)
+router.post(
+  '/:id/return',
+  protect,
+  authorize(USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER, USER_ROLES.STAFF),
+  validateDto(returnOrderSchema),
+  OrderController.returnOrder
 );
 
 // 7. Cổng thanh toán VNPay (Sandbox)

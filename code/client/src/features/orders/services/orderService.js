@@ -238,5 +238,17 @@ export const orderService = {
     }
     const response = await axiosClient.patch(`/orders/${orderId}/exchange-sku`, payload);
     return response?.data?.data || response?.data;
+  },
+
+  returnOrder: async (orderId, payload) => {
+    if (isMockEnabled()) {
+      return {
+        order: { _id: orderId, orderStatus: 'RETURNED', paymentStatus: 'REFUNDED' },
+        returnRecord: { returnCode: `RTN-MOCK-${Date.now()}`, refundAmount: 0 },
+        shiftAdjusted: false
+      };
+    }
+    const response = await axiosClient.post(`/orders/${orderId}/return`, payload);
+    return response?.data || response;
   }
 };

@@ -51,6 +51,9 @@ export class AuditLogService {
       case AUDIT_ACTIONS.POS_SHIFT_VOUCHER: {
         return changes?.after?.voucherType === 'OUT' ? AUDIT_SEVERITY.WARNING : AUDIT_SEVERITY.INFO;
       }
+      case AUDIT_ACTIONS.ORDER_RETURN: {
+        return AUDIT_SEVERITY.WARNING;
+      }
       case AUDIT_ACTIONS.USER_ROLE_CHANGE: {
         if (changes?.after?.role === 'SUPER_ADMIN') {
           return AUDIT_SEVERITY.CRITICAL;

@@ -24,7 +24,8 @@ import {
   ArrowUpRight,
   ArrowRight,
   Barcode,
-  AlertCircle
+  AlertCircle,
+  RotateCcw
 } from 'lucide-react';
 import { orderService } from '../../features/orders/services/orderService.js';
 import { branchService } from '../../features/branches/services/branchService.js';
@@ -33,6 +34,7 @@ import { inventoryService } from '../../features/inventory/services/inventorySer
 import usePosAudio from '../../features/pos/hooks/usePosAudio';
 import Toast from '../../components/common/Toast';
 import DataTablePagination from '../../components/common/DataTablePagination';
+import ReturnOrderModal from '../../features/orders/components/ReturnOrderModal.jsx';
 
 const formatVND = (val) => `${Number(val || 0).toLocaleString('vi-VN')} ₫`;
 
@@ -61,6 +63,16 @@ const ORDER_STATUS_META = {
     label: 'Hoàn tất',
     badgeClass: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
     icon: CheckCircle2
+  },
+  PARTIALLY_RETURNED: {
+    label: 'Trả 1 phần',
+    badgeClass: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+    icon: RotateCcw
+  },
+  RETURNED: {
+    label: 'Đã trả hàng',
+    badgeClass: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+    icon: RotateCcw
   },
   CANCELLED: {
     label: 'Đã hủy',
@@ -93,6 +105,7 @@ export const BranchOrdersPage = () => {
 
   // Modal state
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [returnTargetOrder, setReturnTargetOrder] = useState(null);
   const [verifiedSerialInfo, setVerifiedSerialInfo] = useState(null);
   const [verifyingSerial, setVerifyingSerial] = useState('');
 
@@ -567,6 +580,8 @@ export const BranchOrdersPage = () => {
             <option value="PROCESSING">PROCESSING - Đang đóng gói</option>
             <option value="READY_FOR_SHIPPING">READY_FOR_SHIPPING - Sẵn sàng giao</option>
             <option value="COMPLETED">COMPLETED - Hoàn tất</option>
+            <option value="PARTIALLY_RETURNED">PARTIALLY_RETURNED - Trả 1 phần</option>
+            <option value="RETURNED">RETURNED - Đã trả hàng</option>
             <option value="CANCELLED">CANCELLED - Đã hủy</option>
           </select>
         </div>
@@ -758,6 +773,7 @@ export const BranchOrdersPage = () => {
         {/* Pagination */}
         <DataTablePagination
           currentPage={currentPage}
+          totalPages={Math.ceil(orders.length / pageSize) || 1}
           pageSize={pageSize}
           totalItems={orders.length}
           onPageChange={setCurrentPage}
@@ -766,7 +782,7 @@ export const BranchOrdersPage = () => {
             setCurrentPage(1);
           }}
           variant="dark"
-          itemLabel="đơn hàng"
+          itemName="đơn hàng"
         />
       </div>
 
@@ -968,6 +984,49 @@ export const BranchOrdersPage = () => {
                 </div>
               )}
 
+              {/* Return History Box */}
+              {Array.isArray(selectedOrder.returnHistory) && selectedOrder.returnHistory.length > 0 && (
+                <div className="rounded-xl border border-rose-500/30 bg-rose-950/15 p-4">
+                  <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-2">
+                    <RotateCcw className="h-4 w-4" />
+                    Lịch Sử Trả Hàng &amp; Hoàn Tiền ({selectedOrder.returnHistory.length})
+                  </h3>
+                  <div className="space-y-2.5">
+                    {selectedOrder.returnHistory.map((rtn, rIdx) => (
+                      <div key={rtn._id || rIdx} className="rounded-lg border border-rose-500/20 bg-slate-900/80 p-3 text-xs space-y-1.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-1.5">
+                          <span className="font-mono font-bold text-rose-300">{rtn.returnCode}</span>
+                          <span className="text-[11px] text-slate-400">
+                            {new Date(rtn.returnedAt).toLocaleString('vi-VN')} • {rtn.processedByName || 'Nhân viên quầy'}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-slate-300">Lý do: <em className="text-slate-200">{rtn.reason}</em></span>
+                          <span className="font-mono font-bold text-rose-400">
+                            Hoàn {formatVND(rtn.refundAmount)} ({rtn.refundMethod === 'CASH' ? 'Tiền mặt' : 'Chuyển khoản'})
+                          </span>
+                        </div>
+                        <div className="space-y-1 pt-1">
+                          {(rtn.items || []).map((ri, iIdx) => (
+                            <div key={iIdx} className="text-[11px] text-slate-400 flex flex-wrap justify-between">
+                              <span>
+                                • {ri.productName} ({ri.sku}) x{ri.quantity} —{' '}
+                                <strong className={ri.condition === 'GOOD' ? 'text-emerald-400' : 'text-amber-400'}>
+                                  {ri.condition === 'GOOD' ? 'Nhập kho bán lại' : 'Hàng lỗi DEFECTIVE'}
+                                </strong>
+                              </span>
+                              {Array.isArray(ri.serialsReturned) && ri.serialsReturned.length > 0 && (
+                                <span className="font-mono text-slate-300">[{ri.serialsReturned.join(', ')}]</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Items & Assigned Serials */}
               <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
                 <div className="mb-3 flex items-center justify-between">
@@ -1141,8 +1200,21 @@ export const BranchOrdersPage = () => {
                   </button>
                 )}
 
+                {/* Return & Refund button for COMPLETED or PARTIALLY_RETURNED orders */}
+                {['COMPLETED', 'PARTIALLY_RETURNED'].includes(selectedOrder.orderStatus) && canComplete && (
+                  <button
+                    type="button"
+                    onClick={() => setReturnTargetOrder(selectedOrder)}
+                    disabled={actionLoading}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 px-3.5 py-2 text-xs font-semibold text-rose-300 transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    <RotateCcw className="h-4 w-4 text-rose-400" />
+                    Trả hàng &amp; Hoàn tiền
+                  </button>
+                )}
+
                 {/* Cancel & Stock refund button for Manager / Super Admin */}
-                {!['COMPLETED', 'CANCELLED'].includes(selectedOrder.orderStatus) && isManager && (
+                {!['COMPLETED', 'PARTIALLY_RETURNED', 'RETURNED', 'CANCELLED'].includes(selectedOrder.orderStatus) && isManager && (
                   <button
                     type="button"
                     onClick={() => handleCancelOrder(selectedOrder)}
@@ -1472,6 +1544,27 @@ export const BranchOrdersPage = () => {
           </div>
         </div>
       )}
+
+      {/* Return & Refund Modal (UC-ORD-12) */}
+      <ReturnOrderModal
+        isOpen={Boolean(returnTargetOrder)}
+        onClose={() => setReturnTargetOrder(null)}
+        order={returnTargetOrder}
+        onReturnSuccess={(result) => {
+          const updatedOrder = result?.order;
+          const returnCode = result?.returnRecord?.returnCode || 'RTN';
+          const refundAmt = result?.returnRecord?.refundAmount || 0;
+          showToast(
+            'success',
+            'Xử lý trả hàng thành công',
+            `Phiếu trả ${returnCode}: Đã hoàn ${formatVND(refundAmt)} và cập nhật kho/Serial.`
+          );
+          if (updatedOrder) {
+            setSelectedOrder(updatedOrder);
+          }
+          fetchOrders();
+        }}
+      />
 
       {/* Floating System Toast Notification */}
       <Toast toast={toast} onClose={() => setToast(null)} />
