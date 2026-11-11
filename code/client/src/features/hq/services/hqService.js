@@ -91,6 +91,11 @@ export const hqService = {
   async rejectExecutiveRequest(id, reviewNote = '') {
     const response = await axiosClient.patch(`/approvals/${id}/reject`, { reviewNote });
     return response?.data || response;
+  },
+
+  async getDemandForecast(params = {}) {
+    const response = await axiosClient.get('/hq/bi/demand-forecast', { params });
+    return response?.data || response;
   }
 };
 

@@ -1,5 +1,6 @@
 import { HqCommandService } from './hqCommand.service.js';
 import { SupplyChainService } from './supplyChain.service.js';
+import { HqBiService } from './hqBi.service.js';
 import { catchAsync } from '../../utils/catchAsync.js';
 import { sendSuccess } from '../../utils/response.js';
 
@@ -65,6 +66,16 @@ export class HqController {
       statusCode: 201,
       message: 'Đã tạo lệnh luân chuyển hàng tồn chậm liên chi nhánh',
       data: { transfer }
+    });
+  });
+
+  static getDemandForecast = catchAsync(async (req, res) => {
+    const { daysWindow, targetCoverDays } = req.query;
+    const data = await HqBiService.getDemandForecast({ daysWindow, targetCoverDays });
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Lấy báo cáo dự báo nhu cầu nhập hàng thành công',
+      data
     });
   });
 }

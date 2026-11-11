@@ -252,7 +252,7 @@ export const PortalLayout = () => {
     {
       to: '/portal/admin/analytics',
       label: 'Báo Cáo Doanh Thu',
-      badge: 'BI',
+      badge: 'BI & Forecast',
       icon: BarChart3,
       roles: ['SUPER_ADMIN']
     },

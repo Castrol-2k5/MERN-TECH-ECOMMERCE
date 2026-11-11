@@ -38,4 +38,7 @@ router.post(
   HqController.executeDeadStockRebalance
 );
 
+// Business Intelligence & Demand Forecasting (UC-HQ-12)
+router.get('/bi/demand-forecast', HqController.getDemandForecast);
+
 export default router;
