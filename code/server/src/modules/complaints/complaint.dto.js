@@ -1,9 +1,14 @@
 import { z } from 'zod';
-import { COMPLAINT_SEVERITY, COMPLAINT_STATUS } from './complaint.model.js';
+import { COMPLAINT_SEVERITY, COMPLAINT_STATUS, COMPLAINT_REQUEST_TYPES } from './complaint.model.js';
 
 export const createComplaintSchema = z.object({
   branchId: z.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
   orderCode: z.string().trim().max(50).optional().default(''),
+  serialNumber: z.string().trim().max(80).optional().default(''),
+  requestType: z
+    .enum(Object.values(COMPLAINT_REQUEST_TYPES))
+    .optional()
+    .default(COMPLAINT_REQUEST_TYPES.SERVICE_COMPLAINT),
   customerName: z.string().trim().min(2, 'Tên khách hàng tối thiểu 2 ký tự'),
   customerPhone: z
     .string()
@@ -12,6 +17,21 @@ export const createComplaintSchema = z.object({
     .refine((v) => /^(0|\+84)(3|5|7|8|9)[0-9]{8}$/.test(v), 'Số điện thoại không đúng định dạng VN'),
   severity: z.enum(Object.values(COMPLAINT_SEVERITY)).optional().default(COMPLAINT_SEVERITY.HIGH),
   description: z.string().trim().min(5, 'Vui lòng mô tả nội dung khiếu nại (tối thiểu 5 ký tự)').max(1000)
+});
+
+export const createCustomerSupportRequestSchema = z.object({
+  requestType: z
+    .enum(Object.values(COMPLAINT_REQUEST_TYPES))
+    .optional()
+    .default(COMPLAINT_REQUEST_TYPES.WARRANTY_REQUEST),
+  orderCode: z.string().trim().max(50).optional().default(''),
+  serialNumber: z.string().trim().max(80).optional().default(''),
+  branchId: z.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
+  description: z
+    .string()
+    .trim()
+    .min(5, 'Vui lòng mô tả tình trạng thiết bị hoặc nội dung hỗ trợ (tối thiểu 5 ký tự)')
+    .max(1000)
 });
 
 export const updateComplaintSchema = z.object({

@@ -25,6 +25,21 @@ const STATUS_META = {
   CLOSED: 'bg-slate-800 text-slate-400 border-slate-700'
 };
 
+const REQUEST_TYPE_META = {
+  WARRANTY_REQUEST: {
+    label: 'Yêu cầu Bảo hành',
+    cls: 'bg-purple-500/15 text-purple-300 border-purple-500/30'
+  },
+  RETURN_REQUEST: {
+    label: 'Yêu cầu Đổi trả',
+    cls: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30'
+  },
+  SERVICE_COMPLAINT: {
+    label: 'Khiếu nại dịch vụ',
+    cls: 'bg-slate-800 text-slate-300 border-slate-700'
+  }
+};
+
 export const BranchComplaintsPage = () => {
   const authUser = useSelector((state) => state.auth?.user);
   const isManagerOrAdmin = ['BRANCH_MANAGER', 'SUPER_ADMIN'].includes(authUser?.role);
@@ -215,13 +230,25 @@ export const BranchComplaintsPage = () => {
           {complaints.map((c) => (
             <div key={c._id} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2.5 text-xs">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono font-bold text-cyan-400">{c.complaintCode}</span>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                      (REQUEST_TYPE_META[c.requestType] || REQUEST_TYPE_META.SERVICE_COMPLAINT).cls
+                    }`}
+                  >
+                    {(REQUEST_TYPE_META[c.requestType] || REQUEST_TYPE_META.SERVICE_COMPLAINT).label}
+                  </span>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${SEVERITY_META[c.severity]}`}>
                     {c.severity}
                   </span>
                   {c.orderCode && (
                     <span className="font-mono text-[11px] text-slate-400">Đơn: {c.orderCode}</span>
+                  )}
+                  {c.serialNumber && (
+                    <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-slate-800 text-purple-300">
+                      SN: {c.serialNumber}
+                    </span>
                   )}
                 </div>
                 <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${STATUS_META[c.status]}`}>

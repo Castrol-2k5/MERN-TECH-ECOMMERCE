@@ -24,7 +24,12 @@ export {
   APPROVAL_LEVELS,
   APPROVAL_STATUS
 } from '../modules/approvals/approval.model.js';
-export { Complaint, COMPLAINT_STATUS, COMPLAINT_SEVERITY } from '../modules/complaints/complaint.model.js';
+export {
+  Complaint,
+  COMPLAINT_STATUS,
+  COMPLAINT_SEVERITY,
+  COMPLAINT_REQUEST_TYPES
+} from '../modules/complaints/complaint.model.js';
 export {
   WorkSchedule,
   SHIFT_TYPES,

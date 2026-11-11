@@ -39,4 +39,22 @@ export class ComplaintController {
       data: { tickets }
     });
   });
+
+  static createCustomerRequest = catchAsync(async (req, res) => {
+    const requestDoc = await ComplaintService.createCustomerRequest(req.body, req.user);
+    return sendSuccess(res, {
+      statusCode: 201,
+      message: 'Đã gửi yêu cầu bảo hành / hỗ trợ tới chi nhánh phụ trách!',
+      data: { complaint: requestDoc }
+    });
+  });
+
+  static getMyRequests = catchAsync(async (req, res) => {
+    const requests = await ComplaintService.getMyRequests(req.user.id);
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Lấy danh sách yêu cầu hỗ trợ thành công',
+      data: { requests }
+    });
+  });
 }

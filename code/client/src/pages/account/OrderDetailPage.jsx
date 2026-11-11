@@ -12,10 +12,12 @@ import {
   ExternalLink,
   AlertCircle,
   Star,
-  Send
+  Send,
+  Wrench
 } from 'lucide-react';
 import { orderService } from '../../features/orders/services/orderService.js';
 import { reviewService } from '../../features/reviews/services/reviewService.js';
+import CustomerSupportModal from '../../features/complaints/components/CustomerSupportModal.jsx';
 
 const REVIEW_TAGS = [
   'Tư vấn nhiệt tình',
@@ -36,6 +38,9 @@ export const OrderDetailPage = () => {
   const [comment, setComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewError, setReviewError] = useState('');
+  const [supportModalOpen, setSupportModalOpen] = useState(false);
+  const [supportSerial, setSupportSerial] = useState('');
+  const [supportBanner, setSupportBanner] = useState('');
 
   useEffect(() => {
     let ignore = false;
@@ -201,7 +206,20 @@ export const OrderDetailPage = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {order.orderStatus !== 'CANCELLED' && (
+            <button
+              type="button"
+              onClick={() => {
+                setSupportSerial(order.items?.[0]?.serialsAssigned?.[0] || '');
+                setSupportModalOpen(true);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Wrench className="w-3.5 h-3.5 text-amber-600" />
+              <span>Yêu cầu BH / Đổi trả</span>
+            </button>
+          )}
           <span className="text-xs font-semibold text-slate-500">Trạng thái:</span>
           <span
             className={`px-3 py-1 rounded-full text-xs font-black ${
@@ -582,6 +600,29 @@ export const OrderDetailPage = () => {
           )}
         </div>
       )}
+      {/* Customer Support Modal (UC-CUS-04) */}
+      {supportBanner && (
+        <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{supportBanner}</span>
+        </div>
+      )}
+
+      <CustomerSupportModal
+        key={`${order.orderCode}-${supportSerial}-${supportModalOpen}`}
+        open={supportModalOpen}
+        onClose={() => setSupportModalOpen(false)}
+        initialOrderCode={order.orderCode}
+        initialSerialNumber={supportSerial}
+        initialRequestType="WARRANTY_REQUEST"
+        onSubmitted={(created) => {
+          if (created) {
+            setSupportBanner(
+              `Đã gửi yêu cầu ${created.complaintCode} tới chi nhánh phụ trách. Bạn có thể theo dõi phản hồi tại Hồ sơ -> Tab Bảo hành.`
+            );
+          }
+        }}
+      />
     </div>
   );
 };

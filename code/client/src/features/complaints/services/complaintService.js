@@ -23,6 +23,16 @@ export const complaintService = {
   getWarrantyWatchlist: async () => {
     const res = await axiosClient.get('/complaints/warranty-watchlist');
     return res?.data?.tickets || [];
+  },
+
+  createCustomerRequest: async (payload) => {
+    const res = await axiosClient.post('/complaints/customer', payload);
+    return res?.data?.complaint || null;
+  },
+
+  getMyRequests: async () => {
+    const res = await axiosClient.get('/complaints/my-requests');
+    return res?.data?.requests || [];
   }
 };
 

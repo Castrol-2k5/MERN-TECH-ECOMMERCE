@@ -15,6 +15,12 @@ export const COMPLAINT_STATUS = {
   CLOSED: 'CLOSED'
 };
 
+export const COMPLAINT_REQUEST_TYPES = {
+  WARRANTY_REQUEST: 'WARRANTY_REQUEST',
+  RETURN_REQUEST: 'RETURN_REQUEST',
+  SERVICE_COMPLAINT: 'SERVICE_COMPLAINT'
+};
+
 const complaintSchema = new Schema(
   {
     complaintCode: {
@@ -44,6 +50,22 @@ const complaintSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: 'WarrantyTicket',
       default: null
+    },
+    customerId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    requestType: {
+      type: String,
+      enum: Object.values(COMPLAINT_REQUEST_TYPES),
+      default: COMPLAINT_REQUEST_TYPES.SERVICE_COMPLAINT
+    },
+    serialNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: ''
     },
     customerInfo: {
       fullName: { type: String, required: true, trim: true },
@@ -96,5 +118,6 @@ const complaintSchema = new Schema(
 
 complaintSchema.index({ branchId: 1, status: 1, createdAt: -1 });
 complaintSchema.index({ 'customerInfo.phone': 1 });
+complaintSchema.index({ customerId: 1, createdAt: -1 });
 
 export const Complaint = mongoose.model('Complaint', complaintSchema);

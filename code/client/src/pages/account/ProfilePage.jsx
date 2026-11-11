@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   User,
   MapPin,
@@ -21,15 +21,17 @@ import {
   Check,
   Calendar,
   Lock,
-  ArrowRight
+  ArrowRight,
+  Wrench
 } from 'lucide-react';
 import userService from '../../features/users/services/userService.js';
 import { orderService } from '../../features/orders/services/orderService.js';
+import complaintService from '../../features/complaints/services/complaintService.js';
+import CustomerSupportModal from '../../features/complaints/components/CustomerSupportModal.jsx';
 import { setCredentials } from '../../store/slices/authSlice.js';
 
 export const ProfilePage = () => {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
   const authUser = useSelector((state) => state.auth?.user);
 
   const [activeTab, setActiveTab] = useState('PROFILE'); // 'PROFILE' | 'ADDRESSES' | 'WARRANTY'
@@ -66,6 +68,14 @@ export const ProfilePage = () => {
   // My Devices & Warranties State (Derived from orders)
   const [devices, setDevices] = useState([]);
   const [devicesLoading, setDevicesLoading] = useState(false);
+  const [supportRequests, setSupportRequests] = useState([]);
+  const [supportModal, setSupportModal] = useState({
+    open: false,
+    orderCode: '',
+    serialNumber: '',
+    deviceName: '',
+    requestType: 'WARRANTY_REQUEST'
+  });
 
   // Load User Profile Data
   useEffect(() => {
@@ -114,7 +124,13 @@ export const ProfilePage = () => {
     const loadDevices = async () => {
       try {
         setDevicesLoading(true);
-        const orders = await orderService.getMyOrders();
+        const [orders, myRequests] = await Promise.all([
+          orderService.getMyOrders(),
+          complaintService.getMyRequests().catch(() => [])
+        ]);
+        if (!ignore && Array.isArray(myRequests)) {
+          setSupportRequests(myRequests);
+        }
         if (!ignore && Array.isArray(orders)) {
           const deviceList = [];
           for (const order of orders) {
@@ -738,6 +754,8 @@ export const ProfilePage = () => {
                   ))}
                 </div>
               )}
+
+              {/* Submitted Warranty & Support Requests */}
             </div>
           )}
 
@@ -754,13 +772,31 @@ export const ProfilePage = () => {
                     Hệ thống tự động kích hoạt bảo hành điện tử theo Serial/IMEI ngay khi bạn nhận máy thành công.
                   </p>
                 </div>
-                <Link
-                  to="/warranty-check"
-                  className="px-4 py-2.5 rounded-xl border border-blue-200 bg-blue-50/60 hover:bg-blue-100/70 text-blue-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer w-fit"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Tra cứu bảo hành độc lập</span>
-                </Link>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSupportModal({
+                        open: true,
+                        orderCode: '',
+                        serialNumber: '',
+                        deviceName: '',
+                        requestType: 'SERVICE_COMPLAINT'
+                      })
+                    }
+                    className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Gửi yêu cầu hỗ trợ</span>
+                  </button>
+                  <Link
+                    to="/warranty-check"
+                    className="px-4 py-2.5 rounded-xl border border-blue-200 bg-blue-50/60 hover:bg-blue-100/70 text-blue-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer w-fit"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Tra cứu bảo hành độc lập</span>
+                  </Link>
+                </div>
               </div>
 
               {devicesLoading ? (
@@ -820,7 +856,23 @@ export const ProfilePage = () => {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                      <div className="flex flex-wrap items-center gap-2 shrink-0 self-end sm:self-auto">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSupportModal({
+                              open: true,
+                              orderCode: device.orderCode,
+                              serialNumber: device.serialNumber,
+                              deviceName: device.productName,
+                              requestType: 'WARRANTY_REQUEST'
+                            })
+                          }
+                          className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <Wrench className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Yêu cầu BH / Hỗ trợ</span>
+                        </button>
                         <Link
                           to={`/warranty-check?serial=${encodeURIComponent(device.serialNumber)}`}
                           className="px-3 py-1.5 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 text-slate-700 hover:text-blue-600 text-xs font-semibold flex items-center gap-1.5 transition-colors"
@@ -833,6 +885,75 @@ export const ProfilePage = () => {
                   ))}
                 </div>
               )}
+
+              {/* Submitted Warranty & Support Requests */}
+              <div className="pt-5 border-t border-slate-100 space-y-3">
+                <h3 className="text-sm font-bold text-slate-900">
+                  Yêu cầu Bảo hành &amp; Hỗ trợ đã gửi ({supportRequests.length})
+                </h3>
+                {supportRequests.length === 0 ? (
+                  <p className="text-xs text-slate-400">
+                    Bạn chưa gửi yêu cầu bảo hành / đổi trả / khiếu nại trực tuyến nào.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {supportRequests.map((reqItem) => (
+                      <div
+                        key={reqItem._id}
+                        className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60 space-y-2 text-xs"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono font-bold text-blue-600">
+                              {reqItem.complaintCode}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200/80 text-slate-700">
+                              {reqItem.requestType === 'WARRANTY_REQUEST'
+                                ? 'Bảo hành thiết bị'
+                                : reqItem.requestType === 'RETURN_REQUEST'
+                                ? 'Đổi trả'
+                                : 'Khiếu nại dịch vụ'}
+                            </span>
+                            {reqItem.serialNumber && (
+                              <span className="font-mono text-[11px] text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md">
+                                SN: {reqItem.serialNumber}
+                              </span>
+                            )}
+                            {reqItem.orderCode && (
+                              <span className="font-mono text-[11px] text-slate-500">
+                                Đơn: {reqItem.orderCode}
+                              </span>
+                            )}
+                          </div>
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                              reqItem.status === 'RESOLVED' || reqItem.status === 'CLOSED'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : reqItem.status === 'INVESTIGATING'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-amber-100 text-amber-800'
+                            }`}
+                          >
+                            {reqItem.status}
+                          </span>
+                        </div>
+                        <p className="text-slate-700">{reqItem.description}</p>
+                        {reqItem.branchId?.name && (
+                          <p className="text-[11px] text-slate-500">
+                            Chi nhánh tiếp nhận: <strong>{reqItem.branchId.name}</strong>
+                          </p>
+                        )}
+                        {reqItem.resolutionNote && (
+                          <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800">
+                            <strong>Phản hồi từ Quản lý:</strong> {reqItem.resolutionNote}
+                            {reqItem.compensationNote ? ` • Hỗ trợ thêm: ${reqItem.compensationNote}` : ''}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -953,6 +1074,22 @@ export const ProfilePage = () => {
           </div>
         </div>
       )}
+
+      <CustomerSupportModal
+        key={`${supportModal.orderCode}-${supportModal.serialNumber}-${supportModal.requestType}-${supportModal.open}`}
+        open={supportModal.open}
+        onClose={() => setSupportModal((prev) => ({ ...prev, open: false }))}
+        initialOrderCode={supportModal.orderCode}
+        initialSerialNumber={supportModal.serialNumber}
+        initialRequestType={supportModal.requestType}
+        deviceName={supportModal.deviceName}
+        onSubmitted={(created) => {
+          if (created) {
+            setSupportRequests((prev) => [created, ...prev]);
+            setSuccessMsg(`Đã gửi yêu cầu ${created.complaintCode} tới chi nhánh phụ trách!`);
+          }
+        }}
+      />
     </div>
   );
 };
