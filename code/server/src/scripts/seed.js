@@ -31,6 +31,8 @@ import {
   PurchaseOrder,
   BranchExpense,
   CommissionRule,
+  Cart,
+  OrderReview,
   PosShift,
   SHIFT_STATUS,
   InterBranchSettlement,
@@ -79,6 +81,8 @@ export async function seedDatabase({ connect = true, disconnect = true } = {}) {
     PurchaseOrder.deleteMany({}),
     BranchExpense.deleteMany({}),
     CommissionRule.deleteMany({}),
+    Cart.deleteMany({}),
+    OrderReview.deleteMany({}),
     AuditLog.collection.drop().catch(() => {})
   ]);
 
@@ -106,6 +110,8 @@ export async function seedDatabase({ connect = true, disconnect = true } = {}) {
     PurchaseOrder.syncIndexes(),
     BranchExpense.syncIndexes(),
     CommissionRule.syncIndexes(),
+    Cart.syncIndexes(),
+    OrderReview.syncIndexes(),
     AuditLog.syncIndexes()
   ]);
 

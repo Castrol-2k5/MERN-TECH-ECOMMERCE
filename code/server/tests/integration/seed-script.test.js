@@ -10,7 +10,7 @@ describe('Seed Script Smoke Test: Full 3-Tier Expansion Data', () => {
   test('seedDatabase() chạy không lỗi và đổ đủ dữ liệu test cho POS, Branch Manager & HQ Hub', async () => {
     await seedDatabase({ connect: false, disconnect: false });
 
-    const [adminLogin, mgrLogin, staffLogin] = await Promise.all([
+    const [adminLogin, mgrLogin, staffLogin, cusLogin] = await Promise.all([
       request(app).post('/api/v1/auth/login').send({
         identifier: 'admin@techstore.com',
         password: '123456'
@@ -22,16 +22,22 @@ describe('Seed Script Smoke Test: Full 3-Tier Expansion Data', () => {
       request(app).post('/api/v1/auth/login').send({
         identifier: 'staff.q1@techstore.com',
         password: '123456'
+      }),
+      request(app).post('/api/v1/auth/login').send({
+        identifier: 'customer@gmail.com',
+        password: '123456'
       })
     ]);
 
     expect(adminLogin.status).toBe(200);
     expect(mgrLogin.status).toBe(200);
     expect(staffLogin.status).toBe(200);
+    expect(cusLogin.status).toBe(200);
 
     const adminToken = adminLogin.body.data.accessToken;
     const mgrToken = mgrLogin.body.data.accessToken;
     const staffToken = staffLogin.body.data.accessToken;
+    const cusToken = cusLogin.body.data.accessToken;
 
     const [
       cmdRes,
@@ -99,5 +105,33 @@ describe('Seed Script Smoke Test: Full 3-Tier Expansion Data', () => {
 
     expect(myShiftRes.status).toBe(200);
     expect(myShiftRes.body.data.shift.shiftCode).toBe('SHF-TODAY-Q1-OPEN');
+
+    // Kiểm tra dữ liệu Customer Omnichannel (Gói 1 - Gói 4)
+    const [cusOrdersRes, cusCartRes, cusReviewsRes, cusSupportRes, branchKpiRes, recsRes] = await Promise.all([
+      request(app).get('/api/v1/orders/my-orders').set('Authorization', `Bearer ${cusToken}`),
+      request(app).get('/api/v1/cart').set('Authorization', `Bearer ${cusToken}`),
+      request(app).get('/api/v1/reviews/my-reviews').set('Authorization', `Bearer ${cusToken}`),
+      request(app).get('/api/v1/complaints/my-requests').set('Authorization', `Bearer ${cusToken}`),
+      request(app).get('/api/v1/analytics/branch-staff-kpi?range=7d').set('Authorization', `Bearer ${mgrToken}`),
+      request(app).get('/api/v1/products/recommendations?limit=4')
+    ]);
+
+    expect(cusOrdersRes.status).toBe(200);
+    expect(cusOrdersRes.body.data.orders.some((o) => o.orderCode === 'ORD-POS-CUS-OMNI')).toBe(true);
+
+    expect(cusCartRes.status).toBe(200);
+    expect(cusCartRes.body.data.cart.totalQuantity).toBeGreaterThanOrEqual(1);
+
+    expect(cusReviewsRes.status).toBe(200);
+    expect(cusReviewsRes.body.data.reviews.length).toBeGreaterThanOrEqual(2);
+
+    expect(cusSupportRes.status).toBe(200);
+    expect(cusSupportRes.body.data.requests.length).toBeGreaterThanOrEqual(2);
+
+    expect(branchKpiRes.status).toBe(200);
+    expect(branchKpiRes.body.data.ranking.some((r) => r.fiveStarReviewsCount >= 1)).toBe(true);
+
+    expect(recsRes.status).toBe(200);
+    expect(recsRes.body.data.products.length).toBeGreaterThanOrEqual(1);
   }, 30000);
 });

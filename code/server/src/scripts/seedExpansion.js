@@ -25,6 +25,9 @@ import {
   Complaint,
   COMPLAINT_STATUS,
   COMPLAINT_SEVERITY,
+  COMPLAINT_REQUEST_TYPES,
+  Cart,
+  OrderReview,
   WorkSchedule,
   SHIFT_TYPES,
   ATTENDANCE_STATUS,
@@ -694,6 +697,155 @@ export async function seedExpansionData({
       changes: { after: { fixedPerUnit: 150000, accessoriesPct: 10 } },
       context: { ipAddress: '127.0.0.1', notes: 'Thiết lập chính sách hoa hồng toàn chuỗi' },
       timestamp: daysAgo(2)
+    }
+  ]);
+
+  // ----------------------------------------------------
+  // 6. Customer Omnichannel (Gói 1-4): POS Phone Sync + Hybrid Cart + Reviews + Support Requests
+  // ----------------------------------------------------
+  const [posOmniOrder, b2cCusDoneOrder] = await Order.create([
+    {
+      orderCode: 'ORD-POS-CUS-OMNI',
+      orderType: ORDER_TYPES.POS_STORE,
+      branchId: branchQ1._id,
+      staffId: staffQ1User._id,
+      customerId: null,
+      customerInfo: {
+        fullName: customerUser.fullName,
+        phone: '+84909000005',
+        address: 'Mua trực tiếp tại Showroom Quận 1'
+      },
+      items: [
+        {
+          productId: pMap['iphone-16-pro-max']._id,
+          productSkuId: p6Sku1Id,
+          productName: pMap['iphone-16-pro-max'].name,
+          sku: ip16Sku.sku,
+          quantity: 1,
+          unitPrice: ip16Sku.salePrice,
+          costPrice: ip16Sku.costPrice,
+          subtotal: ip16Sku.salePrice,
+          serialsAssigned: ['IP16PM-OMNI-POS-001']
+        }
+      ],
+      totalAmount: ip16Sku.salePrice,
+      paymentMethod: PAYMENT_METHODS.CASH,
+      paymentStatus: PAYMENT_STATUS.PAID,
+      orderStatus: ORDER_STATUS.COMPLETED,
+      completedAt: daysAgo(1)
+    },
+    {
+      orderCode: 'ORD-B2C-CUS-DONE',
+      orderType: ORDER_TYPES.B2C_ONLINE,
+      branchId: branchQ1._id,
+      staffId: staff2Q1User._id,
+      customerId: customerUser._id,
+      customerInfo: {
+        fullName: customerUser.fullName,
+        phone: customerUser.phone,
+        address: '45 Võ Văn Ngân, TP. Thủ Đức, TP.HCM'
+      },
+      items: [
+        {
+          productId: pMap['chuot-logitech-g502-hero']._id,
+          productSkuId: p21Sku1Id,
+          productName: pMap['chuot-logitech-g502-hero'].name,
+          sku: g502Sku.sku,
+          quantity: 1,
+          unitPrice: g502Sku.salePrice,
+          costPrice: g502Sku.costPrice,
+          subtotal: g502Sku.salePrice,
+          serialsAssigned: []
+        }
+      ],
+      totalAmount: g502Sku.salePrice,
+      paymentMethod: PAYMENT_METHODS.VNPAY,
+      paymentStatus: PAYMENT_STATUS.PAID,
+      orderStatus: ORDER_STATUS.COMPLETED,
+      completedAt: daysAgo(3)
+    }
+  ]);
+
+  await Serial.create({
+    serialNumber: 'IP16PM-OMNI-POS-001',
+    productId: pMap['iphone-16-pro-max']._id,
+    productSkuId: p6Sku1Id,
+    branchId: branchQ1._id,
+    orderId: posOmniOrder._id,
+    status: SERIAL_STATUS.SOLD,
+    soldAt: daysAgo(1)
+  });
+
+  // Giỏ hàng đồng bộ sẵn trên DB cho customer@gmail.com (Hybrid Cart Gói 1)
+  await Cart.create({
+    customerId: customerUser._id,
+    selectedBranchId: branchQ1._id,
+    items: [
+      {
+        productId: pMap['chuot-logitech-g502-hero']._id,
+        productSkuId: p21Sku1Id,
+        quantity: 1
+      }
+    ]
+  });
+
+  // Đánh giá 5 sao mẫu nối thẳng KPI nhân sự Q1 (Gói 3)
+  await OrderReview.create([
+    {
+      orderId: b2cCusDoneOrder._id,
+      orderCode: b2cCusDoneOrder.orderCode,
+      branchId: branchQ1._id,
+      staffId: staff2Q1User._id,
+      customerId: customerUser._id,
+      rating: 5,
+      tags: ['Tư vấn nhiệt tình', 'Thanh toán nhanh gọn'],
+      comment: 'Chuột Logitech nhận nhanh tại quầy, bạn nhân viên hỗ trợ rất chu đáo!'
+    },
+    {
+      orderId: posOrder._id,
+      orderCode: posOrder.orderCode,
+      branchId: branchQ1._id,
+      staffId: staffQ1User._id,
+      customerId: customerUser._id,
+      rating: 5,
+      tags: ['Máy nguyên seal', 'Tư vấn nhiệt tình'],
+      comment: 'Mua máy trực tiếp tại quầy Q1 trải nghiệm rất hài lòng.'
+    }
+  ]);
+
+  // Yêu cầu Bảo hành / Đổi trả tự phục vụ từ Khách hàng (Gói 4)
+  await Complaint.create([
+    {
+      complaintCode: 'CMP-CUS-WAR-001',
+      branchId: branchQ1._id,
+      orderId: posOmniOrder._id,
+      orderCode: posOmniOrder.orderCode,
+      customerId: customerUser._id,
+      requestType: COMPLAINT_REQUEST_TYPES.WARRANTY_REQUEST,
+      serialNumber: 'IP16PM-OMNI-POS-001',
+      customerInfo: { fullName: customerUser.fullName, phone: customerUser.phone },
+      severity: COMPLAINT_SEVERITY.NORMAL,
+      status: COMPLAINT_STATUS.RESOLVED,
+      description: 'Cổng sạc Type-C đôi lúc nhận cáp chậm, nhờ kỹ thuật kiểm tra vệ sinh chân sạc',
+      reportedBy: { userId: customerUser._id, fullName: customerUser.fullName },
+      assignedManagerId: managerQ1User._id,
+      resolutionNote: 'Kỹ thuật Q1 đã vệ sinh chân sạc Type-C và kiểm tra dòng sạc đạt chuẩn 27W',
+      compensationNote: 'Tặng cường lực chính hãng & miễn phí kiểm tra định kỳ',
+      resolvedAt: daysAgo(0)
+    },
+    {
+      complaintCode: 'CMP-CUS-RET-002',
+      branchId: branchQ1._id,
+      orderId: b2cCusDoneOrder._id,
+      orderCode: b2cCusDoneOrder.orderCode,
+      customerId: customerUser._id,
+      requestType: COMPLAINT_REQUEST_TYPES.RETURN_REQUEST,
+      serialNumber: '',
+      customerInfo: { fullName: customerUser.fullName, phone: customerUser.phone },
+      severity: COMPLAINT_SEVERITY.HIGH,
+      status: COMPLAINT_STATUS.OPEN,
+      description: 'Nút cuộn chuột hơi rít sau 2 ngày sử dụng, muốn đổi sang sản phẩm mới cùng mẫu',
+      reportedBy: { userId: customerUser._id, fullName: customerUser.fullName }
     }
   ]);
 }
