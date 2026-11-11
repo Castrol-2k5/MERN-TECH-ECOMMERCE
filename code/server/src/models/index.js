@@ -39,3 +39,4 @@ export {
   EXPENSE_STATUS
 } from '../modules/finance/branchExpense.model.js';
 export { CommissionRule, COMMISSION_RULE_TYPES } from '../modules/finance/commissionRule.model.js';
+export { Cart } from '../modules/cart/cart.model.js';

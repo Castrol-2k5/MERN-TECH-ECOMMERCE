@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import axiosClient from '../../../services/axiosClient.js';
 import { setCredentials } from '../../../store/slices/authSlice.js';
+import { setCartItems } from '../../../store/slices/cartSlice.js';
+import { cartService } from '../../cart/services/cartService.js';
 
 export const LoginForm = () => {
   const navigate = useNavigate();
@@ -29,12 +31,24 @@ export const LoginForm = () => {
   const infoMessage = location.state?.message || '';
   const from = location.state?.from?.pathname || null;
 
-  const handleLoginSuccess = (user, accessToken) => {
+  const handleLoginSuccess = async (user, accessToken) => {
     dispatch(setCredentials({ user, accessToken }));
+
+    if (user.role === 'CUSTOMER') {
+      try {
+        const localItems = JSON.parse(localStorage.getItem('techone_cart') || '[]');
+        const mergedCart = await cartService.mergeCart(Array.isArray(localItems) ? localItems : []);
+        if (mergedCart?.items) {
+          dispatch(setCartItems(mergedCart.items));
+        }
+      } catch {
+        // Keep local cart fallback if sync temporarily fails
+      }
+    }
 
     // RBAC Navigation
     if (user.role === 'SUPER_ADMIN') {
-      navigate('/portal/admin/products', { replace: true });
+      navigate('/portal/hq/command-center', { replace: true });
     } else if (user.role === 'BRANCH_MANAGER' || user.role === 'STAFF') {
       navigate('/portal/pos', { replace: true });
     } else {
@@ -64,7 +78,7 @@ export const LoginForm = () => {
       });
 
       const { user, accessToken } = res.data;
-      handleLoginSuccess(user, accessToken);
+      await handleLoginSuccess(user, accessToken);
     } catch (err) {
       setError(
         err.response?.data?.message ||

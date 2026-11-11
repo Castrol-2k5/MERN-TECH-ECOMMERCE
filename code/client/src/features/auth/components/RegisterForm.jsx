@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import axiosClient from '../../../services/axiosClient.js';
 import { setCredentials } from '../../../store/slices/authSlice.js';
+import { setCartItems } from '../../../store/slices/cartSlice.js';
+import { cartService } from '../../cart/services/cartService.js';
 
 export const RegisterForm = () => {
   const navigate = useNavigate();
@@ -111,6 +113,17 @@ export const RegisterForm = () => {
       const accessToken = res?.data?.accessToken;
       if (user && accessToken) {
         dispatch(setCredentials({ user, accessToken }));
+        if (user.role === 'CUSTOMER') {
+          try {
+            const localItems = JSON.parse(localStorage.getItem('techone_cart') || '[]');
+            const mergedCart = await cartService.mergeCart(Array.isArray(localItems) ? localItems : []);
+            if (mergedCart?.items) {
+              dispatch(setCartItems(mergedCart.items));
+            }
+          } catch {
+            // Keep local cart fallback
+          }
+        }
       }
 
       setSuccess(true);

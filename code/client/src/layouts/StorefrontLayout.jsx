@@ -23,6 +23,8 @@ import {
   Navigation
 } from 'lucide-react';
 import { logout } from '../store/slices/authSlice.js';
+import { clearCart, setCartItems } from '../store/slices/cartSlice.js';
+import { cartService } from '../features/cart/services/cartService.js';
 import axiosClient from '../services/axiosClient.js';
 import branchService from '../features/branches/services/branchService.js';
 import useUserLocation from '../features/branches/hooks/useUserLocation.js';
@@ -42,6 +44,7 @@ export const StorefrontLayout = () => {
   const location = useLocation();
   const dispatch = useDispatch();
   const totalCartQuantity = useSelector((state) => state.cart.totalQuantity);
+  const cartItems = useSelector((state) => state.cart.items);
   const compareCount = useSelector((state) => state.compare.products.length);
   const authUser = useSelector((state) => state.auth?.user);
   const isAuthenticated = useSelector((state) => state.auth?.isAuthenticated);
@@ -81,6 +84,61 @@ export const StorefrontLayout = () => {
   const startX = useRef(0);
   const startScrollLeft = useRef(0);
   const hasMoved = useRef(false);
+  const syncedUserIdRef = useRef(null);
+  const lastCartSnapshotRef = useRef('');
+
+  const toCartSnapshot = (list = []) =>
+    JSON.stringify(
+      (list || []).map((i) => ({
+        p: String(i.productId || ''),
+        s: String(i.productSkuId || ''),
+        q: Number(i.quantity || 1)
+      }))
+    );
+
+  useEffect(() => {
+    const userId = authUser?._id || authUser?.id || null;
+    if (!isAuthenticated || authUser?.role !== 'CUSTOMER' || !userId) {
+      syncedUserIdRef.current = null;
+      lastCartSnapshotRef.current = '';
+      return;
+    }
+    if (syncedUserIdRef.current === userId) return;
+
+    let cancelled = false;
+    cartService
+      .getMyCart()
+      .then((serverCart) => {
+        if (cancelled) return;
+        const serverItems = Array.isArray(serverCart?.items) ? serverCart.items : [];
+        lastCartSnapshotRef.current = toCartSnapshot(serverItems);
+        syncedUserIdRef.current = userId;
+        dispatch(setCartItems(serverItems));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          syncedUserIdRef.current = userId;
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, authUser, dispatch]);
+
+  useEffect(() => {
+    const userId = authUser?._id || authUser?.id || null;
+    if (!isAuthenticated || authUser?.role !== 'CUSTOMER' || !userId) return;
+    if (syncedUserIdRef.current !== userId) return;
+
+    const snap = toCartSnapshot(cartItems);
+    if (snap === lastCartSnapshotRef.current) return;
+    lastCartSnapshotRef.current = snap;
+
+    cartService.syncCart(cartItems).catch(() => {
+      // Keep local cart fallback if network unavailable
+    });
+  }, [cartItems, isAuthenticated, authUser]);
 
   const checkNavScroll = () => {
     const el = navContainerRef.current;
@@ -177,8 +235,13 @@ export const StorefrontLayout = () => {
   useEffect(() => {
     const q = searchQuery.trim();
     if (!q) {
-      setSuggestions([]);
-      return;
+      let cancelled = false;
+      Promise.resolve().then(() => {
+        if (!cancelled) setSuggestions([]);
+      });
+      return () => {
+        cancelled = true;
+      };
     }
 
     let isMounted = true;
@@ -596,6 +659,7 @@ export const StorefrontLayout = () => {
                             // ignore
                           }
                           dispatch(logout());
+                          dispatch(clearCart());
                           setIsUserDropdownOpen(false);
                           navigate('/');
                         }}

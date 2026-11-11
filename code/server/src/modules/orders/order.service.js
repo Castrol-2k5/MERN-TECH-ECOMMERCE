@@ -6,7 +6,7 @@ import { Serial, SERIAL_STATUS } from '../serials/serial.model.js';
 import { Product } from '../products/product.model.js';
 import { Branch } from '../branches/branch.model.js';
 import { AppError } from '../../utils/appError.js';
-import { USER_ROLES } from '../users/user.model.js';
+import { User, USER_ROLES } from '../users/user.model.js';
 import { VnpayService } from './vnpay.service.js';
 import { env } from '../../config/environment.js';
 import { PosShiftService } from '../shifts/posShift.service.js';
@@ -354,12 +354,54 @@ export class OrderService {
   /**
    * Khách hàng xem lịch sử đơn hàng của mình
    */
+  static buildPhoneVariants(rawPhone) {
+    const cleaned = String(rawPhone || '').replace(/[\s.-]/g, '').trim();
+    if (!cleaned) return [];
+
+    const variants = new Set([cleaned]);
+    if (cleaned.startsWith('0') && cleaned.length >= 9) {
+      const tail = cleaned.slice(1);
+      variants.add(`+84${tail}`);
+      variants.add(`84${tail}`);
+    } else if (cleaned.startsWith('+84') && cleaned.length >= 11) {
+      const tail = cleaned.slice(3);
+      variants.add(`0${tail}`);
+      variants.add(`84${tail}`);
+    } else if (cleaned.startsWith('84') && cleaned.length >= 10) {
+      const tail = cleaned.slice(2);
+      variants.add(`0${tail}`);
+      variants.add(`+84${tail}`);
+    }
+
+    return Array.from(variants);
+  }
+
+  static async buildCustomerOwnershipFilter(customerId) {
+    const ownerConditions = [{ customerId }];
+    if (customerId && mongoose.Types.ObjectId.isValid(customerId)) {
+      const user = await User.findById(customerId).select('phone').lean();
+      const phoneVariants = OrderService.buildPhoneVariants(user?.phone);
+      if (phoneVariants.length > 0) {
+        ownerConditions.push({ 'customerInfo.phone': { $in: phoneVariants } });
+      }
+    }
+
+    return ownerConditions.length === 1 ? ownerConditions[0] : { $or: ownerConditions };
+  }
+
   static async getMyOrders(customerId, query = {}) {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
     const limit = Math.max(1, Math.min(100, parseInt(query.limit, 10) || 10));
     const skip = (page - 1) * limit;
 
-    const filter = { customerId };
+    const ownerFilter = await OrderService.buildCustomerOwnershipFilter(customerId);
+    const filter = { ...ownerFilter };
+    if (query.orderType && Object.values(ORDER_TYPES).includes(query.orderType)) {
+      filter.orderType = query.orderType;
+    }
+    if (query.orderStatus && Object.values(ORDER_STATUS).includes(query.orderStatus)) {
+      filter.orderStatus = query.orderStatus;
+    }
     const total = await Order.countDocuments(filter);
     const orders = await Order.find(filter)
       .populate('branchId', 'name branchCode address phone')
@@ -385,15 +427,13 @@ export class OrderService {
       throw new AppError('Mã đơn hàng hoặc ID không được để trống.', 400, 'VALIDATION_ERROR');
     }
 
+    const ownerFilter = await OrderService.buildCustomerOwnershipFilter(customerId);
     const isMongoId = mongoose.Types.ObjectId.isValid(orderIdOrCode);
-    const query = { customerId };
-    if (isMongoId) {
-      query.$or = [{ _id: orderIdOrCode }, { orderCode: orderIdOrCode.toUpperCase() }];
-    } else {
-      query.orderCode = orderIdOrCode.toUpperCase();
-    }
+    const idOrCodeFilter = isMongoId
+      ? { $or: [{ _id: orderIdOrCode }, { orderCode: orderIdOrCode.toUpperCase() }] }
+      : { orderCode: orderIdOrCode.toUpperCase() };
 
-    const order = await Order.findOne(query)
+    const order = await Order.findOne({ $and: [ownerFilter, idOrCodeFilter] })
       .populate('branchId', 'name branchCode address phone')
       .lean();
 
