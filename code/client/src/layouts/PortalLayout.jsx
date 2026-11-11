@@ -180,6 +180,13 @@ export const PortalLayout = () => {
       roles: ['SUPER_ADMIN']
     },
     {
+      to: '/portal/hq/finance',
+      label: 'Tài Chính & P&L Chuỗi',
+      badge: 'P&L / HH',
+      icon: Coins,
+      roles: ['SUPER_ADMIN']
+    },
+    {
       to: '/portal/branch/staff',
       label: 'Nhân Sự & KPI Đội Ngũ',
       badge: 'Team',

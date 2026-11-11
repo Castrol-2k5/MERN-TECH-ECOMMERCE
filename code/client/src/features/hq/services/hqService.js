@@ -36,6 +36,61 @@ export const hqService = {
   async executeDeadStockRebalance(payload) {
     const response = await axiosClient.post('/hq/supply-chain/rebalance', payload);
     return response?.data || response;
+  },
+
+  async getConsolidatedPnl(params = {}) {
+    const response = await axiosClient.get('/hq/finance/pnl', { params });
+    return response?.data || response;
+  },
+
+  async getExpenses(params = {}) {
+    const response = await axiosClient.get('/hq/finance/expenses', { params });
+    return response?.data || response;
+  },
+
+  async createExpense(payload) {
+    const response = await axiosClient.post('/hq/finance/expenses', payload);
+    return response?.data || response;
+  },
+
+  async reviewExpense(expenseId, payload) {
+    const response = await axiosClient.patch(`/hq/finance/expenses/${expenseId}/review`, payload);
+    return response?.data || response;
+  },
+
+  async getCommissionRules() {
+    const response = await axiosClient.get('/hq/finance/commissions/rules');
+    return response?.data || response;
+  },
+
+  async createCommissionRule(payload) {
+    const response = await axiosClient.post('/hq/finance/commissions/rules', payload);
+    return response?.data || response;
+  },
+
+  async toggleCommissionRule(ruleId, isActive) {
+    const response = await axiosClient.patch(`/hq/finance/commissions/rules/${ruleId}`, { isActive });
+    return response?.data || response;
+  },
+
+  async getCommissionReport(params = {}) {
+    const response = await axiosClient.get('/hq/finance/commissions/report', { params });
+    return response?.data || response;
+  },
+
+  async getExecutiveApprovals(params = {}) {
+    const response = await axiosClient.get('/hq/finance/executive-approvals', { params });
+    return response?.data || response;
+  },
+
+  async approveExecutiveRequest(id, reviewNote = '') {
+    const response = await axiosClient.patch(`/approvals/${id}/approve`, { reviewNote });
+    return response?.data || response;
+  },
+
+  async rejectExecutiveRequest(id, reviewNote = '') {
+    const response = await axiosClient.patch(`/approvals/${id}/reject`, { reviewNote });
+    return response?.data || response;
   }
 };
 

@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import {
   ApprovalRequest,
   APPROVAL_TYPES,
+  APPROVAL_LEVELS,
   APPROVAL_STATUS
 } from './approval.model.js';
 import { Order, ORDER_STATUS, ORDER_TYPES } from '../orders/order.model.js';
@@ -10,6 +11,7 @@ import { OrderReturnService } from '../orders/orderReturn.service.js';
 import { OrderService } from '../orders/order.service.js';
 import { PosShift, SHIFT_STATUS } from '../shifts/posShift.model.js';
 import { PosShiftService } from '../shifts/posShift.service.js';
+import { BranchExpense, EXPENSE_STATUS } from '../finance/branchExpense.model.js';
 import { AppError } from '../../utils/appError.js';
 import { USER_ROLES } from '../users/user.model.js';
 import { AuditLogService } from '../audit/auditLog.service.js';
@@ -32,8 +34,12 @@ export class ApprovalService {
     let targetModel = 'Order';
     let targetCode = '';
     let estimatedAmount = 0;
+    let approvalLevel = APPROVAL_LEVELS.BRANCH_MANAGER;
 
-    if (type === APPROVAL_TYPES.HIGH_VALUE_RETURN) {
+    if (
+      type === APPROVAL_TYPES.HIGH_VALUE_RETURN ||
+      type === APPROVAL_TYPES.EXECUTIVE_HIGH_REFUND
+    ) {
       const order = await Order.findById(targetId).lean();
       if (!order) {
         throw new AppError('Không tìm thấy đơn hàng cần hoàn trả.', 404, 'ORDER_NOT_FOUND');
@@ -67,6 +73,19 @@ export class ApprovalService {
       branchId = order.branchId;
       targetModel = 'Order';
       targetCode = order.orderCode;
+      if (type === APPROVAL_TYPES.EXECUTIVE_HIGH_REFUND) {
+        approvalLevel = APPROVAL_LEVELS.EXECUTIVE;
+      }
+    } else if (type === APPROVAL_TYPES.EXECUTIVE_EXPENSE) {
+      const expense = await BranchExpense.findById(targetId).lean();
+      if (!expense) {
+        throw new AppError('Không tìm thấy phiếu chi phí vận hành.', 404, 'EXPENSE_NOT_FOUND');
+      }
+      branchId = expense.branchId;
+      targetModel = 'BranchExpense';
+      targetCode = expense.expenseCode;
+      estimatedAmount = Number(expense.amount || 0);
+      approvalLevel = APPROVAL_LEVELS.EXECUTIVE;
     } else if (type === APPROVAL_TYPES.LARGE_CASH_OUT) {
       const shift = await PosShift.findById(targetId).lean();
       if (!shift) {
@@ -131,6 +150,7 @@ export class ApprovalService {
       requestCode: this.generateRequestCode(),
       branchId,
       type,
+      approvalLevel,
       status: APPROVAL_STATUS.PENDING,
       requestedBy: {
         userId: currentUser.id,
@@ -186,6 +206,9 @@ export class ApprovalService {
     if (query.type && query.type !== 'ALL') {
       filter.type = query.type;
     }
+    if (query.approvalLevel && query.approvalLevel !== 'ALL') {
+      filter.approvalLevel = query.approvalLevel;
+    }
 
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.max(1, Math.min(100, Number(query.limit) || 20));
@@ -239,6 +262,16 @@ export class ApprovalService {
       throw new AppError('Chỉ Quản lý Chi nhánh hoặc Super Admin mới có quyền phê duyệt.', 403, 'FORBIDDEN');
     }
     if (
+      request.approvalLevel === APPROVAL_LEVELS.EXECUTIVE &&
+      currentUser.role !== USER_ROLES.SUPER_ADMIN
+    ) {
+      throw new AppError(
+        'Yêu cầu Phê duyệt Tối cao (Executive) chỉ thuộc thẩm quyền của Quản lý tổng (SUPER_ADMIN).',
+        403,
+        'EXECUTIVE_APPROVAL_REQUIRED'
+      );
+    }
+    if (
       currentUser.role === USER_ROLES.BRANCH_MANAGER &&
       request.branchId.toString() !== currentUser.branchId?.toString()
     ) {
@@ -266,7 +299,10 @@ export class ApprovalService {
 
     let executionResult = null;
 
-    if (request.type === APPROVAL_TYPES.HIGH_VALUE_RETURN) {
+    if (
+      request.type === APPROVAL_TYPES.HIGH_VALUE_RETURN ||
+      request.type === APPROVAL_TYPES.EXECUTIVE_HIGH_REFUND
+    ) {
       const res = await OrderReturnService.processReturn(
         request.targetId.toString(),
         {
@@ -309,6 +345,28 @@ export class ApprovalService {
         orderCode: res.order?.orderCode,
         orderStatus: res.order?.orderStatus,
         shiftAdjusted: res.shiftAdjusted
+      };
+    } else if (request.type === APPROVAL_TYPES.EXECUTIVE_EXPENSE) {
+      const expense = await BranchExpense.findByIdAndUpdate(
+        request.targetId,
+        {
+          $set: {
+            status: EXPENSE_STATUS.APPROVED,
+            reviewedBy: {
+              userId: currentUser.id,
+              fullName: currentUser.fullName || 'Quản trị viên HQ'
+            },
+            reviewedAt: new Date(),
+            reviewNote: reviewNote || 'Duyệt ngân sách tối cao'
+          }
+        },
+        { new: true }
+      ).lean();
+
+      executionResult = {
+        expenseCode: expense?.expenseCode,
+        amount: expense?.amount,
+        status: expense?.status
       };
     }
 
@@ -366,6 +424,20 @@ export class ApprovalService {
     request.reviewedAt = new Date();
     request.reviewNote = reviewNote || 'Quản lý chi nhánh từ chối phê duyệt';
     await request.save();
+
+    if (request.type === APPROVAL_TYPES.EXECUTIVE_EXPENSE) {
+      await BranchExpense.findByIdAndUpdate(request.targetId, {
+        $set: {
+          status: EXPENSE_STATUS.REJECTED,
+          reviewedBy: {
+            userId: currentUser.id,
+            fullName: currentUser.fullName || 'Quản trị viên HQ'
+          },
+          reviewedAt: new Date(),
+          reviewNote: request.reviewNote
+        }
+      });
+    }
 
     AuditLogService.record({
       actor: currentUser,

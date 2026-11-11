@@ -4,13 +4,22 @@ const { Schema } = mongoose;
 
 export const APPROVAL_THRESHOLDS = {
   HIGH_VALUE_RETURN_VND: 5000000,
-  LARGE_CASH_OUT_VND: 1000000
+  LARGE_CASH_OUT_VND: 1000000,
+  EXECUTIVE_EXPENSE_VND: 5000000,
+  EXECUTIVE_HIGH_REFUND_VND: 20000000
+};
+
+export const APPROVAL_LEVELS = {
+  BRANCH_MANAGER: 'BRANCH_MANAGER',
+  EXECUTIVE: 'EXECUTIVE'
 };
 
 export const APPROVAL_TYPES = {
   HIGH_VALUE_RETURN: 'HIGH_VALUE_RETURN',
   LARGE_CASH_OUT: 'LARGE_CASH_OUT',
-  VOID_POS_ORDER: 'VOID_POS_ORDER'
+  VOID_POS_ORDER: 'VOID_POS_ORDER',
+  EXECUTIVE_EXPENSE: 'EXECUTIVE_EXPENSE',
+  EXECUTIVE_HIGH_REFUND: 'EXECUTIVE_HIGH_REFUND'
 };
 
 export const APPROVAL_STATUS = {
@@ -38,6 +47,11 @@ const approvalRequestSchema = new Schema(
       enum: Object.values(APPROVAL_TYPES),
       required: true
     },
+    approvalLevel: {
+      type: String,
+      enum: Object.values(APPROVAL_LEVELS),
+      default: APPROVAL_LEVELS.BRANCH_MANAGER
+    },
     status: {
       type: String,
       enum: Object.values(APPROVAL_STATUS),
@@ -50,7 +64,7 @@ const approvalRequestSchema = new Schema(
     },
     targetModel: {
       type: String,
-      enum: ['Order', 'PosShift'],
+      enum: ['Order', 'PosShift', 'BranchExpense'],
       required: true
     },
     targetId: {
