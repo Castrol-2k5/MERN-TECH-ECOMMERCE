@@ -71,6 +71,11 @@ const productSkuSchema = new Schema({
     default: 0,
     min: [0, 'Giá khuyến mãi không được âm']
   },
+  costPrice: {
+    type: Number,
+    default: 0,
+    min: [0, 'Giá vốn nhập không được âm']
+  },
   images: {
     type: [String],
     default: []

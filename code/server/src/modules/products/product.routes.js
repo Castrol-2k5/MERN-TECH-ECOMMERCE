@@ -6,15 +6,15 @@ import {
   queryProductSchema
 } from './product.dto.js';
 import { validateDto } from '../../middlewares/validate.middleware.js';
-import { protect } from '../../middlewares/auth.middleware.js';
+import { protect, attachUserIfAuthenticated } from '../../middlewares/auth.middleware.js';
 import { authorize } from '../../middlewares/rbac.middleware.js';
 import { USER_ROLES } from '../users/user.model.js';
 
 const router = Router();
 
-// Public routes
-router.get('/', validateDto(queryProductSchema, 'query'), ProductController.getAllProducts);
-router.get('/:slug', ProductController.getProductBySlug);
+// Public routes (attach user softly to decide whether internal costPrice should be visible)
+router.get('/', attachUserIfAuthenticated, validateDto(queryProductSchema, 'query'), ProductController.getAllProducts);
+router.get('/:slug', attachUserIfAuthenticated, ProductController.getProductBySlug);
 
 // Admin-only management routes (SUPER_ADMIN)
 router.post(

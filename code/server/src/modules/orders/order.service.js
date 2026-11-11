@@ -128,6 +128,7 @@ export class OrderService {
         sku: sku.sku,
         quantity: item.quantity,
         unitPrice,
+        costPrice: Math.max(0, Number(sku.costPrice || 0)),
         subtotal,
         serialsAssigned: cleanSerials
       });
@@ -306,6 +307,7 @@ export class OrderService {
           sku: sku.sku,
           quantity: item.quantity,
           unitPrice,
+          costPrice: Math.max(0, Number(sku.costPrice || 0)),
           subtotal,
           serialsAssigned: []
         });
@@ -1214,6 +1216,7 @@ export class OrderService {
       sku: targetSku.sku,
       quantity: oldItem.quantity,
       unitPrice: newUnitPrice,
+      costPrice: Math.max(0, Number(targetSku.costPrice || 0)),
       subtotal: newTotal,
       serialsAssigned: newSerials
     };

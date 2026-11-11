@@ -22,7 +22,8 @@ import {
   Users,
   ClipboardCheck,
   AlertTriangle,
-  Calendar
+  Calendar,
+  BellRing
 } from 'lucide-react';
 import { logout } from '../store/slices/authSlice.js';
 import { clearCart } from '../store/slices/posCartSlice.js';
@@ -157,6 +158,13 @@ export const PortalLayout = () => {
   ].filter((item) => item.roles.includes(userRole));
 
   const hqAdminLinks = [
+    {
+      to: '/portal/hq/command-center',
+      label: 'Trung Tâm Điều Hành HQ',
+      badge: 'Red Alert',
+      icon: BellRing,
+      roles: ['SUPER_ADMIN']
+    },
     {
       to: '/portal/branch/staff',
       label: 'Nhân Sự & KPI Đội Ngũ',

@@ -26,6 +26,11 @@ export const skuSchema = z
       .number()
       .min(0, 'Giá khuyến mãi không được âm')
       .optional(),
+    costPrice: z
+      .number()
+      .min(0, 'Giá vốn nhập không được âm')
+      .optional()
+      .default(0),
     images: z.array(z.string().trim()).optional().default([]),
     optionValues: z.array(skuOptionValueSchema).optional().default([]),
     isActive: z.boolean().optional().default(true)

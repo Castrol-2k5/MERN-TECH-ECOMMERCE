@@ -14,7 +14,7 @@ export class ProductController {
   });
 
   static getAllProducts = catchAsync(async (req, res) => {
-    const result = await ProductService.getAllProducts(req.query);
+    const result = await ProductService.getAllProducts(req.query, req.user || null);
 
     return sendSuccess(res, {
       statusCode: 200,
@@ -38,7 +38,7 @@ export class ProductController {
   });
 
   static getProductBySlug = catchAsync(async (req, res) => {
-    const product = await ProductService.getProductBySlug(req.params.slug);
+    const product = await ProductService.getProductBySlug(req.params.slug, req.user || null);
 
     return sendSuccess(res, {
       statusCode: 200,
@@ -48,7 +48,7 @@ export class ProductController {
   });
 
   static updateProduct = catchAsync(async (req, res) => {
-    const product = await ProductService.updateProduct(req.params.id, req.body);
+    const product = await ProductService.updateProduct(req.params.id, req.body, req.user || null);
 
     return sendSuccess(res, {
       statusCode: 200,

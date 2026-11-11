@@ -368,6 +368,7 @@ export const buildCleanProductPayload = (payload = {}) => {
           sku: String(s.sku || s.code).trim().toUpperCase(),
           price: listPrice,
           salePrice,
+          costPrice: Math.max(0, Number(s.costPrice || 0)),
           images: Array.isArray(s.images)
             ? s.images.map((img) => String(img || '').trim()).filter(Boolean)
             : [],

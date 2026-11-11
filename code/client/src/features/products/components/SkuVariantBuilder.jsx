@@ -18,6 +18,7 @@ export const SkuVariantBuilder = ({
   const [newSkuCode, setNewSkuCode] = useState('');
   const [newListPrice, setNewListPrice] = useState('');
   const [newSalePrice, setNewSalePrice] = useState('');
+  const [newCostPrice, setNewCostPrice] = useState('');
   const [selectedOptions, setSelectedOptions] = useState({});
 
   const handleAddOptionGroup = (e) => {
@@ -57,6 +58,7 @@ export const SkuVariantBuilder = ({
     const listPrice = Math.max(0, parseInt(newListPrice, 10) || 0);
     const rawSale = newSalePrice !== '' ? parseInt(newSalePrice, 10) : listPrice;
     const salePrice = Math.max(0, Math.min(listPrice, isNaN(rawSale) ? listPrice : rawSale));
+    const costPrice = Math.max(0, parseInt(newCostPrice, 10) || 0);
 
     const cleanOptions = {};
     Object.entries(selectedOptions).forEach(([k, v]) => {
@@ -76,6 +78,7 @@ export const SkuVariantBuilder = ({
       price: listPrice,
       originalPrice: listPrice,
       salePrice,
+      costPrice,
       options: cleanOptions,
       optionValues,
       isActive: true,
@@ -85,6 +88,7 @@ export const SkuVariantBuilder = ({
     setNewSkuCode('');
     setNewListPrice('');
     setNewSalePrice('');
+    setNewCostPrice('');
     setSelectedOptions({});
     setShowAddModal(false);
   };
@@ -114,6 +118,13 @@ export const SkuVariantBuilder = ({
           price: listPrice,
           originalPrice: listPrice,
           salePrice,
+        };
+      }
+      if (field === 'costPrice') {
+        const costPrice = Math.max(0, parseInt(rawVal, 10) || 0);
+        return {
+          ...s,
+          costPrice,
         };
       }
       return s;
@@ -249,7 +260,7 @@ export const SkuVariantBuilder = ({
             <span>Thêm biến thể SKU mới cho sản phẩm</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
               <label className="text-[11px] text-slate-400 block mb-1">Mã SKU duy nhất *:</label>
               <input
@@ -259,6 +270,21 @@ export const SkuVariantBuilder = ({
                 onChange={(e) => setNewSkuCode(e.target.value)}
                 placeholder="ROG-G16-I7-16-512"
                 className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs font-mono font-bold text-cyan-400 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-[11px] text-slate-400 block mb-1">
+                Giá vốn nhập (costPrice - VND):
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="10000"
+                value={newCostPrice}
+                onChange={(e) => setNewCostPrice(e.target.value)}
+                placeholder="27000000"
+                className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs font-mono text-amber-300 focus:outline-none focus:border-blue-500"
               />
             </div>
 
@@ -338,17 +364,19 @@ export const SkuVariantBuilder = ({
         <table className="w-full text-left text-xs text-slate-300">
           <thead>
             <tr className="bg-slate-950 border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              <th className="py-2.5 px-3 w-48">Mã SKU</th>
+              <th className="py-2.5 px-3 w-44">Mã SKU</th>
               <th className="py-2.5 px-3">Tổ hợp biến thể (optionValues)</th>
-              <th className="py-2.5 px-3 text-right w-44">Giá niêm yết (price)</th>
-              <th className="py-2.5 px-3 text-right w-44">Giá bán KM (salePrice)</th>
-              <th className="py-2.5 px-3 text-right w-16">Xóa</th>
+              <th className="py-2.5 px-3 text-right w-40">Giá vốn (costPrice)</th>
+              <th className="py-2.5 px-3 text-right w-40">Giá niêm yết (price)</th>
+              <th className="py-2.5 px-3 text-right w-40">Giá bán KM (salePrice)</th>
+              <th className="py-2.5 px-3 text-right w-24">Biên LN</th>
+              <th className="py-2.5 px-3 text-right w-14">Xóa</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60 font-medium">
             {skus.length === 0 ? (
               <tr>
-                <td colSpan="5" className="py-8 text-center text-slate-500">
+                <td colSpan="7" className="py-8 text-center text-slate-500">
                   Chưa có biến thể SKU nào. Sản phẩm bắt buộc phải có ít nhất 1 SKU.
                 </td>
               </tr>
@@ -394,6 +422,16 @@ export const SkuVariantBuilder = ({
                         type="number"
                         min="0"
                         step="10000"
+                        value={skuItem.costPrice ?? 0}
+                        onChange={(e) => handleUpdateSkuField(idx, 'costPrice', e.target.value)}
+                        className="w-full px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg font-mono text-right text-amber-300 text-xs focus:outline-none focus:border-blue-500"
+                      />
+                    </td>
+                    <td className="py-2 px-3 text-right">
+                      <input
+                        type="number"
+                        min="0"
+                        step="10000"
                         value={skuItem.price ?? 0}
                         onChange={(e) => handleUpdateSkuField(idx, 'price', e.target.value)}
                         className="w-full px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg font-mono text-right text-slate-200 text-xs focus:outline-none focus:border-blue-500"
@@ -408,6 +446,19 @@ export const SkuVariantBuilder = ({
                         onChange={(e) => handleUpdateSkuField(idx, 'salePrice', e.target.value)}
                         className="w-full px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg font-mono font-bold text-right text-emerald-400 text-xs focus:outline-none focus:border-blue-500"
                       />
+                    </td>
+                    <td className="py-2 px-3 text-right font-mono text-[11px]">
+                      {(() => {
+                        const sell = Number(skuItem.salePrice ?? skuItem.price ?? 0);
+                        const cost = Number(skuItem.costPrice ?? 0);
+                        if (sell <= 0 || cost <= 0) return <span className="text-slate-500">--</span>;
+                        const margin = Math.round(((sell - cost) / sell) * 1000) / 10;
+                        return (
+                          <span className={margin >= 10 ? 'text-emerald-400 font-bold' : margin >= 0 ? 'text-amber-300 font-bold' : 'text-rose-400 font-bold'}>
+                            {margin}%
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="py-2 px-3 text-right">
                       <button

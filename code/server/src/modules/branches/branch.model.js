@@ -2,6 +2,15 @@ import mongoose from 'mongoose';
 
 const { Schema } = mongoose;
 
+export const BRANCH_REGIONS = {
+  HCM: 'HCM',
+  HANOI: 'HANOI',
+  MIEN_NAM: 'MIEN_NAM',
+  MIEN_TRUNG: 'MIEN_TRUNG',
+  MIEN_BAC: 'MIEN_BAC',
+  KHAC: 'KHAC'
+};
+
 const branchSchema = new Schema(
   {
     branchCode: {
@@ -40,6 +49,20 @@ const branchSchema = new Schema(
     isHeadquarter: {
       type: Boolean,
       default: false
+    },
+    isWarehouse: {
+      type: Boolean,
+      default: false
+    },
+    region: {
+      type: String,
+      enum: Object.values(BRANCH_REGIONS),
+      default: BRANCH_REGIONS.KHAC
+    },
+    monthlyRevenueTarget: {
+      type: Number,
+      default: 0,
+      min: [0, 'Chỉ tiêu doanh thu tháng không được âm']
     },
     isActive: {
       type: Boolean,

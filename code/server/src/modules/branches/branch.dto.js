@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BRANCH_REGIONS } from './branch.model.js';
 
 // Chấp nhận SĐT di động VN (03,05,07,08,09), số máy bàn cố định (02x) và tổng đài (1800/1900)
 export const BRANCH_PHONE_REGEX = /^((0|\+84)[235789][0-9]{8,9}|1[89]00[0-9]{4,6})$/;
@@ -44,6 +45,16 @@ export const createBranchSchema = z
       { required_error: 'Vị trí địa lý (location) là bắt buộc' }
     ),
     isHeadquarter: z.boolean().optional().default(false),
+    isWarehouse: z.boolean().optional().default(false),
+    region: z.enum(Object.values(BRANCH_REGIONS)).optional().default(BRANCH_REGIONS.KHAC),
+    monthlyRevenueTarget: z.number().min(0, 'Chỉ tiêu doanh thu tháng không được âm').optional().default(0),
+    bootstrapInventory: z.boolean().optional().default(false),
+    bootstrapFromBranchId: z
+      .string()
+      .trim()
+      .regex(/^[0-9a-fA-F]{24}$/, 'ID chi nhánh mẫu không hợp lệ')
+      .nullable()
+      .optional(),
     isActive: z.boolean().optional().default(true)
   })
   .strict();

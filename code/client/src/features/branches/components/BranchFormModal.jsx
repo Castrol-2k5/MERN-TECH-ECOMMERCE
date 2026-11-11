@@ -1,46 +1,47 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { X, Store, Navigation, Check } from 'lucide-react';
+
+const REGION_OPTIONS = [
+  { value: 'HCM', label: 'TP. Hồ Chí Minh' },
+  { value: 'HANOI', label: 'Hà Nội' },
+  { value: 'MIEN_NAM', label: 'Miền Nam' },
+  { value: 'MIEN_TRUNG', label: 'Miền Trung' },
+  { value: 'MIEN_BAC', label: 'Miền Bắc' },
+  { value: 'KHAC', label: 'Khu vực khác' }
+];
 
 export const BranchFormModal = ({
   isOpen,
   onClose,
   branch,
+  branches = [],
   onSaveBranch
 }) => {
-  const [name, setName] = useState('');
-  const [branchCode, setBranchCode] = useState('');
-  const [address, setAddress] = useState('');
-  const [phone, setPhone] = useState('');
-  const [longitude, setLongitude] = useState('106.6917');
-  const [latitude, setLatitude] = useState('10.7725');
-  const [isHeadquarter, setIsHeadquarter] = useState(false);
-  const [isActive, setIsActive] = useState(true);
+  const [name, setName] = useState(() => branch?.name || '');
+  const [branchCode, setBranchCode] = useState(() => branch?.branchCode || branch?.code || '');
+  const [address, setAddress] = useState(() => branch?.address || '');
+  const [phone, setPhone] = useState(() => branch?.phone || (branch ? '' : '02838226868'));
+  const [longitude, setLongitude] = useState(
+    () => branch?.location?.coordinates?.[0]?.toString() ?? '106.6917'
+  );
+  const [latitude, setLatitude] = useState(
+    () => branch?.location?.coordinates?.[1]?.toString() ?? '10.7725'
+  );
+  const [region, setRegion] = useState(() => branch?.region || (branch ? 'KHAC' : 'HCM'));
+  const [monthlyRevenueTarget, setMonthlyRevenueTarget] = useState(() =>
+    String(branch ? (branch.monthlyRevenueTarget ?? 0) : 500000000)
+  );
+  const [isHeadquarter, setIsHeadquarter] = useState(() =>
+    Boolean(branch?.isHeadquarter || branch?.branchCode === 'BR-HQ')
+  );
+  const [isWarehouse, setIsWarehouse] = useState(() =>
+    Boolean(branch?.isWarehouse || branch?.isHeadquarter || branch?.branchCode === 'BR-HQ')
+  );
+  const [bootstrapInventory, setBootstrapInventory] = useState(() => !branch);
+  const [bootstrapFromBranchId, setBootstrapFromBranchId] = useState('');
+  const [isActive, setIsActive] = useState(() => branch?.isActive !== false);
   const [errorMsg, setErrorMsg] = useState('');
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    setErrorMsg('');
-    if (branch) {
-      setName(branch.name || '');
-      setBranchCode(branch.branchCode || branch.code || '');
-      setAddress(branch.address || '');
-      setPhone(branch.phone || '');
-      setLongitude(branch.location?.coordinates?.[0]?.toString() ?? '106.6917');
-      setLatitude(branch.location?.coordinates?.[1]?.toString() ?? '10.7725');
-      setIsHeadquarter(Boolean(branch.isHeadquarter || branch.branchCode === 'BR-HQ'));
-      setIsActive(branch.isActive !== false);
-    } else {
-      setName('');
-      setBranchCode('');
-      setAddress('');
-      setPhone('02838226868');
-      setLongitude('106.6917');
-      setLatitude('10.7725');
-      setIsHeadquarter(false);
-      setIsActive(true);
-    }
-  }, [branch, isOpen]);
 
   if (!isOpen) return null;
 
@@ -71,8 +72,17 @@ export const BranchFormModal = ({
         type: 'Point',
         coordinates: [lngNum, latNum]
       },
+      region,
+      monthlyRevenueTarget: Math.max(0, Number(monthlyRevenueTarget || 0)),
       isHeadquarter,
-      isActive
+      isWarehouse: Boolean(isWarehouse || isHeadquarter),
+      isActive,
+      ...(!branch
+        ? {
+            bootstrapInventory: Boolean(bootstrapInventory),
+            ...(bootstrapFromBranchId ? { bootstrapFromBranchId } : {})
+          }
+        : {})
     };
 
     setSaving(true);
@@ -165,17 +175,51 @@ export const BranchFormModal = ({
             />
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                Số điện thoại liên hệ:
+              </label>
+              <input
+                type="text"
+                required
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="02838226868 hoặc 0909123456"
+                className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono text-slate-100 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                Khu vực quản lý (Region):
+              </label>
+              <select
+                value={region}
+                onChange={(e) => setRegion(e.target.value)}
+                className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-blue-500"
+              >
+                {REGION_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <div>
             <label className="text-[11px] font-semibold text-slate-300 block mb-1">
-              Số điện thoại liên hệ (Di động hoặc Máy bàn):
+              Chỉ tiêu doanh thu tháng (Monthly Target - VND):
             </label>
             <input
-              type="text"
-              required
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="02838226868 hoặc 0909123456"
-              className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono text-slate-100 focus:outline-none focus:border-blue-500"
+              type="number"
+              min="0"
+              step="1000000"
+              value={monthlyRevenueTarget}
+              onChange={(e) => setMonthlyRevenueTarget(e.target.value)}
+              placeholder="500000000"
+              className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono text-emerald-400 focus:outline-none focus:border-blue-500"
             />
           </div>
 
@@ -228,6 +272,50 @@ export const BranchFormModal = ({
                 Là Kho Trung Tâm Trụ Sở Chính (HQ Warehouse)
               </label>
             </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="branch-warehouse"
+                checked={isWarehouse}
+                onChange={(e) => setIsWarehouse(e.target.checked)}
+                className="rounded border-slate-700 text-cyan-600 focus:ring-0"
+              />
+              <label htmlFor="branch-warehouse" className="text-xs text-slate-300 cursor-pointer">
+                Là Kho trung chuyển vùng (Warehouse Hub)
+              </label>
+            </div>
+
+            {!branch && (
+              <div className="p-2.5 bg-slate-950 border border-slate-800 rounded-xl space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="branch-bootstrap"
+                    checked={bootstrapInventory}
+                    onChange={(e) => setBootstrapInventory(e.target.checked)}
+                    className="rounded border-slate-700 text-emerald-600 focus:ring-0"
+                  />
+                  <label htmlFor="branch-bootstrap" className="text-xs text-emerald-300 cursor-pointer font-semibold">
+                    Tự động khởi tạo danh mục tồn kho chuẩn (Auto-Bootstrap)
+                  </label>
+                </div>
+                {bootstrapInventory && branches.length > 0 && (
+                  <select
+                    value={bootstrapFromBranchId}
+                    onChange={(e) => setBootstrapFromBranchId(e.target.value)}
+                    className="w-full px-2.5 py-1 bg-slate-900 border border-slate-700 rounded text-[11px] text-slate-200 focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="">-- Khởi tạo toàn bộ SKU đang kinh doanh (Min/Max = 0) --</option>
+                    {branches.map((b) => (
+                      <option key={b._id} value={b._id}>
+                        Sao chép định mức từ: {b.name} ({b.branchCode})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
 
             <div className="flex items-center gap-2">
               <input

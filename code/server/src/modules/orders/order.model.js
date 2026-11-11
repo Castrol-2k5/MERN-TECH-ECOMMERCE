@@ -63,6 +63,11 @@ const orderItemSchema = new Schema({
     required: [true, 'Đơn giá là bắt buộc'],
     min: [0, 'Đơn giá không được âm']
   },
+  costPrice: {
+    type: Number,
+    default: 0,
+    min: [0, 'Giá vốn không được âm']
+  },
   subtotal: {
     type: Number,
     required: [true, 'Thành tiền (subtotal) là bắt buộc'],

@@ -247,15 +247,19 @@ export const AdminBranchesUsersPage = () => {
       )}
 
       {/* Branch Form Modal */}
-      <BranchFormModal
-        isOpen={showBranchModal}
-        onClose={() => {
-          setShowBranchModal(false);
-          setEditingBranch(null);
-        }}
-        branch={editingBranch}
-        onSaveBranch={handleSaveBranch}
-      />
+      {showBranchModal && (
+        <BranchFormModal
+          key={editingBranch?._id || 'new-branch'}
+          isOpen={showBranchModal}
+          onClose={() => {
+            setShowBranchModal(false);
+            setEditingBranch(null);
+          }}
+          branch={editingBranch}
+          branches={branches}
+          onSaveBranch={handleSaveBranch}
+        />
+      )}
 
       {/* User Form Modal */}
       <UserFormModal

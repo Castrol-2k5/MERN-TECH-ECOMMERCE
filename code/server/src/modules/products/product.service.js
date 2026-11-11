@@ -1,10 +1,31 @@
 import mongoose from 'mongoose';
 import { Product } from './product.model.js';
 import { Category } from '../categories/category.model.js';
+import { USER_ROLES } from '../users/user.model.js';
+import { AuditLogService } from '../audit/auditLog.service.js';
+import { AUDIT_ACTIONS } from '../audit/auditLog.model.js';
 import { AppError } from '../../utils/appError.js';
 import { slugify } from '../../utils/slugify.js';
 
 export class ProductService {
+  static canViewCostPrice(currentUser = null) {
+    return Boolean(
+      currentUser && [USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER].includes(currentUser.role)
+    );
+  }
+
+  static sanitizeProductCostPrice(product, currentUser = null) {
+    if (!product || this.canViewCostPrice(currentUser)) return product;
+    if (!Array.isArray(product.skus)) return product;
+    return {
+      ...product,
+      skus: product.skus.map((sku) => {
+        if (!sku || typeof sku !== 'object') return sku;
+        const { costPrice: _hidden, ...rest } = sku;
+        return rest;
+      })
+    };
+  }
   /**
    * Tạo sản phẩm mới kèm SKUs và Attributes
    */
@@ -66,12 +87,15 @@ export class ProductService {
       const price = Number(sku.price);
       const salePrice =
         sku.salePrice !== undefined && sku.salePrice !== null ? Number(sku.salePrice) : price;
+      const costPrice =
+        sku.costPrice !== undefined && sku.costPrice !== null ? Math.max(0, Number(sku.costPrice)) : 0;
 
       return {
         ...sku,
         sku: skuCode,
         price,
-        salePrice
+        salePrice,
+        costPrice
       };
     });
 
@@ -104,7 +128,7 @@ export class ProductService {
   /**
    * Lấy danh sách sản phẩm phân trang, tìm kiếm và bộ lọc động (Dynamic Filter Engine)
    */
-  static async getAllProducts(queryParams = {}) {
+  static async getAllProducts(queryParams = {}, currentUser = null) {
     const reservedKeys = new Set([
       'page',
       'limit',
@@ -361,8 +385,12 @@ export class ProductService {
 
     const totalPages = Math.ceil(total / limitNum) || (total === 0 ? 0 : 1);
 
+    const sanitizedProducts = (products || []).map((p) =>
+      this.sanitizeProductCostPrice(p, currentUser)
+    );
+
     return {
-      products,
+      products: sanitizedProducts,
       total,
       page: pageNum,
       totalPages,
@@ -383,7 +411,7 @@ export class ProductService {
   /**
    * Lấy chi tiết sản phẩm theo slug
    */
-  static async getProductBySlug(slug) {
+  static async getProductBySlug(slug, currentUser = null) {
     const product = await Product.findOne({ slug: slug.toLowerCase().trim(), isActive: true })
       .populate('categoryId', 'name slug attributeKeys')
       .lean();
@@ -392,13 +420,13 @@ export class ProductService {
       throw new AppError('Không tìm thấy sản phẩm yêu cầu.', 404, 'PRODUCT_NOT_FOUND');
     }
 
-    return product;
+    return this.sanitizeProductCostPrice(product, currentUser);
   }
 
   /**
    * Cập nhật thông tin sản phẩm (cho phép Admin cập nhật và bật lại cả sản phẩm đang ẩn isActive: false)
    */
-  static async updateProduct(productId, updateData) {
+  static async updateProduct(productId, updateData, currentUser = null) {
     const existingProduct = await Product.findById(productId);
     if (!existingProduct) {
       throw new AppError('Không tìm thấy sản phẩm cần cập nhật.', 404, 'PRODUCT_NOT_FOUND');
@@ -459,18 +487,29 @@ export class ProductService {
       }
     }
 
-    // Xử lý cập nhật SKUs
+    // Xử lý cập nhật SKUs (bảo toàn costPrice cũ nếu payload không gửi kèm)
+    const oldSkuMap = new Map(
+      (existingProduct.skus || []).map((s) => [String(s.sku || '').toUpperCase(), s])
+    );
+
     if (updateData.skus) {
       updateData.skus = updateData.skus.map((sku) => {
+        const skuCode = sku.sku.trim().toUpperCase();
+        const prevSku = oldSkuMap.get(skuCode);
         const price = Number(sku.price);
         const salePrice =
           sku.salePrice !== undefined && sku.salePrice !== null ? Number(sku.salePrice) : price;
+        const costPrice =
+          sku.costPrice !== undefined && sku.costPrice !== null
+            ? Math.max(0, Number(sku.costPrice))
+            : Number(prevSku?.costPrice || 0);
 
         return {
           ...sku,
-          sku: sku.sku.trim().toUpperCase(),
+          sku: skuCode,
           price,
-          salePrice
+          salePrice,
+          costPrice
         };
       });
 
@@ -491,6 +530,53 @@ export class ProductService {
     )
       .populate('categoryId', 'name slug parentId attributeKeys')
       .lean();
+
+    if (currentUser && updateData.skus) {
+      const priceDiffs = [];
+      for (const nextSku of product.skus || []) {
+        const prevSku = oldSkuMap.get(String(nextSku.sku || '').toUpperCase());
+        const beforeSnap = prevSku
+          ? {
+              price: Number(prevSku.price || 0),
+              salePrice: Number(prevSku.salePrice || 0),
+              costPrice: Number(prevSku.costPrice || 0)
+            }
+          : null;
+        const afterSnap = {
+          price: Number(nextSku.price || 0),
+          salePrice: Number(nextSku.salePrice || 0),
+          costPrice: Number(nextSku.costPrice || 0)
+        };
+        if (
+          !beforeSnap ||
+          beforeSnap.price !== afterSnap.price ||
+          beforeSnap.salePrice !== afterSnap.salePrice ||
+          beforeSnap.costPrice !== afterSnap.costPrice
+        ) {
+          priceDiffs.push({ sku: nextSku.sku, before: beforeSnap, after: afterSnap });
+        }
+      }
+
+      if (priceDiffs.length > 0) {
+        AuditLogService.record({
+          actor: currentUser,
+          action: AUDIT_ACTIONS.PRODUCT_PRICE_CHANGE,
+          target: {
+            model: 'Product',
+            entityId: product._id,
+            code: product.slug,
+            name: product.name
+          },
+          changes: {
+            before: priceDiffs.map((d) => ({ sku: d.sku, ...(d.before || {}) })),
+            after: priceDiffs.map((d) => ({ sku: d.sku, ...d.after }))
+          },
+          context: {
+            notes: `Cập nhật giá bán / giá vốn cho ${priceDiffs.length} biến thể SKU`
+          }
+        });
+      }
+    }
 
     return product;
   }

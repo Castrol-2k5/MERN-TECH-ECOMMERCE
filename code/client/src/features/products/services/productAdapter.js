@@ -26,8 +26,8 @@ export const normalizeProductSkus = (skus, basePrice, baseOriginalPrice, product
     }));
 
     // Xác định Giá niêm yết (listPrice -> DB sku.price) và Giá bán khuyến mãi (sellingPrice -> DB sku.salePrice)
-    let listPrice = 0;
-    let sellingPrice = 0;
+    let listPrice;
+    let sellingPrice;
 
     if (s.originalPrice !== undefined && s.salePrice === undefined) {
       // Dữ liệu từ Mock/UI cũ (price = giá bán, originalPrice = giá gốc)
@@ -56,6 +56,7 @@ export const normalizeProductSkus = (skus, basePrice, baseOriginalPrice, product
       price: listPrice,
       salePrice: sellingPrice,
       originalPrice: listPrice,
+      ...(s.costPrice !== undefined ? { costPrice: Math.max(0, Number(s.costPrice || 0)) } : {}),
       stock: s.stock !== undefined ? s.stock : 0,
       options: optionsDict,
       optionValues,

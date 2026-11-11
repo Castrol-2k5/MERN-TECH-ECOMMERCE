@@ -50,11 +50,12 @@ import BranchStocktakePage from '../pages/portal/BranchStocktakePage.jsx';
 import BranchAnalyticsPage from '../pages/portal/BranchAnalyticsPage.jsx';
 import BranchComplaintsPage from '../pages/portal/BranchComplaintsPage.jsx';
 import BranchRosterPage from '../pages/portal/BranchRosterPage.jsx';
+import HqCommandCenterPage from '../pages/portal/HqCommandCenterPage.jsx';
 
 const PortalIndexRedirect = () => {
   const user = useSelector((state) => state.auth?.user);
   if (user?.role === 'SUPER_ADMIN') {
-    return <Navigate to="/portal/admin/products" replace />;
+    return <Navigate to="/portal/hq/command-center" replace />;
   }
   return <Navigate to="/portal/pos" replace />;
 };
@@ -91,6 +92,7 @@ export const AppRoutes = () => {
 
           {/* HQ Administration & Operations (SUPER_ADMIN Only) */}
           <Route element={<RoleProtectedRoute allowedRoles={['SUPER_ADMIN']} />}>
+            <Route path="hq/command-center" element={<HqCommandCenterPage />} />
             <Route path="admin/products" element={<AdminProductsPage />} />
             <Route path="admin/branches-rbac" element={<AdminBranchesUsersPage />} />
             <Route path="admin/analytics" element={<AdminAnalyticsPage />} />

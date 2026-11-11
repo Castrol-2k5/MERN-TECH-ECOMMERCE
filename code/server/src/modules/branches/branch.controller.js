@@ -4,7 +4,7 @@ import { sendSuccess } from '../../utils/response.js';
 
 export class BranchController {
   static createBranch = catchAsync(async (req, res) => {
-    const branch = await BranchService.createBranch(req.body);
+    const branch = await BranchService.createBranch(req.body, req.user);
 
     return sendSuccess(res, {
       statusCode: 201,
@@ -51,7 +51,7 @@ export class BranchController {
   });
 
   static updateBranch = catchAsync(async (req, res) => {
-    const branch = await BranchService.updateBranch(req.params.id, req.body);
+    const branch = await BranchService.updateBranch(req.params.id, req.body, req.user);
 
     return sendSuccess(res, {
       statusCode: 200,

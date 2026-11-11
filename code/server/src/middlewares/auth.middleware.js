@@ -54,3 +54,27 @@ export const optionalProtect = catchAsync(async (req, res, next) => {
   }
   next();
 });
+
+export const attachUserIfAuthenticated = async (req, res, next) => {
+  try {
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+      const token = req.headers.authorization.split(' ')[1];
+      if (token) {
+        const decoded = verifyAccessToken(token);
+        const currentUser = await User.findById(decoded.id).select('email fullName role branchId isActive').lean();
+        if (currentUser && currentUser.isActive !== false) {
+          req.user = {
+            id: currentUser._id.toString(),
+            email: currentUser.email,
+            fullName: currentUser.fullName,
+            role: currentUser.role,
+            branchId: currentUser.branchId ? currentUser.branchId.toString() : null
+          };
+        }
+      }
+    }
+  } catch {
+    // Public routes must never fail due to an expired/invalid optional token
+  }
+  next();
+};
