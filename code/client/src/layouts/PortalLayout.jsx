@@ -166,6 +166,13 @@ export const PortalLayout = () => {
       roles: ['SUPER_ADMIN']
     },
     {
+      to: '/portal/hq/procurement',
+      label: 'Kho Tổng & NCC',
+      badge: 'PO / Công nợ',
+      icon: Truck,
+      roles: ['SUPER_ADMIN']
+    },
+    {
       to: '/portal/branch/staff',
       label: 'Nhân Sự & KPI Đội Ngũ',
       badge: 'Team',

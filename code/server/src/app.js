@@ -26,6 +26,7 @@ import approvalRoutes from './modules/approvals/approval.routes.js';
 import complaintRoutes from './modules/complaints/complaint.routes.js';
 import rosterRoutes from './modules/roster/roster.routes.js';
 import hqRoutes from './modules/hq/hq.routes.js';
+import procurementRoutes from './modules/procurement/procurement.routes.js';
 
 const app = express();
 
@@ -80,6 +81,7 @@ app.use(`${env.API_PREFIX}/approvals`, approvalRoutes);
 app.use(`${env.API_PREFIX}/complaints`, complaintRoutes);
 app.use(`${env.API_PREFIX}/roster`, rosterRoutes);
 app.use(`${env.API_PREFIX}/hq`, hqRoutes);
+app.use(`${env.API_PREFIX}/procurement`, procurementRoutes);
 
 // Internal routes for integration testing RBAC and data scoping
 app.get(`${env.API_PREFIX}/test/admin-only`, protect, authorize('SUPER_ADMIN'), (req, res) => {

@@ -51,6 +51,7 @@ import BranchAnalyticsPage from '../pages/portal/BranchAnalyticsPage.jsx';
 import BranchComplaintsPage from '../pages/portal/BranchComplaintsPage.jsx';
 import BranchRosterPage from '../pages/portal/BranchRosterPage.jsx';
 import HqCommandCenterPage from '../pages/portal/HqCommandCenterPage.jsx';
+import HqProcurementPage from '../pages/portal/HqProcurementPage.jsx';
 
 const PortalIndexRedirect = () => {
   const user = useSelector((state) => state.auth?.user);
@@ -93,6 +94,7 @@ export const AppRoutes = () => {
           {/* HQ Administration & Operations (SUPER_ADMIN Only) */}
           <Route element={<RoleProtectedRoute allowedRoles={['SUPER_ADMIN']} />}>
             <Route path="hq/command-center" element={<HqCommandCenterPage />} />
+            <Route path="hq/procurement" element={<HqProcurementPage />} />
             <Route path="admin/products" element={<AdminProductsPage />} />
             <Route path="admin/branches-rbac" element={<AdminBranchesUsersPage />} />
             <Route path="admin/analytics" element={<AdminAnalyticsPage />} />
