@@ -24,6 +24,16 @@ const branchInventorySchema = new Schema(
       min: [0, 'Số lượng tồn kho không được âm'],
       default: 0
     },
+    minStock: {
+      type: Number,
+      default: 0,
+      min: [0, 'Định mức tồn tối thiểu không được âm']
+    },
+    maxStock: {
+      type: Number,
+      default: 0,
+      min: [0, 'Định mức tồn tối đa không được âm']
+    },
     shelfLocation: {
       type: String,
       trim: true,
