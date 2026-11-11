@@ -19,6 +19,7 @@ import SkuVariantSelector from '../../features/products/components/SkuVariantSel
 import SpecsTable from '../../features/products/components/SpecsTable.jsx';
 import MultiBranchStockBox from '../../features/inventory/components/MultiBranchStockBox.jsx';
 import ProductCard from '../../features/products/components/ProductCard.jsx';
+import AccessoryRecommendations from '../../features/products/components/AccessoryRecommendations.jsx';
 import productService, { fallbackProducts } from '../../features/products/services/productService.js';
 import { createCartItem } from '../../features/products/services/productAdapter.js';
 import { addToCart } from '../../store/slices/cartSlice.js';
@@ -489,6 +490,11 @@ export const ProductDetailPage = () => {
           </div>
         )}
       </div>
+
+      <AccessoryRecommendations
+        productIds={[product._id || product.id]}
+        branchId={selectedBranch?.branchId || selectedBranch?._id || null}
+      />
 
       <section className="my-12">
         <h3 className="text-xl sm:text-2xl font-black text-slate-900 mb-6">

@@ -125,3 +125,9 @@ export const queryProductSchema = z
     sortBy: z.enum(['price_asc', 'price_desc', 'newest', 'oldest', 'popular']).optional().default('newest')
   })
   .passthrough();
+
+export const queryRecommendationsSchema = z.object({
+  productIds: z.string().trim().optional().default(''),
+  limit: z.coerce.number().int().min(1).max(20).optional().default(4),
+  branchId: z.string().trim().optional()
+});

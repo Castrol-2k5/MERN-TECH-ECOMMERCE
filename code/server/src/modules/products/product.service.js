@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { Product } from './product.model.js';
 import { Category } from '../categories/category.model.js';
+import { BranchInventory } from '../inventory/inventory.model.js';
 import { USER_ROLES } from '../users/user.model.js';
 import { AuditLogService } from '../audit/auditLog.service.js';
 import { AUDIT_ACTIONS } from '../audit/auditLog.model.js';
@@ -596,5 +597,127 @@ export class ProductService {
     }
 
     return product;
+  }
+
+  /**
+   * Gợi ý phụ kiện / thiết bị mua kèm phù hợp dựa trên sản phẩm đang xem hoặc trong giỏ hàng
+   * Loại trừ sản phẩm đầu vào, ưu tiên danh mục phụ kiện/âm thanh còn hàng
+   */
+  static async getRecommendations(query = {}, currentUser = null) {
+    const limit = Math.max(1, Math.min(20, parseInt(query.limit, 10) || 4));
+    const rawIds = String(query.productIds || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter((id) => mongoose.Types.ObjectId.isValid(id));
+    const excludeIds = Array.from(new Set(rawIds)).map((id) => new mongoose.Types.ObjectId(id));
+
+    const branchId =
+      query.branchId && mongoose.Types.ObjectId.isValid(String(query.branchId))
+        ? new mongoose.Types.ObjectId(String(query.branchId))
+        : null;
+
+    const ACCESSORY_SLUGS = ['phu-kien', 'am-thanh'];
+    const seedProducts = excludeIds.length
+      ? await Product.find({ _id: { $in: excludeIds } })
+          .populate('categoryId', 'slug name')
+          .lean()
+      : [];
+
+    const seedSlugs = seedProducts.map((p) => p.categoryId?.slug).filter(Boolean);
+    const allSeedAreAccessories =
+      seedSlugs.length > 0 && seedSlugs.every((slug) => ACCESSORY_SLUGS.includes(slug));
+
+    const accessoryCategories = await Category.find({
+      isActive: true,
+      slug: { $in: ACCESSORY_SLUGS }
+    })
+      .select('_id slug')
+      .lean();
+    const accessoryRootIds = accessoryCategories.map((c) => c._id);
+
+    const childCategories = accessoryRootIds.length
+      ? await Category.find({
+          isActive: true,
+          parentId: { $in: accessoryRootIds }
+        })
+          .select('_id')
+          .lean()
+      : [];
+    const targetCategoryIds = [...accessoryRootIds, ...childCategories.map((c) => c._id)];
+
+    const baseFilter = {
+      isActive: true,
+      ...(excludeIds.length > 0 ? { _id: { $nin: excludeIds } } : {})
+    };
+
+    let candidates = targetCategoryIds.length
+      ? await Product.find({ ...baseFilter, categoryId: { $in: targetCategoryIds } })
+          .populate('categoryId', 'name slug')
+          .sort({ createdAt: -1 })
+          .limit(limit * 4)
+          .lean()
+      : [];
+
+    // Bổ sung sản phẩm hoạt động khác nếu cửa hàng có ít phụ kiện
+    if (candidates.length < limit) {
+      const pickedIds = new Set([...excludeIds.map(String), ...candidates.map((p) => String(p._id))]);
+      const extra = await Product.find({
+        isActive: true,
+        _id: { $nin: Array.from(pickedIds).map((id) => new mongoose.Types.ObjectId(id)) }
+      })
+        .populate('categoryId', 'name slug')
+        .sort({ createdAt: -1 })
+        .limit((limit - candidates.length) * 2)
+        .lean();
+      candidates = [...candidates, ...extra];
+    }
+
+    // Lọc các sản phẩm có ít nhất 1 SKU active & tính tồn kho khả dụng
+    const skuIds = [];
+    for (const prod of candidates) {
+      for (const s of prod.skus || []) {
+        if (s.isActive) skuIds.push(s._id);
+      }
+    }
+
+    const invFilter = { productSkuId: { $in: skuIds } };
+    if (branchId) {
+      invFilter.branchId = branchId;
+    }
+    const inventories = skuIds.length
+      ? await BranchInventory.find(invFilter).select('productSkuId quantity').lean()
+      : [];
+
+    const skuStockMap = new Map();
+    for (const inv of inventories) {
+      const key = String(inv.productSkuId);
+      skuStockMap.set(key, (skuStockMap.get(key) || 0) + Math.max(0, Number(inv.quantity) || 0));
+    }
+
+    const targetCatSet = new Set(targetCategoryIds.map(String));
+    const scored = candidates
+      .filter((p) => Array.isArray(p.skus) && p.skus.some((s) => s.isActive))
+      .map((p) => {
+        const availableStock = p.skus.reduce(
+          (sum, s) => (s.isActive ? sum + (skuStockMap.get(String(s._id)) || 0) : sum),
+          0
+        );
+        const catIdStr = String(p.categoryId?._id || p.categoryId || '');
+        const isAccessoryCategory = targetCatSet.has(catIdStr);
+        const sanitized = this.sanitizeProductCostPrice(p, currentUser);
+        return {
+          ...sanitized,
+          availableStock,
+          _score: (isAccessoryCategory ? 10 : 0) + (availableStock > 0 ? 5 : 0)
+        };
+      })
+      .sort((a, b) => b._score - a._score || b.availableStock - a.availableStock)
+      .slice(0, limit)
+      .map(({ _score, ...clean }) => clean);
+
+    return {
+      products: scored,
+      strategy: allSeedAreAccessories ? 'COMPLEMENTARY_ACCESSORY' : 'ACCESSORY_CROSS_SELL'
+    };
   }
 }

@@ -3,7 +3,8 @@ import { ProductController } from './product.controller.js';
 import {
   createProductSchema,
   updateProductSchema,
-  queryProductSchema
+  queryProductSchema,
+  queryRecommendationsSchema
 } from './product.dto.js';
 import { validateDto } from '../../middlewares/validate.middleware.js';
 import { protect, attachUserIfAuthenticated } from '../../middlewares/auth.middleware.js';
@@ -14,6 +15,7 @@ const router = Router();
 
 // Public routes (attach user softly to decide whether internal costPrice should be visible)
 router.get('/', attachUserIfAuthenticated, validateDto(queryProductSchema, 'query'), ProductController.getAllProducts);
+router.get('/recommendations', attachUserIfAuthenticated, validateDto(queryRecommendationsSchema, 'query'), ProductController.getRecommendations);
 router.get('/:slug', attachUserIfAuthenticated, ProductController.getProductBySlug);
 
 // Admin-only management routes (SUPER_ADMIN)

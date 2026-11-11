@@ -37,6 +37,16 @@ export class ProductController {
     });
   });
 
+  static getRecommendations = catchAsync(async (req, res) => {
+    const result = await ProductService.getRecommendations(req.query, req.user || null);
+
+    return sendSuccess(res, {
+      statusCode: 200,
+      message: 'Lấy danh sách sản phẩm gợi ý mua kèm thành công',
+      data: result
+    });
+  });
+
   static getProductBySlug = catchAsync(async (req, res) => {
     const product = await ProductService.getProductBySlug(req.params.slug, req.user || null);
 

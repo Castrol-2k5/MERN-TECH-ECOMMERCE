@@ -506,6 +506,32 @@ export const productService = {
       return [];
     }
   },
+
+  getRecommendations: async ({ productIds = [], limit = 4, branchId = null } = {}) => {
+    if (isMockEnabled()) {
+      return [];
+    }
+    const idStr = Array.isArray(productIds)
+      ? productIds.map(String).filter(Boolean).join(',')
+      : String(productIds || '');
+
+    try {
+      const response = await axiosClient.get('/products/recommendations', {
+        params: {
+          ...(idStr ? { productIds: idStr } : {}),
+          limit,
+          ...(branchId ? { branchId } : {}),
+        },
+      });
+      const rawProducts = response?.data?.products || [];
+      return rawProducts.map((raw) => ({
+        ...normalizeProduct(raw),
+        availableStock: raw.availableStock ?? 0,
+      }));
+    } catch {
+      return [];
+    }
+  },
 };
 
 export default productService;

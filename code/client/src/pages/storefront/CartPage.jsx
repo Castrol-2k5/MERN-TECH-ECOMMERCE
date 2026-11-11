@@ -22,6 +22,7 @@ import {
 } from '../../store/slices/cartSlice.js';
 import { branchService } from '../../features/branches/services/branchService.js';
 import { cartService } from '../../features/cart/services/cartService.js';
+import AccessoryRecommendations from '../../features/products/components/AccessoryRecommendations.jsx';
 
 const getInitialBranchId = () => {
   try {
@@ -275,6 +276,7 @@ export const CartPage = () => {
           </Link>
         </div>
       ) : (
+        <>
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Cart Items List */}
           <div className="lg:col-span-8 space-y-4">
@@ -445,6 +447,12 @@ export const CartPage = () => {
             </div>
           </div>
         </div>
+
+        <AccessoryRecommendations
+          productIds={items.map((i) => i.productId)}
+          branchId={selectedBranchId || null}
+        />
+        </>
       )}
     </div>
   );
