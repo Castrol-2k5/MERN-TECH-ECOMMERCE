@@ -1,9 +1,11 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
 import {
   User,
   USER_ROLES,
   Branch,
+  BRANCH_REGIONS,
   Category,
   Product,
   BranchInventory,
@@ -19,6 +21,16 @@ import {
   Session,
   StockTransfer,
   TRANSFER_STATUS,
+  Stocktake,
+  TransferRequest,
+  RmaOutbound,
+  ApprovalRequest,
+  Complaint,
+  WorkSchedule,
+  Vendor,
+  PurchaseOrder,
+  BranchExpense,
+  CommissionRule,
   PosShift,
   SHIFT_STATUS,
   InterBranchSettlement,
@@ -28,6 +40,7 @@ import {
   AUDIT_ACTIONS,
   AUDIT_SEVERITY
 } from '../models/index.js';
+import { seedExpansionData } from './seedExpansion.js';
 
 dotenv.config();
 
@@ -35,10 +48,12 @@ const MONGODB_URI =
   process.env.MONGODB_URI ||
   'mongodb://127.0.0.1:27017/mern_techstore_dev?replicaSet=rs0&directConnection=true';
 
-async function seed() {
-  console.log('🔄 Connecting to MongoDB...');
-  await mongoose.connect(MONGODB_URI, { autoIndex: true });
-  console.log(`✓ Connected to ${mongoose.connection.name}`);
+export async function seedDatabase({ connect = true, disconnect = true } = {}) {
+  if (connect) {
+    console.log('🔄 Connecting to MongoDB...');
+    await mongoose.connect(MONGODB_URI, { autoIndex: true });
+    console.log(`✓ Connected to ${mongoose.connection.name}`);
+  }
 
   console.log('🧹 Cleaning up existing data in all collections...');
   await Promise.all([
@@ -48,12 +63,22 @@ async function seed() {
     Product.deleteMany({}),
     BranchInventory.deleteMany({}),
     StockTransfer.deleteMany({}),
+    Stocktake.deleteMany({}),
+    TransferRequest.deleteMany({}),
+    RmaOutbound.deleteMany({}),
     Serial.deleteMany({}),
     Order.deleteMany({}),
     WarrantyTicket.deleteMany({}),
     Session.deleteMany({}),
     PosShift.deleteMany({}),
     InterBranchSettlement.deleteMany({}),
+    ApprovalRequest.deleteMany({}),
+    Complaint.deleteMany({}),
+    WorkSchedule.deleteMany({}),
+    Vendor.deleteMany({}),
+    PurchaseOrder.deleteMany({}),
+    BranchExpense.deleteMany({}),
+    CommissionRule.deleteMany({}),
     AuditLog.collection.drop().catch(() => {})
   ]);
 
@@ -65,12 +90,22 @@ async function seed() {
     Product.syncIndexes(),
     BranchInventory.syncIndexes(),
     StockTransfer.syncIndexes(),
+    Stocktake.syncIndexes(),
+    TransferRequest.syncIndexes(),
+    RmaOutbound.syncIndexes(),
     Serial.syncIndexes(),
     Order.syncIndexes(),
     WarrantyTicket.syncIndexes(),
     Session.syncIndexes(),
     PosShift.syncIndexes(),
     InterBranchSettlement.syncIndexes(),
+    ApprovalRequest.syncIndexes(),
+    Complaint.syncIndexes(),
+    WorkSchedule.syncIndexes(),
+    Vendor.syncIndexes(),
+    PurchaseOrder.syncIndexes(),
+    BranchExpense.syncIndexes(),
+    CommissionRule.syncIndexes(),
     AuditLog.syncIndexes()
   ]);
 
@@ -88,6 +123,9 @@ async function seed() {
       coordinates: [106.7009, 10.7829]
     },
     isHeadquarter: true,
+    isWarehouse: true,
+    region: BRANCH_REGIONS.HCM,
+    monthlyRevenueTarget: 0,
     isActive: true
   });
 
@@ -101,6 +139,8 @@ async function seed() {
       coordinates: [106.6917, 10.7725]
     },
     isHeadquarter: false,
+    region: BRANCH_REGIONS.HCM,
+    monthlyRevenueTarget: 350000000,
     isActive: true
   });
 
@@ -114,6 +154,8 @@ async function seed() {
       coordinates: [106.7645, 10.8512]
     },
     isHeadquarter: false,
+    region: BRANCH_REGIONS.HCM,
+    monthlyRevenueTarget: 250000000,
     isActive: true
   });
 
@@ -121,7 +163,7 @@ async function seed() {
   // Bước 2: Khởi tạo Tài khoản Người dùng Mẫu (users)
   // ==========================================
   console.log('👤 Seeding users...');
-  const [adminUser, managerQ1User, managerTDucUser, staffQ1User, staffTDucUser, customerUser] = await User.create([
+  const [adminUser, managerQ1User, managerTDucUser, staffQ1User, staff2Q1User, staffTDucUser, customerUser] = await User.create([
     {
       fullName: 'Nguyễn Văn Quản Trị',
       email: 'admin@techstore.com',
@@ -153,6 +195,15 @@ async function seed() {
       fullName: 'Lê Thu Ngân Q1',
       email: 'staff.q1@techstore.com',
       phone: '0909000003',
+      passwordHash: '123456',
+      role: USER_ROLES.STAFF,
+      branchId: branchQ1._id,
+      isActive: true
+    },
+    {
+      fullName: 'Nguyễn Bảo Bán Hàng Q1',
+      email: 'staff2.q1@techstore.com',
+      phone: '0909000007',
       passwordHash: '123456',
       role: USER_ROLES.STAFF,
       branchId: branchQ1._id,
@@ -1257,6 +1308,16 @@ async function seed() {
     ]
   });
 
+  // Tự động gắn giá vốn (costPrice ~ 78% giá bán) cho toàn bộ biến thể SKU
+  for (const prod of productsData) {
+    for (const sku of prod.skus || []) {
+      if (sku.costPrice === undefined) {
+        const sell = Number(sku.salePrice || sku.price || 0);
+        sku.costPrice = Math.round((sell * 0.78) / 10000) * 10000;
+      }
+    }
+  }
+
   const createdProducts = await Product.create(productsData);
   console.log(`✓ Inserted ${createdProducts.length} products.`);
 
@@ -1602,6 +1663,7 @@ async function seed() {
         sku: 'ROG-G16-16GB-GRY',
         quantity: 1,
         unitPrice: 34990000,
+        costPrice: 27290000,
         subtotal: 34990000,
         serialsAssigned: ['ROG-SOLD-EXPIRED']
       }
@@ -1642,6 +1704,7 @@ async function seed() {
         sku: 'IP16PM-256GB-DESERT',
         quantity: 1,
         unitPrice: 33490000,
+        costPrice: 26120000,
         subtotal: 33490000,
         serialsAssigned: ['IP16-SOLD-VALID']
       },
@@ -1653,6 +1716,7 @@ async function seed() {
         sku: 'LOGI-G502-HERO',
         quantity: 1,
         unitPrice: 990000,
+        costPrice: 770000,
         subtotal: 990000,
         serialsAssigned: []
       }
@@ -1782,6 +1846,7 @@ async function seed() {
     actualEndingBalance: 1950000,
     discrepancy: -50000,
     discrepancyNote: 'Thối nhầm 50.000đ tiền lẻ cho khách mua phụ kiện',
+    discrepancyResolution: { status: 'UNRESOLVED' },
     approvedById: managerTDucUser._id,
     totalOrdersCount: 2
   });
@@ -1900,30 +1965,42 @@ async function seed() {
     }
   ]);
 
+  console.log('🚀 Seeding expansion data (POS, Branch Manager & HQ Chain Director)...');
+  await seedExpansionData({
+    branches: { branchHQ, branchQ1, branchTDuc },
+    users: { adminUser, managerQ1User, staffQ1User, staff2Q1User, staffTDucUser, customerUser },
+    categories: { catGamingGear },
+    pMap,
+    skuIds: { p1Sku1Id, p4Sku1Id, p6Sku1Id, p21Sku1Id },
+    posOrder
+  });
+
   console.log('\n======================================================');
   console.log('🎉 SEEDING DATA HOÀN TẤT THÀNH CÔNG VỚI DỮ LIỆU ĐA DẠNG!');
-  console.log(`- Chi nhánh: 3 (HQ, Q1 Flagship, Thủ Đức Hub)`);
+  console.log(`- Chi nhánh: 3 (HQ, Q1 Flagship [target 350tr], Thủ Đức Hub [target 250tr])`);
   console.log(`- Danh mục: 5 nhóm ngành hàng (Laptop, Smartphone, Màn hình, Âm thanh, Gear)`);
-  console.log(`- Nhãn hiệu: Apple, ASUS, Dell, Lenovo, Acer, Samsung, Xiaomi, LG, Sony, Marshall, Sennheiser, Logitech, Razer, Keychron, Corsair`);
-  console.log(`- Sản phẩm: ${createdProducts.length} sản phẩm, hàng chục biến thể SKU`);
-  console.log(`- Tồn kho: ${inventoryList.length} bản ghi tồn kho chi nhánh (có cả SKU hết hàng để test)`);
-  console.log(`- Mã Serial/IMEI: ${createdSerials.length} mã máy (IN_STOCK, SOLD còn hạn, SOLD hết hạn, TRANSIT)`);
-  console.log(`- Đơn hàng mẫu: POS Completed, B2C Online READY_FOR_SHIPPING`);
-  console.log(`- Phiếu chuyển kho: 1 phiếu IN_TRANSIT (BR-Q1 -> BR-TDUC, IP15-TRANSIT-001)`);
-  console.log(`- Ca thu ngân lịch sử: 2 ca CLOSED (Q1 cân đối, Thủ Đức lệch -50.000đ)`);
-  console.log(`- Đối soát công nợ: 1 phiếu PENDING_CLEARING (${b2cOrder.orderCode})`);
-  console.log(`- Audit Logs: 3 bản ghi mẫu (TRANSFER_CREATE, POS_SHIFT_CLOSE, STOCK_ADJUST)`);
-  console.log(`- Tài khoản test:`);
-  console.log(`  * Super Admin: admin@techstore.com / 123456`);
-  console.log(`  * Branch Manager: manager.q1@techstore.com, manager.tduc@techstore.com / 123456`);
-  console.log(`  * POS Staff: staff.q1@techstore.com, staff.tduc@techstore.com / 123456`);
-  console.log(`  * Customer B2C: customer@gmail.com / 123456`);
+  console.log(`- Sản phẩm: ${createdProducts.length} sản phẩm (đều đã gắn giá vốn costPrice)`);
+  console.log(`- Tồn kho: ${inventoryList.length} bản ghi + cấu hình Min/Max (BR-TDUC thiếu IP16PM, ThinkPad Q1 tồn >40d)`);
+  console.log(`- Mã Serial/IMEI: ${createdSerials.length}+ mã máy (IN_STOCK, SOLD, DEFECTIVE, TRANSIT, Dead Stock >40d)`);
+  console.log(`- POS & Bảo hành: Ca Q1 đang MỞ (kèm phiếu thu/chi), Ca Thủ Đức lệch -50k UNRESOLVED, Ticket BH đang sửa`);
+  console.log(`- Quản lý Chi nhánh: Kiểm kho IN_PROGRESS, Xin cấp hàng PENDING, RMA Outbound, Khiếu nại OPEN/RESOLVED, Lịch ca tuần + Đổi ca PENDING, Phê duyệt cấp CN`);
+  console.log(`- HQ Chain Director: 2 NCC + 2 PO (RECEIVED PARTIAL & ORDERED), Chi phí OPEX Q1/Thủ Đức + Duyệt Tối cao (EXECUTIVE), 2 Quy tắc Hoa hồng, Red Alert`);
+  console.log(`- Tài khoản test (mật khẩu chung: 123456):`);
+  console.log(`  * Super Admin (HQ): admin@techstore.com`);
+  console.log(`  * Branch Manager: manager.q1@techstore.com, manager.tduc@techstore.com`);
+  console.log(`  * POS Staff: staff.q1@techstore.com, staff2.q1@techstore.com, staff.tduc@techstore.com`);
+  console.log(`  * Customer B2C: customer@gmail.com`);
   console.log('======================================================\n');
 
-  await mongoose.disconnect();
+  if (disconnect) {
+    await mongoose.disconnect();
+  }
 }
 
-seed().catch((err) => {
-  console.error('❌ Lỗi khi chạy Seeding:', err);
-  process.exit(1);
-});
+const isCliRun = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+if (isCliRun) {
+  seedDatabase().catch((err) => {
+    console.error('❌ Lỗi khi chạy Seeding:', err);
+    process.exit(1);
+  });
+}
