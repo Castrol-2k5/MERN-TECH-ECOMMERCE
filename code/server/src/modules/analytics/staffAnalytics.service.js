@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { Order, ORDER_STATUS, ORDER_TYPES } from '../orders/order.model.js';
 import { PosShift } from '../shifts/posShift.model.js';
 import { WarrantyTicket } from '../warranty/warranty.model.js';
+import { OrderReview } from '../reviews/orderReview.model.js';
 import { User, USER_ROLES } from '../users/user.model.js';
 import { AppError } from '../../utils/appError.js';
 
@@ -43,7 +44,7 @@ export class StaffAnalyticsService {
       createdAt: { $gte: startDate, $lte: endDate }
     };
 
-    const [kpiAgg, dailyChartAgg, categoryAgg, shiftCount, warrantyCount, recentOrders] = await Promise.all([
+    const [kpiAgg, dailyChartAgg, categoryAgg, shiftCount, warrantyCount, recentOrders, reviewAgg] = await Promise.all([
       Order.aggregate([
         { $match: completedOrderMatch },
         {
@@ -151,7 +152,23 @@ export class StaffAnalyticsService {
         .select('orderCode orderType orderStatus paymentMethod paymentStatus totalAmount refundedAmount customerInfo items.productName items.quantity createdAt')
         .sort({ createdAt: -1 })
         .limit(20)
-        .lean()
+        .lean(),
+      OrderReview.aggregate([
+        {
+          $match: {
+            staffId: staffObjectId,
+            createdAt: { $gte: startDate, $lte: endDate }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalReviewsCount: { $sum: 1 },
+            fiveStarReviewsCount: { $sum: { $cond: [{ $eq: ['$rating', 5] }, 1, 0] } },
+            avgRating: { $avg: '$rating' }
+          }
+        }
+      ])
     ]);
 
     const kpiRaw = kpiAgg[0] || {
@@ -170,6 +187,14 @@ export class StaffAnalyticsService {
       percentage: totalCategoryRev > 0 ? Math.round((c.revenue / totalCategoryRev) * 100) : 0
     }));
 
+    const reviewRaw = reviewAgg[0] || {
+      totalReviewsCount: 0,
+      fiveStarReviewsCount: 0,
+      avgRating: 0
+    };
+    const avgCustomerRating =
+      reviewRaw.totalReviewsCount > 0 ? Number(Number(reviewRaw.avgRating || 0).toFixed(1)) : 0;
+
     return {
       range,
       period: { startDate, endDate },
@@ -179,7 +204,10 @@ export class StaffAnalyticsService {
         posOrdersCount: kpiRaw.posOrdersCount,
         avgOrderValue,
         shiftCount,
-        warrantyCount
+        warrantyCount,
+        totalReviewsCount: reviewRaw.totalReviewsCount,
+        fiveStarReviewsCount: reviewRaw.fiveStarReviewsCount,
+        avgCustomerRating
       },
       dailyChart: dailyChartAgg.map((d) => ({
         day: d.day,
@@ -228,7 +256,7 @@ export class StaffAnalyticsService {
 
     const staffIds = staffList.map((u) => u._id);
 
-    const [orderStatsAgg, shiftStatsAgg, warrantyStatsAgg] = await Promise.all([
+    const [orderStatsAgg, shiftStatsAgg, warrantyStatsAgg, reviewStatsAgg] = await Promise.all([
       Order.aggregate([
         {
           $match: {
@@ -314,12 +342,29 @@ export class StaffAnalyticsService {
           }
         },
         { $group: { _id: '$staffId', warrantyCount: { $sum: 1 } } }
+      ]),
+      OrderReview.aggregate([
+        {
+          $match: {
+            staffId: { $in: staffIds },
+            createdAt: { $gte: startDate, $lte: endDate }
+          }
+        },
+        {
+          $group: {
+            _id: '$staffId',
+            totalReviewsCount: { $sum: 1 },
+            fiveStarReviewsCount: { $sum: { $cond: [{ $eq: ['$rating', 5] }, 1, 0] } },
+            ratingSum: { $sum: '$rating' }
+          }
+        }
       ])
     ]);
 
     const orderMap = new Map(orderStatsAgg.map((o) => [o._id.toString(), o]));
     const shiftMap = new Map(shiftStatsAgg.map((s) => [s._id.toString(), s.shiftCount]));
     const warrantyMap = new Map(warrantyStatsAgg.map((w) => [w._id.toString(), w.warrantyCount]));
+    const reviewMap = new Map(reviewStatsAgg.map((r) => [r._id.toString(), r]));
 
     const ranking = staffList
       .map((member) => {
@@ -338,6 +383,16 @@ export class StaffAnalyticsService {
             ? Number(((oStat.returnedOrdersCount / oStat.totalHandledOrders) * 100).toFixed(1))
             : 0;
 
+        const rStat = reviewMap.get(key) || {
+          totalReviewsCount: 0,
+          fiveStarReviewsCount: 0,
+          ratingSum: 0
+        };
+        const avgCustomerRating =
+          rStat.totalReviewsCount > 0
+            ? Number((rStat.ratingSum / rStat.totalReviewsCount).toFixed(1))
+            : 0;
+
         return {
           staffId: member._id,
           fullName: member.fullName,
@@ -353,7 +408,10 @@ export class StaffAnalyticsService {
           avgOrderValue,
           returnRate,
           shiftCount: shiftMap.get(key) || 0,
-          warrantyCount: warrantyMap.get(key) || 0
+          warrantyCount: warrantyMap.get(key) || 0,
+          totalReviewsCount: rStat.totalReviewsCount,
+          fiveStarReviewsCount: rStat.fiveStarReviewsCount,
+          avgCustomerRating
         };
       })
       .sort((a, b) => b.netRevenue - a.netRevenue || b.completedOrders - a.completedOrders)
@@ -361,6 +419,8 @@ export class StaffAnalyticsService {
 
     const totalTeamRevenue = ranking.reduce((sum, r) => sum + r.netRevenue, 0);
     const totalTeamOrders = ranking.reduce((sum, r) => sum + r.completedOrders, 0);
+    const totalTeamReviews = ranking.reduce((sum, r) => sum + r.totalReviewsCount, 0);
+    const totalTeamFiveStarReviews = ranking.reduce((sum, r) => sum + r.fiveStarReviewsCount, 0);
     const activeStaffCount = staffList.filter((s) => s.isActive).length;
 
     return {
@@ -369,6 +429,8 @@ export class StaffAnalyticsService {
       summary: {
         totalTeamRevenue,
         totalTeamOrders,
+        totalTeamReviews,
+        totalTeamFiveStarReviews,
         activeStaffCount,
         totalStaffCount: staffList.length,
         topPerformer: ranking[0] || null

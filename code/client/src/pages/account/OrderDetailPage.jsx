@@ -10,24 +10,48 @@ import {
   CreditCard,
   CheckCircle2,
   ExternalLink,
-  AlertCircle
+  AlertCircle,
+  Star,
+  Send
 } from 'lucide-react';
 import { orderService } from '../../features/orders/services/orderService.js';
+import { reviewService } from '../../features/reviews/services/reviewService.js';
+
+const REVIEW_TAGS = [
+  'Tư vấn nhiệt tình',
+  'Máy nguyên seal',
+  'Thanh toán nhanh gọn',
+  'Chi nhánh sạch đẹp'
+];
 
 export const OrderDetailPage = () => {
   const { id } = useParams();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [existingReview, setExistingReview] = useState(null);
+  const [rating, setRating] = useState(5);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [selectedTags, setSelectedTags] = useState(['Tư vấn nhiệt tình']);
+  const [comment, setComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewError, setReviewError] = useState('');
 
   useEffect(() => {
     let ignore = false;
     const fetchOrderDetail = async () => {
       try {
         setError('');
-        const detail = await orderService.getMyOrderDetail(id);
+        const [detail, myReviews] = await Promise.all([
+          orderService.getMyOrderDetail(id),
+          reviewService.getMyReviews().catch(() => [])
+        ]);
         if (!ignore) {
           setOrder(detail);
+          const matched = (myReviews || []).find(
+            (r) => String(r.orderId) === String(detail?._id || detail?.id || '')
+          );
+          setExistingReview(matched || null);
         }
       } catch (err) {
         if (!ignore) {
@@ -49,6 +73,34 @@ export const OrderDetailPage = () => {
       ignore = true;
     };
   }, [id]);
+
+  const handleToggleTag = (tag) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  };
+
+  const handleSubmitReview = async (e) => {
+    e.preventDefault();
+    if (!order?._id && !order?.id) return;
+    setSubmittingReview(true);
+    setReviewError('');
+    try {
+      const created = await reviewService.createReview({
+        orderId: order._id || order.id,
+        rating,
+        tags: selectedTags,
+        comment: comment.trim()
+      });
+      setExistingReview(created);
+    } catch (err) {
+      setReviewError(
+        err.response?.data?.message || err.message || 'Không thể gửi đánh giá. Vui lòng thử lại.'
+      );
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -387,6 +439,149 @@ export const OrderDetailPage = () => {
           ))}
         </div>
       </div>
+
+      {/* Customer Review Section (UC-CUS-03) */}
+      {['COMPLETED', 'PARTIALLY_RETURNED'].includes(order.orderStatus) && (
+        <div id="review" className="bg-white rounded-3xl border border-amber-200/80 p-6 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
+              <h2 className="text-sm font-black text-slate-900">
+                Đánh giá trải nghiệm mua hàng &amp; nhân viên phục vụ
+              </h2>
+            </div>
+            {existingReview && (
+              <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold">
+                Đã gửi đánh giá
+              </span>
+            )}
+          </div>
+
+          {existingReview ? (
+            <div className="space-y-3 text-xs">
+              <div className="flex items-center gap-1.5">
+                {[1, 2, 3, 4, 5].map((num) => (
+                  <Star
+                    key={num}
+                    className={`w-5 h-5 ${
+                      num <= existingReview.rating
+                        ? 'fill-amber-400 text-amber-400'
+                        : 'text-slate-200'
+                    }`}
+                  />
+                ))}
+                <span className="ml-2 font-black text-slate-900 text-sm">
+                  {existingReview.rating}/5 sao
+                </span>
+              </div>
+              {existingReview.tags?.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {existingReview.tags.map((t) => (
+                    <span
+                      key={t}
+                      className="px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 font-semibold"
+                    >
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {existingReview.comment && (
+                <p className="p-3 rounded-2xl bg-slate-50 text-slate-700 leading-relaxed">
+                  “{existingReview.comment}”
+                </p>
+              )}
+              <p className="text-slate-400">
+                Cảm ơn bạn! Đánh giá của bạn được ghi nhận trực tiếp vào chất lượng phục vụ tại chi nhánh.
+              </p>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmitReview} className="space-y-4">
+              {reviewError && (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold">
+                  {reviewError}
+                </div>
+              )}
+
+              <div>
+                <p className="text-xs font-semibold text-slate-600 mb-2">
+                  Chấm mức độ hài lòng của bạn:
+                </p>
+                <div className="flex items-center gap-2">
+                  {[1, 2, 3, 4, 5].map((num) => {
+                    const active = num <= (hoverRating || rating);
+                    return (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => setRating(num)}
+                        onMouseEnter={() => setHoverRating(num)}
+                        onMouseLeave={() => setHoverRating(0)}
+                        className="p-1 cursor-pointer transition-transform hover:scale-110"
+                      >
+                        <Star
+                          className={`w-7 h-7 ${
+                            active ? 'fill-amber-400 text-amber-400' : 'text-slate-300'
+                          }`}
+                        />
+                      </button>
+                    );
+                  })}
+                  <span className="ml-2 text-xs font-bold text-amber-700">
+                    {(hoverRating || rating) === 5
+                      ? 'Tuyệt vời (5★)'
+                      : `${hoverRating || rating}/5 sao`}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-slate-600 mb-2">Điểm bạn hài lòng:</p>
+                <div className="flex flex-wrap gap-2">
+                  {REVIEW_TAGS.map((tag) => {
+                    const active = selectedTags.includes(tag);
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => handleToggleTag(tag)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
+                          active
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-blue-300'
+                        }`}
+                      >
+                        {tag}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <textarea
+                  rows={3}
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Chia sẻ thêm cảm nhận về tư vấn viên, tình trạng máy lúc nhận tại quầy..."
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                />
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={submittingReview}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 text-white text-xs font-black shadow-md shadow-amber-500/20 transition-colors cursor-pointer"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{submittingReview ? 'Đang gửi...' : 'Gửi đánh giá'}</span>
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
     </div>
   );
 };

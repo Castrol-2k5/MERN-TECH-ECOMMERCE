@@ -29,6 +29,7 @@ import hqRoutes from './modules/hq/hq.routes.js';
 import procurementRoutes from './modules/procurement/procurement.routes.js';
 import financeRoutes from './modules/finance/finance.routes.js';
 import cartRoutes from './modules/cart/cart.routes.js';
+import reviewRoutes from './modules/reviews/review.routes.js';
 
 const app = express();
 
@@ -86,6 +87,7 @@ app.use(`${env.API_PREFIX}/hq/finance`, financeRoutes);
 app.use(`${env.API_PREFIX}/hq`, hqRoutes);
 app.use(`${env.API_PREFIX}/procurement`, procurementRoutes);
 app.use(`${env.API_PREFIX}/cart`, cartRoutes);
+app.use(`${env.API_PREFIX}/reviews`, reviewRoutes);
 
 // Internal routes for integration testing RBAC and data scoping
 app.get(`${env.API_PREFIX}/test/admin-only`, protect, authorize('SUPER_ADMIN'), (req, res) => {

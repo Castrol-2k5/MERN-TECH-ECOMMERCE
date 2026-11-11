@@ -11,15 +11,17 @@ import {
   Truck,
   AlertCircle,
   ShoppingBag,
-  ExternalLink,
   ShieldCheck,
-  User
+  User,
+  Star
 } from 'lucide-react';
 import { orderService } from '../../features/orders/services/orderService.js';
+import { reviewService } from '../../features/reviews/services/reviewService.js';
 import DataTablePagination from '../../components/common/DataTablePagination';
 
 export const OrdersPage = () => {
   const [orders, setOrders] = useState([]);
+  const [reviewedMap, setReviewedMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('ALL');
@@ -31,9 +33,17 @@ export const OrdersPage = () => {
     const fetchOrders = async () => {
       try {
         setError('');
-        const list = await orderService.getMyOrders();
+        const [list, myReviews] = await Promise.all([
+          orderService.getMyOrders(),
+          reviewService.getMyReviews().catch(() => [])
+        ]);
         if (!ignore) {
           setOrders(list || []);
+          const nextMap = {};
+          for (const r of myReviews || []) {
+            if (r?.orderId) nextMap[String(r.orderId)] = r;
+          }
+          setReviewedMap(nextMap);
         }
       } catch (err) {
         if (!ignore) {
@@ -311,6 +321,22 @@ export const OrdersPage = () => {
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {['COMPLETED', 'PARTIALLY_RETURNED'].includes(order.orderStatus) && (
+                      reviewedMap[String(order._id || order.id)] ? (
+                        <span className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 font-bold">
+                          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                          <span>Đã đánh giá {reviewedMap[String(order._id || order.id)].rating}★</span>
+                        </span>
+                      ) : (
+                        <Link
+                          to={`/account/orders/${order._id || order.id}#review`}
+                          className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold transition-colors"
+                        >
+                          <Star className="w-3.5 h-3.5 fill-white" />
+                          <span>Đánh giá</span>
+                        </Link>
+                      )
+                    )}
                     <Link
                       to={`/account/orders/${order._id || order.id}`}
                       className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold transition-colors"

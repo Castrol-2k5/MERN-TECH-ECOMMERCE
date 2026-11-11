@@ -40,3 +40,4 @@ export {
 } from '../modules/finance/branchExpense.model.js';
 export { CommissionRule, COMMISSION_RULE_TYPES } from '../modules/finance/commissionRule.model.js';
 export { Cart } from '../modules/cart/cart.model.js';
+export { OrderReview } from '../modules/reviews/orderReview.model.js';

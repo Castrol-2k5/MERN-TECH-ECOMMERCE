@@ -13,7 +13,8 @@ import {
   ShoppingBag,
   Award,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Star
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -381,6 +382,7 @@ export const BranchStaffPage = () => {
                     <th className="py-3 px-4 text-center">Đơn hoàn tất</th>
                     <th className="py-3 px-4 text-right">Giá trị TB (AOV)</th>
                     <th className="py-3 px-4 text-center">Ca / Bảo hành</th>
+                    <th className="py-3 px-4 text-center">Đánh giá 5★ / TB</th>
                     <th className="py-3 px-4 text-center">Tỷ lệ hoàn</th>
                   </tr>
                 </thead>
@@ -430,6 +432,21 @@ export const BranchStaffPage = () => {
                         {row.shiftCount} ca • {row.warrantyCount} BH
                       </td>
                       <td className="py-3 px-4 text-center font-mono">
+                        {row.totalReviewsCount > 0 ? (
+                          <div>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                              <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                              {row.fiveStarReviewsCount} lượt 5★
+                            </span>
+                            <span className="block text-[10px] text-slate-400 mt-0.5">
+                              TB {row.avgCustomerRating}★ ({row.totalReviewsCount} lượt)
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-slate-500">Chưa có</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-center font-mono">
                         <span
                           className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
                             row.returnRate > 15
@@ -444,7 +461,7 @@ export const BranchStaffPage = () => {
                   ))}
                   {ranking.length === 0 && (
                     <tr>
-                      <td colSpan="7" className="py-10 text-center text-slate-500">
+                      <td colSpan="8" className="py-10 text-center text-slate-500">
                         Không có nhân viên nào trong chi nhánh.
                       </td>
                     </tr>
