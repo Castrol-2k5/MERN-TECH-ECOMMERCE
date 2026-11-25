@@ -238,4 +238,95 @@ describe('HQ Chain Director Wave 2: Vendor, Purchase Order Intake & AP Debt Sett
     }).lean();
     expect(logs.length).toBeGreaterThanOrEqual(4);
   });
+
+  it('Phân bổ gạch nợ FIFO khi thanh toán công nợ tổng & hỗ trợ Hủy PO đang ORDERED', async () => {
+    const cat = await Category.create({ name: 'Phụ kiện FIFO', slug: 'phu-kien-fifo' });
+    const nonSerialProd = await Product.create({
+      name: 'Sạc dự phòng Anker',
+      slug: 'sac-du-phong-anker-fifo',
+      categoryId: cat._id,
+      brand: 'Anker',
+      isSerialManaged: false,
+      skus: [{ sku: 'ANKER-PB-01', price: 1200000, costPrice: 700000 }]
+    });
+    const pbSkuId = nonSerialProd.skus[0]._id;
+
+    const vRes = await request(app)
+      .post('/api/v1/procurement/vendors')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        vendorCode: 'NPP-ANKER-FIFO',
+        name: 'Anker Vietnam',
+        phone: '0909888777'
+      });
+    const vendor = vRes.body.data.vendor;
+
+    // Tạo PO1 (10tr) và PO2 (15tr) đều nhận hàng xong
+    const po1Res = await request(app)
+      .post('/api/v1/procurement/purchase-orders')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        vendorId: vendor._id.toString(),
+        warehouseBranchId: hqBranch._id.toString(),
+        items: [{ productId: nonSerialProd._id.toString(), productSkuId: pbSkuId.toString(), orderedQty: 10, unitCost: 1000000 }]
+      });
+    const po1 = po1Res.body.data.purchaseOrder;
+
+    const po2Res = await request(app)
+      .post('/api/v1/procurement/purchase-orders')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        vendorId: vendor._id.toString(),
+        warehouseBranchId: hqBranch._id.toString(),
+        items: [{ productId: nonSerialProd._id.toString(), productSkuId: pbSkuId.toString(), orderedQty: 15, unitCost: 1000000 }]
+      });
+    const po2 = po2Res.body.data.purchaseOrder;
+
+    // Tạo PO3 rồi Hủy
+    const po3Res = await request(app)
+      .post('/api/v1/procurement/purchase-orders')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        vendorId: vendor._id.toString(),
+        warehouseBranchId: hqBranch._id.toString(),
+        items: [{ productId: nonSerialProd._id.toString(), productSkuId: pbSkuId.toString(), orderedQty: 5, unitCost: 1000000 }]
+      });
+    const po3 = po3Res.body.data.purchaseOrder;
+    const cancelRes = await request(app)
+      .patch(`/api/v1/procurement/purchase-orders/${po3._id}/status`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ status: PO_STATUS.CANCELLED });
+    expect(cancelRes.status).toBe(200);
+    expect(cancelRes.body.data.purchaseOrder.status).toBe(PO_STATUS.CANCELLED);
+
+    await request(app)
+      .post(`/api/v1/procurement/purchase-orders/${po1._id}/receive`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ items: [{ productSkuId: pbSkuId.toString(), receivedQty: 10, serials: [] }] });
+
+    await request(app)
+      .post(`/api/v1/procurement/purchase-orders/${po2._id}/receive`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ items: [{ productSkuId: pbSkuId.toString(), receivedQty: 15, serials: [] }] });
+
+    // Thanh toán công nợ tổng 14.000.000 đ (không truyền purchaseOrderId) -> PO1 PAID (10tr), PO2 PARTIAL (4tr), nợ còn 11tr
+    const payRes = await request(app)
+      .post(`/api/v1/procurement/vendors/${vendor._id}/payments`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ amount: 14000000, note: 'Chuyển khoản tổng đợt 1' });
+
+    expect(payRes.status).toBe(200);
+    expect(payRes.body.data.vendor.outstandingDebt).toBe(11000000);
+    expect(payRes.body.data.allocatedPurchaseOrders).toHaveLength(2);
+    expect(payRes.body.data.allocatedPurchaseOrders[0]).toMatchObject({
+      poCode: po1.poCode,
+      allocatedAmount: 10000000,
+      paymentStatus: PO_PAYMENT_STATUS.PAID
+    });
+    expect(payRes.body.data.allocatedPurchaseOrders[1]).toMatchObject({
+      poCode: po2.poCode,
+      allocatedAmount: 4000000,
+      paymentStatus: PO_PAYMENT_STATUS.PARTIAL
+    });
+  });
 });

@@ -148,8 +148,8 @@ export class ProcurementService {
 
     const [orders, total] = await Promise.all([
       PurchaseOrder.find(filter)
-        .populate('vendorId', 'vendorCode name phone')
-        .populate('warehouseBranchId', 'branchCode name')
+        .populate('vendorId', 'vendorCode name phone taxCode address')
+        .populate('warehouseBranchId', 'branchCode name address')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -491,6 +491,8 @@ export class ProcurementService {
     }
 
     let updatedPo = null;
+    const allocatedPurchaseOrders = [];
+
     if (dto.purchaseOrderId) {
       const po = await PurchaseOrder.findById(dto.purchaseOrderId);
       if (!po || po.vendorId.toString() !== vendorId.toString()) {
@@ -520,6 +522,47 @@ export class ProcurementService {
       });
       await po.save();
       updatedPo = po;
+      allocatedPurchaseOrders.push({
+        poId: po._id,
+        poCode: po.poCode,
+        allocatedAmount: amount,
+        paymentStatus: po.paymentStatus
+      });
+    } else {
+      // Thanh toán công nợ tổng -> Tự động phân bổ gạch nợ theo thứ tự PO cũ nhất trước (FIFO)
+      const openPos = await PurchaseOrder.find({
+        vendorId: vendor._id,
+        status: PO_STATUS.RECEIVED,
+        paymentStatus: { $in: [PO_PAYMENT_STATUS.UNPAID, PO_PAYMENT_STATUS.PARTIAL] }
+      }).sort({ receivedAt: 1, createdAt: 1 });
+
+      let remainingToAllocate = amount;
+      for (const po of openPos) {
+        if (remainingToAllocate <= 0) break;
+        const remainingOnPo = Math.max(0, Number(po.totalAmount) - Number(po.paidAmount || 0));
+        if (remainingOnPo <= 0) continue;
+
+        const allocated = Math.min(remainingToAllocate, remainingOnPo);
+        po.paidAmount = Number(po.paidAmount || 0) + allocated;
+        po.paymentStatus =
+          po.paidAmount >= po.totalAmount ? PO_PAYMENT_STATUS.PAID : PO_PAYMENT_STATUS.PARTIAL;
+        po.payments.push({
+          amount: allocated,
+          note: dto.note ? `${dto.note} [Phân bổ FIFO]` : 'Thanh toán công nợ tổng [Phân bổ FIFO]',
+          paidAt: new Date(),
+          paidById: currentUser.id,
+          paidByName: currentUser.fullName || 'Quản trị viên HQ'
+        });
+        await po.save();
+
+        remainingToAllocate -= allocated;
+        allocatedPurchaseOrders.push({
+          poId: po._id,
+          poCode: po.poCode,
+          allocatedAmount: allocated,
+          paymentStatus: po.paymentStatus
+        });
+      }
     }
 
     const beforeDebt = vendor.outstandingDebt;
@@ -538,13 +581,13 @@ export class ProcurementService {
       },
       changes: {
         before: { outstandingDebt: beforeDebt },
-        after: { outstandingDebt: vendor.outstandingDebt, paidAmount: amount }
+        after: { outstandingDebt: vendor.outstandingDebt, paidAmount: amount, allocatedPurchaseOrders }
       },
       context: {
         notes: dto.note || `Thanh toán ${amount.toLocaleString('vi-VN')} ₫ cho NCC ${vendor.vendorCode}`
       }
     });
 
-    return { vendor, purchaseOrder: updatedPo };
+    return { vendor, purchaseOrder: updatedPo, allocatedPurchaseOrders };
   }
 }

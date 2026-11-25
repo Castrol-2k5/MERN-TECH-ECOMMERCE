@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
+import * as XLSX from 'xlsx';
 import {
   Building,
   PackagePlus,
@@ -9,11 +10,19 @@ import {
   X,
   RefreshCw,
   Truck,
-  Barcode
+  Barcode,
+  Trash2,
+  Printer,
+  Eye,
+  Ban,
+  Upload,
+  AlertCircle,
+  Search
 } from 'lucide-react';
 import { procurementService } from '../../features/procurement/services/procurementService.js';
 import { productService } from '../../features/products/services/productService.js';
 import { branchService } from '../../features/branches/services/branchService.js';
+import { PoPrintReceiptModal } from '../../features/procurement/components/PoPrintReceiptModal.jsx';
 
 const formatVnd = (n) => `${Number(n || 0).toLocaleString('vi-VN')} ₫`;
 
@@ -30,6 +39,46 @@ const PAYMENT_BADGES = {
   PAID: 'bg-emerald-500/20 text-emerald-300'
 };
 
+const extractApiError = (err, fallback = 'Đã xảy ra lỗi.') => {
+  const fieldErrors = Array.isArray(err?.errors)
+    ? err.errors.map((e) => e?.message || e).filter(Boolean)
+    : Array.isArray(err?.response?.data?.errors)
+      ? err.response.data.errors.map((e) => e?.message || e).filter(Boolean)
+      : [];
+  const baseMsg = err?.response?.data?.message || err?.message || fallback;
+  if (fieldErrors.length > 0) {
+    return `${baseMsg}: ${fieldErrors.join('; ')}`;
+  }
+  return baseMsg;
+};
+
+const fetchAllActiveProducts = async () => {
+  const firstRes = await productService.getProducts({ page: 1, limit: 100 });
+  if (firstRes?.error) {
+    throw new Error(firstRes.error);
+  }
+  const allProducts = [...(firstRes?.products || [])];
+  const totalPages = Math.min(10, Number(firstRes?.meta?.totalPages || 1));
+
+  if (totalPages > 1) {
+    const restCalls = [];
+    for (let p = 2; p <= totalPages; p += 1) {
+      restCalls.push(productService.getProducts({ page: p, limit: 100 }));
+    }
+    const restResults = await Promise.all(restCalls);
+    restResults.forEach((r) => {
+      if (Array.isArray(r?.products)) allProducts.push(...r.products);
+    });
+  }
+  return allProducts;
+};
+
+const parseSerialsFromText = (text) =>
+  String(text || '')
+    .split(/[\r\n,;]+/)
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean);
+
 export const HqProcurementPage = () => {
   const location = useLocation();
   const initialPrefill = location.state?.prefillItems || null;
@@ -42,8 +91,13 @@ export const HqProcurementPage = () => {
   const [warehouses, setWarehouses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toastMsg, setToastMsg] = useState(null);
+  const [modalError, setModalError] = useState('');
 
-  // Modals
+  // PO Filters
+  const [poStatusFilter, setPoStatusFilter] = useState('ALL');
+  const [poVendorFilter, setPoVendorFilter] = useState('ALL');
+
+  // Vendor Modal
   const [showVendorModal, setShowVendorModal] = useState(false);
   const [editingVendor, setEditingVendor] = useState(null);
   const [vendorForm, setVendorForm] = useState({
@@ -54,10 +108,14 @@ export const HqProcurementPage = () => {
     phone: '',
     email: '',
     address: '',
-    paymentTermDays: 30
+    paymentTermDays: 30,
+    notes: '',
+    isActive: true
   });
 
+  // Create PO Modal
   const [showPoModal, setShowPoModal] = useState(() => Boolean(initialPrefill?.length));
+  const [productSearch, setProductSearch] = useState('');
   const [poForm, setPoForm] = useState(() => ({
     vendorId: '',
     warehouseBranchId: '',
@@ -72,9 +130,15 @@ export const HqProcurementPage = () => {
       : [{ productId: '', productSkuId: '', orderedQty: 5, unitCost: 0 }]
   }));
 
+  // Receive PO Modal
   const [receivingPo, setReceivingPo] = useState(null);
   const [serialInputs, setSerialInputs] = useState({});
 
+  // Detail / Payment History / Print Modals
+  const [detailPo, setDetailPo] = useState(null);
+  const [printingPo, setPrintingPo] = useState(null);
+
+  // Payment Modal
   const [payingVendor, setPayingVendor] = useState(null);
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
@@ -82,60 +146,133 @@ export const HqProcurementPage = () => {
     note: ''
   });
 
-  const showToast = (type, message) => {
+  const showToast = useCallback((type, message) => {
     setToastMsg({ type, message });
-    setTimeout(() => setToastMsg(null), 4000);
-  };
+    setTimeout(() => setToastMsg(null), 5000);
+  }, []);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [vendorRes, poRes, prodRes, branchList] = await Promise.all([
+      const [vendorRes, poRes, prodRes, branchRes] = await Promise.allSettled([
         procurementService.getVendors(),
-        procurementService.getPurchaseOrders({ limit: 50 }),
-        productService.getProducts({ limit: 200, includeInactive: false }),
+        procurementService.getPurchaseOrders({ limit: 100 }),
+        fetchAllActiveProducts(),
         branchService.getBranches()
       ]);
-      setVendors(vendorRes?.vendors || []);
-      setTotalDebt(vendorRes?.totalOutstandingDebt || 0);
-      setPurchaseOrders(poRes?.purchaseOrders || []);
-      setProducts(prodRes?.products || []);
-      const hqWh = (branchList || []).filter((b) => b.isHeadquarter || b.isWarehouse || b.branchCode === 'BR-HQ');
-      setWarehouses(hqWh.length > 0 ? hqWh : branchList || []);
-    } catch (err) {
-      showToast('error', err.response?.data?.message || err.message || 'Không thể tải dữ liệu nhập hàng HQ.');
+
+      const errors = [];
+      if (vendorRes.status === 'fulfilled') {
+        setVendors(vendorRes.value?.vendors || []);
+        setTotalDebt(vendorRes.value?.totalOutstandingDebt || 0);
+      } else {
+        errors.push(extractApiError(vendorRes.reason, 'Lỗi tải NCC'));
+      }
+
+      if (poRes.status === 'fulfilled') {
+        setPurchaseOrders(poRes.value?.purchaseOrders || []);
+      } else {
+        errors.push(extractApiError(poRes.reason, 'Lỗi tải PO'));
+      }
+
+      if (prodRes.status === 'fulfilled') {
+        setProducts(prodRes.value || []);
+      } else {
+        errors.push(extractApiError(prodRes.reason, 'Lỗi tải sản phẩm'));
+      }
+
+      if (branchRes.status === 'fulfilled') {
+        const branchList = branchRes.value || [];
+        const hqWh = branchList.filter((b) => b.isHeadquarter || b.isWarehouse || b.branchCode === 'BR-HQ');
+        setWarehouses(hqWh.length > 0 ? hqWh : branchList);
+      }
+
+      if (errors.length > 0) {
+        showToast('error', errors.join(' | '));
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     let ignore = false;
-    Promise.all([
+    Promise.allSettled([
       procurementService.getVendors(),
-      procurementService.getPurchaseOrders({ limit: 50 }),
-      productService.getProducts({ limit: 200, includeInactive: false }),
+      procurementService.getPurchaseOrders({ limit: 100 }),
+      fetchAllActiveProducts(),
       branchService.getBranches()
     ])
-      .then(([vendorRes, poRes, prodRes, branchList]) => {
+      .then(([vendorRes, poRes, prodRes, branchRes]) => {
         if (ignore) return;
-        setVendors(vendorRes?.vendors || []);
-        setTotalDebt(vendorRes?.totalOutstandingDebt || 0);
-        setPurchaseOrders(poRes?.purchaseOrders || []);
-        setProducts(prodRes?.products || []);
-        const hqWh = (branchList || []).filter((b) => b.isHeadquarter || b.isWarehouse || b.branchCode === 'BR-HQ');
-        setWarehouses(hqWh.length > 0 ? hqWh : branchList || []);
+        const errors = [];
+        if (vendorRes.status === 'fulfilled') {
+          setVendors(vendorRes.value?.vendors || []);
+          setTotalDebt(vendorRes.value?.totalOutstandingDebt || 0);
+        } else {
+          errors.push(extractApiError(vendorRes.reason, 'Lỗi tải NCC'));
+        }
+
+        if (poRes.status === 'fulfilled') {
+          setPurchaseOrders(poRes.value?.purchaseOrders || []);
+        } else {
+          errors.push(extractApiError(poRes.reason, 'Lỗi tải PO'));
+        }
+
+        if (prodRes.status === 'fulfilled') {
+          setProducts(prodRes.value || []);
+        } else {
+          errors.push(extractApiError(prodRes.reason, 'Lỗi tải sản phẩm'));
+        }
+
+        if (branchRes.status === 'fulfilled') {
+          const branchList = branchRes.value || [];
+          const hqWh = branchList.filter((b) => b.isHeadquarter || b.isWarehouse || b.branchCode === 'BR-HQ');
+          setWarehouses(hqWh.length > 0 ? hqWh : branchList);
+        }
+
+        if (errors.length > 0) {
+          showToast('error', errors.join(' | '));
+        }
       })
-      .catch(() => {})
       .finally(() => {
         if (!ignore) setLoading(false);
       });
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [showToast]);
+
+  const filteredProducts = useMemo(() => {
+    const q = productSearch.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter(
+      (p) =>
+        p.name?.toLowerCase().includes(q) ||
+        p.brand?.toLowerCase().includes(q) ||
+        (p.skus || []).some((s) => (s.sku || s.code || '').toLowerCase().includes(q))
+    );
+  }, [products, productSearch]);
+
+  const filteredPurchaseOrders = useMemo(() => {
+    return purchaseOrders.filter((po) => {
+      if (poStatusFilter !== 'ALL' && po.status !== poStatusFilter) return false;
+      if (poVendorFilter !== 'ALL' && String(po.vendorId?._id || po.vendorId) !== poVendorFilter) return false;
+      return true;
+    });
+  }, [purchaseOrders, poStatusFilter, poVendorFilter]);
+
+  const poEstimatedTotal = useMemo(
+    () =>
+      poForm.items.reduce(
+        (sum, it) => sum + Math.max(0, Number(it.orderedQty || 0)) * Math.max(0, Number(it.unitCost || 0)),
+        0
+      ),
+    [poForm.items]
+  );
 
   const openCreateVendor = () => {
+    setModalError('');
     setEditingVendor(null);
     setVendorForm({
       vendorCode: '',
@@ -145,12 +282,15 @@ export const HqProcurementPage = () => {
       phone: '',
       email: '',
       address: '',
-      paymentTermDays: 30
+      paymentTermDays: 30,
+      notes: '',
+      isActive: true
     });
     setShowVendorModal(true);
   };
 
   const openEditVendor = (v) => {
+    setModalError('');
     setEditingVendor(v);
     setVendorForm({
       vendorCode: v.vendorCode || '',
@@ -160,18 +300,28 @@ export const HqProcurementPage = () => {
       phone: v.phone || '',
       email: v.email || '',
       address: v.address || '',
-      paymentTermDays: v.paymentTermDays ?? 30
+      paymentTermDays: v.paymentTermDays ?? 30,
+      notes: v.notes || '',
+      isActive: v.isActive !== false
     });
     setShowVendorModal(true);
   };
 
   const handleSaveVendor = async (e) => {
     e.preventDefault();
+    setModalError('');
     try {
       const payload = {
-        ...vendorForm,
         vendorCode: vendorForm.vendorCode.trim().toUpperCase(),
-        paymentTermDays: Math.max(0, Number(vendorForm.paymentTermDays || 0))
+        name: vendorForm.name.trim(),
+        taxCode: vendorForm.taxCode.trim(),
+        contactName: vendorForm.contactName.trim(),
+        phone: vendorForm.phone.trim(),
+        email: vendorForm.email.trim(),
+        address: vendorForm.address.trim(),
+        paymentTermDays: Math.max(0, Number(vendorForm.paymentTermDays || 0)),
+        notes: vendorForm.notes.trim(),
+        isActive: Boolean(vendorForm.isActive)
       };
       if (editingVendor) {
         await procurementService.updateVendor(editingVendor._id, payload);
@@ -183,17 +333,30 @@ export const HqProcurementPage = () => {
       setShowVendorModal(false);
       await fetchAll();
     } catch (err) {
-      showToast('error', err.response?.data?.message || err.message || 'Lỗi lưu nhà cung cấp.');
+      setModalError(extractApiError(err, 'Lỗi lưu nhà cung cấp.'));
     }
+  };
+
+  const openCreatePoModal = () => {
+    setModalError('');
+    setProductSearch('');
+    setPoForm({
+      vendorId: vendors[0]?._id || '',
+      warehouseBranchId: warehouses[0]?._id || '',
+      notes: '',
+      items: [{ productId: '', productSkuId: '', orderedQty: 5, unitCost: 0 }]
+    });
+    setShowPoModal(true);
   };
 
   const handleCreatePo = async (e) => {
     e.preventDefault();
+    setModalError('');
     try {
       const payload = {
         vendorId: poForm.vendorId,
         ...(poForm.warehouseBranchId ? { warehouseBranchId: poForm.warehouseBranchId } : {}),
-        notes: poForm.notes,
+        notes: poForm.notes.trim(),
         items: poForm.items.map((it) => ({
           productId: it.productId,
           productSkuId: it.productSkuId,
@@ -204,17 +367,30 @@ export const HqProcurementPage = () => {
       await procurementService.createPurchaseOrder(payload);
       showToast('success', 'Đã tạo Phiếu Nhập Kho Tổng (PO) thành công.');
       setShowPoModal(false);
+      setActiveTab('PO');
       await fetchAll();
     } catch (err) {
-      showToast('error', err.response?.data?.message || err.message || 'Không thể tạo phiếu PO.');
+      setModalError(extractApiError(err, 'Không thể tạo phiếu PO.'));
+    }
+  };
+
+  const handleCancelPo = async (po) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn hủy phiếu nhập ${po.poCode} không?`)) return;
+    try {
+      await procurementService.updatePurchaseOrderStatus(po._id, 'CANCELLED');
+      showToast('success', `Đã hủy phiếu nhập ${po.poCode}.`);
+      await fetchAll();
+    } catch (err) {
+      showToast('error', extractApiError(err, 'Không thể hủy phiếu nhập.'));
     }
   };
 
   const openReceiveModal = (po) => {
+    setModalError('');
     setReceivingPo(po);
     const initInputs = {};
     (po.items || []).forEach((it) => {
-      initInputs[it.productSkuId] = {
+      initInputs[String(it.productSkuId)] = {
         receivedQty: it.orderedQty,
         serialsText: ''
       };
@@ -222,18 +398,58 @@ export const HqProcurementPage = () => {
     setSerialInputs(initInputs);
   };
 
+  const handleUploadSerialFileForSku = async (skuId, file) => {
+    if (!file) return;
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const firstSheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+      const headerBlacklist = new Set(['SERIAL', 'SERIALNUMBER', 'SERIAL_NUMBER', 'IMEI', 'MA_SERIAL', 'CODE']);
+
+      const extracted = [];
+      rows.forEach((row, idx) => {
+        const rawCell = Array.isArray(row) ? row[0] : '';
+        const cleaned = String(rawCell || '').trim().toUpperCase();
+        if (!cleaned) return;
+        if (idx === 0 && headerBlacklist.has(cleaned.replace(/\s+/g, ''))) return;
+        extracted.push(cleaned);
+      });
+
+      const uniqueSerials = Array.from(new Set(extracted));
+      if (uniqueSerials.length === 0) {
+        setModalError('File không có mã Serial/IMEI hợp lệ ở cột đầu tiên.');
+        return;
+      }
+
+      setModalError('');
+      setSerialInputs((prev) => {
+        const key = String(skuId);
+        const cur = prev[key] || { receivedQty: uniqueSerials.length, serialsText: '' };
+        const merged = Array.from(new Set([...parseSerialsFromText(cur.serialsText), ...uniqueSerials]));
+        return {
+          ...prev,
+          [key]: {
+            ...cur,
+            serialsText: merged.join('\n')
+          }
+        };
+      });
+    } catch (err) {
+      setModalError(`Không thể đọc file Excel/CSV: ${err.message}`);
+    }
+  };
+
   const handleConfirmReceivePo = async (e) => {
     e.preventDefault();
     if (!receivingPo) return;
+    setModalError('');
     try {
       const itemsPayload = (receivingPo.items || []).map((it) => {
-        const inp = serialInputs[it.productSkuId] || {};
-        const serials = String(inp.serialsText || '')
-          .split(/[\r\n,;]+/)
-          .map((s) => s.trim().toUpperCase())
-          .filter(Boolean);
+        const inp = serialInputs[String(it.productSkuId)] || {};
+        const serials = parseSerialsFromText(inp.serialsText);
         return {
-          productSkuId: it.productSkuId,
+          productSkuId: String(it.productSkuId),
           receivedQty: Math.max(1, Number(inp.receivedQty || it.orderedQty)),
           serials
         };
@@ -250,24 +466,31 @@ export const HqProcurementPage = () => {
       setReceivingPo(null);
       await fetchAll();
     } catch (err) {
-      showToast('error', err.response?.data?.message || err.message || 'Lỗi xác nhận nhập kho PO.');
+      setModalError(extractApiError(err, 'Lỗi xác nhận nhập kho PO.'));
     }
   };
 
   const handleRecordPayment = async (e) => {
     e.preventDefault();
     if (!payingVendor) return;
+    setModalError('');
     try {
-      await procurementService.recordVendorPayment(payingVendor._id, {
+      const res = await procurementService.recordVendorPayment(payingVendor._id, {
         amount: Number(paymentForm.amount),
         ...(paymentForm.purchaseOrderId ? { purchaseOrderId: paymentForm.purchaseOrderId } : {}),
-        note: paymentForm.note
+        note: paymentForm.note.trim()
       });
-      showToast('success', `Đã ghi nhận thanh toán công nợ cho ${payingVendor.name}.`);
+      const allocatedCount = res?.allocatedPurchaseOrders?.length || 0;
+      showToast(
+        'success',
+        allocatedCount > 0
+          ? `Đã thanh toán cho ${payingVendor.name} và tự động gạch nợ ${allocatedCount} phiếu PO.`
+          : `Đã ghi nhận thanh toán công nợ cho ${payingVendor.name}.`
+      );
       setPayingVendor(null);
       await fetchAll();
     } catch (err) {
-      showToast('error', err.response?.data?.message || err.message || 'Lỗi thanh toán công nợ.');
+      setModalError(extractApiError(err, 'Lỗi thanh toán công nợ.'));
     }
   };
 
@@ -276,6 +499,23 @@ export const HqProcurementPage = () => {
 
   return (
     <div className="space-y-5 font-sans text-slate-100">
+      {/* Floating Toast (luôn nổi trên mọi Modal) */}
+      {toastMsg && (
+        <div
+          className={`fixed top-4 right-4 z-[100] max-w-md p-3.5 rounded-xl border text-xs font-semibold flex items-center gap-3 shadow-2xl ${
+            toastMsg.type === 'success'
+              ? 'bg-emerald-950/95 border-emerald-500/60 text-emerald-200'
+              : 'bg-rose-950/95 border-rose-500/60 text-rose-200'
+          }`}
+        >
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span className="flex-1">{toastMsg.message}</span>
+          <button type="button" onClick={() => setToastMsg(null)} className="opacity-70 hover:opacity-100 cursor-pointer">
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -285,7 +525,7 @@ export const HqProcurementPage = () => {
           </div>
           <h1 className="text-2xl font-extrabold text-white">Nhà Cung Cấp &amp; Nhập Hàng Kho Tổng (PO)</h1>
           <p className="text-xs text-slate-400 mt-1">
-            Quản lý hợp đồng NCC, tạo phiếu nhập mua, quét Serial vào Kho HQ, tự động tính Giá vốn bình quân &amp; đối trừ Công nợ.
+            Quản lý hợp đồng NCC, tạo phiếu nhập mua, quét Serial vào Kho HQ, tự động tính Giá vốn bình quân &amp; đối trừ Công nợ FIFO.
           </p>
         </div>
 
@@ -308,7 +548,7 @@ export const HqProcurementPage = () => {
           </button>
           <button
             type="button"
-            onClick={() => setShowPoModal(true)}
+            onClick={openCreatePoModal}
             className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-xs font-bold text-white flex items-center gap-1.5 cursor-pointer shadow-md shadow-blue-600/20"
           >
             <PackagePlus className="w-3.5 h-3.5" />
@@ -316,21 +556,6 @@ export const HqProcurementPage = () => {
           </button>
         </div>
       </div>
-
-      {toastMsg && (
-        <div
-          className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-between ${
-            toastMsg.type === 'success'
-              ? 'bg-emerald-950/70 border-emerald-500/40 text-emerald-300'
-              : 'bg-rose-950/70 border-rose-500/40 text-rose-300'
-          }`}
-        >
-          <span>{toastMsg.message}</span>
-          <button type="button" onClick={() => setToastMsg(null)}>
-            ✕
-          </button>
-        </div>
-      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -352,28 +577,57 @@ export const HqProcurementPage = () => {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-2 bg-slate-900 p-1 rounded-xl border border-slate-800 w-fit">
-        <button
-          type="button"
-          onClick={() => setActiveTab('VENDORS')}
-          className={`px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer ${
-            activeTab === 'VENDORS' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <Building className="w-3.5 h-3.5" />
-          <span>Nhà Cung Cấp &amp; Công Nợ ({vendors.length})</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('PO')}
-          className={`px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer ${
-            activeTab === 'PO' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <PackagePlus className="w-3.5 h-3.5" />
-          <span>Phiếu Nhập Kho HQ ({purchaseOrders.length})</span>
-        </button>
+      {/* Tabs + PO Filter */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 bg-slate-900 p-1 rounded-xl border border-slate-800 w-fit">
+          <button
+            type="button"
+            onClick={() => setActiveTab('VENDORS')}
+            className={`px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'VENDORS' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Building className="w-3.5 h-3.5" />
+            <span>Nhà Cung Cấp &amp; Công Nợ ({vendors.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('PO')}
+            className={`px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'PO' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <PackagePlus className="w-3.5 h-3.5" />
+            <span>Phiếu Nhập Kho HQ ({purchaseOrders.length})</span>
+          </button>
+        </div>
+
+        {activeTab === 'PO' && (
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <select
+              value={poVendorFilter}
+              onChange={(e) => setPoVendorFilter(e.target.value)}
+              className="px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-slate-200"
+            >
+              <option value="ALL">Tất cả Nhà cung cấp</option>
+              {vendors.map((v) => (
+                <option key={v._id} value={v._id}>
+                  {v.vendorCode} - {v.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={poStatusFilter}
+              onChange={(e) => setPoStatusFilter(e.target.value)}
+              className="px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-slate-200"
+            >
+              <option value="ALL">Mọi trạng thái PO</option>
+              <option value="ORDERED">ORDERED (Chờ nhận)</option>
+              <option value="RECEIVED">RECEIVED (Đã nhập kho)</option>
+              <option value="CANCELLED">CANCELLED (Đã hủy)</option>
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Tab 1: Vendors */}
@@ -408,7 +662,9 @@ export const HqProcurementPage = () => {
                       </div>
                     </td>
                     <td className="py-3 px-4">
-                      <div>{v.contactName || '--'} • <span className="font-mono">{v.phone}</span></div>
+                      <div>
+                        {v.contactName || '--'} • <span className="font-mono">{v.phone}</span>
+                      </div>
                       <div className="text-[10px] text-slate-400">{v.address || v.email || ''}</div>
                     </td>
                     <td className="py-3 px-4 text-right font-mono">{v.paymentTermDays ?? 30} ngày</td>
@@ -430,6 +686,7 @@ export const HqProcurementPage = () => {
                           <button
                             type="button"
                             onClick={() => {
+                              setModalError('');
                               setPayingVendor(v);
                               setPaymentForm({
                                 amount: String(v.outstandingDebt),
@@ -469,14 +726,14 @@ export const HqProcurementPage = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {purchaseOrders.length === 0 ? (
+              {filteredPurchaseOrders.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="py-8 text-center text-slate-500">
-                    Chưa có phiếu nhập kho HQ nào.
+                    Không có phiếu nhập kho HQ nào phù hợp.
                   </td>
                 </tr>
               ) : (
-                purchaseOrders.map((po) => (
+                filteredPurchaseOrders.map((po) => (
                   <tr key={po._id} className="hover:bg-slate-800/30">
                     <td className="py-3 px-4 font-mono font-bold text-cyan-400">
                       <div>{po.poCode}</div>
@@ -494,7 +751,7 @@ export const HqProcurementPage = () => {
                       {(po.items || []).map((it) => (
                         <div key={it.productSkuId} className="text-[11px]">
                           <span className="font-mono text-cyan-300">{it.sku}</span> • SL:{' '}
-                          <strong>{it.status === 'RECEIVED' ? it.receivedQty : it.orderedQty}</strong> @{' '}
+                          <strong>{it.status === 'RECEIVED' || po.status === 'RECEIVED' ? it.receivedQty : it.orderedQty}</strong> @{' '}
                           {formatVnd(it.unitCost)}
                         </div>
                       ))}
@@ -513,16 +770,45 @@ export const HqProcurementPage = () => {
                       </span>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      {['DRAFT', 'ORDERED'].includes(po.status) && (
+                      <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                        {['DRAFT', 'ORDERED'].includes(po.status) && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => openReceiveModal(po)}
+                              className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Nhận hàng</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleCancelPo(po)}
+                              className="px-2 py-1.5 bg-rose-600/20 hover:bg-rose-600/40 border border-rose-500/40 text-rose-300 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                              title="Hủy phiếu nhập"
+                            >
+                              <Ban className="w-3 h-3" />
+                              <span>Hủy</span>
+                            </button>
+                          </>
+                        )}
                         <button
                           type="button"
-                          onClick={() => openReceiveModal(po)}
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                          onClick={() => setDetailPo(po)}
+                          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg cursor-pointer"
+                          title="Chi tiết & Lịch sử thanh toán"
                         >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Nhận hàng &amp; Quét Serial</span>
+                          <Eye className="w-3.5 h-3.5" />
                         </button>
-                      )}
+                        <button
+                          type="button"
+                          onClick={() => setPrintingPo(po)}
+                          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-lg cursor-pointer"
+                          title="In Phiếu Nhập Kho"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -535,21 +821,30 @@ export const HqProcurementPage = () => {
       {/* Modal Add/Edit Vendor */}
       {showVendorModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-5 space-y-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-5 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="font-bold text-sm text-white">
                 {editingVendor ? 'Cập nhật Nhà Cung Cấp' : 'Thêm Nhà Cung Cấp Mới'}
               </h3>
-              <button type="button" onClick={() => setShowVendorModal(false)}>
+              <button type="button" onClick={() => setShowVendorModal(false)} className="cursor-pointer">
                 <X className="w-4 h-4 text-slate-400" />
               </button>
             </div>
+
+            {modalError && (
+              <div className="p-3 rounded-xl bg-rose-950/80 border border-rose-500/50 text-rose-200 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                <span>{modalError}</span>
+              </div>
+            )}
+
             <form onSubmit={handleSaveVendor} className="space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-slate-300 block mb-1">Mã NCC *</label>
                   <input
                     required
+                    minLength={2}
                     value={vendorForm.vendorCode}
                     onChange={(e) => setVendorForm({ ...vendorForm, vendorCode: e.target.value.toUpperCase() })}
                     placeholder="NPP-FPT"
@@ -557,9 +852,10 @@ export const HqProcurementPage = () => {
                   />
                 </div>
                 <div>
-                  <label className="text-slate-300 block mb-1">SĐT liên hệ *</label>
+                  <label className="text-slate-300 block mb-1">SĐT liên hệ * (tối thiểu 8 số)</label>
                   <input
                     required
+                    minLength={8}
                     value={vendorForm.phone}
                     onChange={(e) => setVendorForm({ ...vendorForm, phone: e.target.value })}
                     placeholder="02873008888"
@@ -571,11 +867,33 @@ export const HqProcurementPage = () => {
                 <label className="text-slate-300 block mb-1">Tên Nhà Cung Cấp *</label>
                 <input
                   required
+                  minLength={2}
                   value={vendorForm.name}
                   onChange={(e) => setVendorForm({ ...vendorForm, name: e.target.value })}
                   placeholder="Công ty TNHH Synnex FPT"
                   className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg"
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 block mb-1">Mã số thuế (MST)</label>
+                  <input
+                    value={vendorForm.taxCode}
+                    onChange={(e) => setVendorForm({ ...vendorForm, taxCode: e.target.value })}
+                    placeholder="0301234567"
+                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-300 block mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={vendorForm.email}
+                    onChange={(e) => setVendorForm({ ...vendorForm, email: e.target.value })}
+                    placeholder="contact@vendor.vn"
+                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg"
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -591,17 +909,35 @@ export const HqProcurementPage = () => {
                   <input
                     type="number"
                     min="0"
+                    max="365"
                     value={vendorForm.paymentTermDays}
                     onChange={(e) => setVendorForm({ ...vendorForm, paymentTermDays: e.target.value })}
                     className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg font-mono"
                   />
                 </div>
               </div>
+              <div>
+                <label className="text-slate-300 block mb-1">Địa chỉ</label>
+                <input
+                  value={vendorForm.address}
+                  onChange={(e) => setVendorForm({ ...vendorForm, address: e.target.value })}
+                  placeholder="Số 123, Quận 1, TP.HCM"
+                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-slate-300 block mb-1">Ghi chú hợp đồng</label>
+                <input
+                  value={vendorForm.notes}
+                  onChange={(e) => setVendorForm({ ...vendorForm, notes: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg"
+                />
+              </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowVendorModal(false)}
-                  className="px-4 py-1.5 bg-slate-800 rounded-xl"
+                  className="px-4 py-1.5 bg-slate-800 rounded-xl cursor-pointer"
                 >
                   Hủy
                 </button>
@@ -617,13 +953,21 @@ export const HqProcurementPage = () => {
       {/* Modal Create PO */}
       {showPoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="font-bold text-sm text-white">Tạo Phiếu Nhập Mua Kho Tổng (PO)</h3>
-              <button type="button" onClick={() => setShowPoModal(false)}>
+              <button type="button" onClick={() => setShowPoModal(false)} className="cursor-pointer">
                 <X className="w-4 h-4 text-slate-400" />
               </button>
             </div>
+
+            {modalError && (
+              <div className="p-3 rounded-xl bg-rose-950/80 border border-rose-500/50 text-rose-200 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                <span>{modalError}</span>
+              </div>
+            )}
+
             <form onSubmit={handleCreatePo} className="space-y-3 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -660,29 +1004,53 @@ export const HqProcurementPage = () => {
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-200">Mặt hàng đặt nhập</span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPoForm({
-                        ...poForm,
-                        items: [...poForm.items, { productId: '', productSkuId: '', orderedQty: 5, unitCost: 0 }]
-                      })
-                    }
-                    className="text-cyan-400 font-bold cursor-pointer"
-                  >
-                    + Thêm dòng SKU
-                  </button>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-bold text-slate-200">
+                    Mặt hàng đặt nhập ({products.length} sản phẩm khả dụng)
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
+                      <input
+                        value={productSearch}
+                        onChange={(e) => setProductSearch(e.target.value)}
+                        placeholder="Lọc nhanh SP / SKU..."
+                        className="pl-8 pr-2.5 py-1 bg-slate-950 border border-slate-700 rounded-lg text-[11px] w-44"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPoForm({
+                          ...poForm,
+                          items: [...poForm.items, { productId: '', productSkuId: '', orderedQty: 5, unitCost: 0 }]
+                        })
+                      }
+                      className="px-2.5 py-1 bg-cyan-500/15 border border-cyan-500/30 rounded-lg text-cyan-300 font-bold cursor-pointer"
+                    >
+                      + Thêm dòng SKU
+                    </button>
+                  </div>
                 </div>
 
                 {poForm.items.map((item, idx) => {
                   const selectedProd = products.find((p) => String(p._id) === String(item.productId));
                   const skus = selectedProd?.skus || [];
+                  const dropdownProds = selectedProd && !filteredProducts.some((p) => p._id === selectedProd._id)
+                    ? [selectedProd, ...filteredProducts]
+                    : filteredProducts;
+
                   return (
                     <div key={idx} className="grid grid-cols-12 gap-2 items-end bg-slate-950 p-2.5 rounded-xl border border-slate-800">
                       <div className="col-span-4">
-                        <label className="text-[10px] text-slate-400 block mb-1">Sản phẩm</label>
+                        <label className="text-[10px] text-slate-400 block mb-1">
+                          Sản phẩm{' '}
+                          {selectedProd && (
+                            <span className={selectedProd.isSerialManaged !== false ? 'text-cyan-400' : 'text-amber-300'}>
+                              ({selectedProd.isSerialManaged !== false ? 'Serial/IMEI' : 'Số lượng'})
+                            </span>
+                          )}
+                        </label>
                         <select
                           required
                           value={item.productId}
@@ -699,12 +1067,12 @@ export const HqProcurementPage = () => {
                             };
                             setPoForm({ ...poForm, items: next });
                           }}
-                          className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg"
+                          className="w-full px-2 py-1.5 bg-slate-900 text-slate-100 border border-slate-700 rounded-lg"
                         >
-                          <option value="">-- Chọn SP --</option>
-                          {products.map((p) => (
-                            <option key={p._id} value={p._id}>
-                              {p.name}
+                          <option value="" className="bg-slate-900 text-slate-300">-- Chọn SP --</option>
+                          {dropdownProds.map((p) => (
+                            <option key={p._id} value={p._id} className="bg-slate-900 text-slate-100">
+                              {p.brand ? `[${p.brand}] ` : ''}{p.name}
                             </option>
                           ))}
                         </select>
@@ -725,12 +1093,12 @@ export const HqProcurementPage = () => {
                             };
                             setPoForm({ ...poForm, items: next });
                           }}
-                          className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg font-mono"
+                          className="w-full px-2 py-1.5 bg-slate-900 text-slate-100 border border-slate-700 rounded-lg font-mono"
                         >
-                          <option value="">-- SKU --</option>
+                          <option value="" className="bg-slate-900 text-slate-300">-- SKU --</option>
                           {skus.map((s) => (
-                            <option key={s._id} value={s._id}>
-                              {s.sku}
+                            <option key={s._id} value={s._id} className="bg-slate-900 text-slate-100">
+                              {s.sku || s.code}
                             </option>
                           ))}
                         </select>
@@ -750,12 +1118,12 @@ export const HqProcurementPage = () => {
                           className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg font-mono"
                         />
                       </div>
-                      <div className="col-span-3">
+                      <div className="col-span-2">
                         <label className="text-[10px] text-slate-400 block mb-1">Giá nhập (VND)</label>
                         <input
                           type="number"
                           min="0"
-                          step="10000"
+                          step="1000"
                           required
                           value={item.unitCost}
                           onChange={(e) => {
@@ -766,9 +1134,31 @@ export const HqProcurementPage = () => {
                           className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg font-mono text-amber-300"
                         />
                       </div>
+                      <div className="col-span-1 flex justify-end">
+                        {poForm.items.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setPoForm({
+                                ...poForm,
+                                items: poForm.items.filter((_, i) => i !== idx)
+                              })
+                            }
+                            className="p-1.5 bg-rose-500/15 hover:bg-rose-500/30 text-rose-300 rounded-lg cursor-pointer"
+                            title="Xóa dòng"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
+              </div>
+
+              <div className="flex items-center justify-between bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5">
+                <span className="text-slate-400 font-semibold">Tổng giá trị phiếu nhập dự kiến:</span>
+                <span className="font-mono font-black text-sm text-cyan-300">{formatVnd(poEstimatedTotal)}</span>
               </div>
 
               <div>
@@ -781,7 +1171,7 @@ export const HqProcurementPage = () => {
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setShowPoModal(false)} className="px-4 py-1.5 bg-slate-800 rounded-xl">
+                <button type="button" onClick={() => setShowPoModal(false)} className="px-4 py-1.5 bg-slate-800 rounded-xl cursor-pointer">
                   Hủy
                 </button>
                 <button type="submit" className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold cursor-pointer">
@@ -796,21 +1186,34 @@ export const HqProcurementPage = () => {
       {/* Modal Receive PO & Scan Serials */}
       {receivingPo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <Barcode className="w-4 h-4 text-emerald-400" />
                 <h3 className="font-bold text-sm text-white">Nhận hàng vào Kho HQ: {receivingPo.poCode}</h3>
               </div>
-              <button type="button" onClick={() => setReceivingPo(null)}>
+              <button type="button" onClick={() => setReceivingPo(null)} className="cursor-pointer">
                 <X className="w-4 h-4 text-slate-400" />
               </button>
             </div>
+
+            {modalError && (
+              <div className="p-3 rounded-xl bg-rose-950/80 border border-rose-500/50 text-rose-200 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                <span>{modalError}</span>
+              </div>
+            )}
+
             <form onSubmit={handleConfirmReceivePo} className="space-y-3 text-xs">
               {(receivingPo.items || []).map((it) => {
-                const inp = serialInputs[it.productSkuId] || { receivedQty: it.orderedQty, serialsText: '' };
+                const key = String(it.productSkuId);
+                const inp = serialInputs[key] || { receivedQty: it.orderedQty, serialsText: '' };
+                const enteredSerials = parseSerialsFromText(inp.serialsText);
+                const targetQty = Math.max(1, Number(inp.receivedQty || 0));
+                const isExactCount = enteredSerials.length === targetQty;
+
                 return (
-                  <div key={it.productSkuId} className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-2">
+                  <div key={key} className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-2">
                     <div className="flex items-center justify-between">
                       <div>
                         <span className="font-bold text-white">{it.productName}</span>{' '}
@@ -828,16 +1231,42 @@ export const HqProcurementPage = () => {
                           onChange={(e) =>
                             setSerialInputs({
                               ...serialInputs,
-                              [it.productSkuId]: { ...inp, receivedQty: e.target.value }
+                              [key]: { ...inp, receivedQty: e.target.value }
                             })
                           }
                           className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg font-mono"
                         />
                       </div>
-                      <div className="col-span-2">
-                        <label className="text-[10px] text-slate-400 block mb-1">
-                          {it.isSerialManaged ? `Danh sách ${inp.receivedQty} Serial/IMEI (mỗi dòng 1 mã) *` : 'Không yêu cầu Serial'}
-                        </label>
+                      <div className="col-span-2 space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="text-[10px] text-slate-400">
+                            {it.isSerialManaged ? (
+                              <>
+                                Serial/IMEI:{' '}
+                                <span className={`font-bold ${isExactCount ? 'text-emerald-400' : 'text-amber-300'}`}>
+                                  Đã nhập {enteredSerials.length} / {targetQty} mã
+                                </span>
+                              </>
+                            ) : (
+                              'Quản lý theo số lượng (không cần Serial)'
+                            )}
+                          </label>
+                          {it.isSerialManaged && (
+                            <label className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-md text-[10px] text-cyan-300 font-semibold inline-flex items-center gap-1 cursor-pointer">
+                              <Upload className="w-3 h-3" />
+                              <span>Nạp Excel/CSV</span>
+                              <input
+                                type="file"
+                                accept=".xlsx,.xls,.csv,.txt"
+                                className="hidden"
+                                onChange={(e) => {
+                                  handleUploadSerialFileForSku(key, e.target.files?.[0]);
+                                  e.target.value = '';
+                                }}
+                              />
+                            </label>
+                          )}
+                        </div>
                         <textarea
                           rows={3}
                           disabled={!it.isSerialManaged}
@@ -845,10 +1274,10 @@ export const HqProcurementPage = () => {
                           onChange={(e) =>
                             setSerialInputs({
                               ...serialInputs,
-                              [it.productSkuId]: { ...inp, serialsText: e.target.value }
+                              [key]: { ...inp, serialsText: e.target.value }
                             })
                           }
-                          placeholder="SN-001&#10;SN-002&#10;SN-003"
+                          placeholder={it.isSerialManaged ? 'SN-001\nSN-002\nSN-003' : 'Không yêu cầu Serial'}
                           className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg font-mono text-[11px]"
                         />
                       </div>
@@ -857,7 +1286,7 @@ export const HqProcurementPage = () => {
                 );
               })}
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setReceivingPo(null)} className="px-4 py-1.5 bg-slate-800 rounded-xl">
+                <button type="button" onClick={() => setReceivingPo(null)} className="px-4 py-1.5 bg-slate-800 rounded-xl cursor-pointer">
                   Hủy
                 </button>
                 <button type="submit" className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold cursor-pointer">
@@ -869,16 +1298,114 @@ export const HqProcurementPage = () => {
         </div>
       )}
 
+      {/* Modal Detail & Payment History */}
+      {detailPo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto text-xs">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="font-bold text-sm text-white">Chi tiết Phiếu Nhập {detailPo.poCode}</h3>
+                <p className="text-[11px] text-slate-400">
+                  NCC: {detailPo.vendorId?.name || '--'} • Kho: {detailPo.warehouseBranchId?.branchCode || 'BR-HQ'}
+                </p>
+              </div>
+              <button type="button" onClick={() => setDetailPo(null)} className="cursor-pointer">
+                <X className="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <div className="font-bold text-slate-200">Danh sách mặt hàng</div>
+              {(detailPo.items || []).map((it, idx) => (
+                <div key={it.productSkuId || idx} className="p-2.5 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
+                  <div className="flex justify-between">
+                    <span className="font-bold text-white">
+                      {it.productName} <span className="font-mono text-cyan-400">({it.sku})</span>
+                    </span>
+                    <span className="font-mono font-bold">{formatVnd(it.subtotal)}</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Đặt: {it.orderedQty} • Thực nhận: {detailPo.status === 'RECEIVED' ? it.receivedQty : '--'} • Đơn giá: {formatVnd(it.unitCost)}
+                  </div>
+                  {Array.isArray(it.serials) && it.serials.length > 0 && (
+                    <div className="text-[10px] font-mono text-emerald-300 break-all">
+                      Serial ({it.serials.length}): {it.serials.join(', ')}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-200">Lịch sử thanh toán công nợ</span>
+                <span className="font-mono text-amber-300">
+                  Đã trả: {formatVnd(detailPo.paidAmount)} / {formatVnd(detailPo.totalAmount)}
+                </span>
+              </div>
+              {(!detailPo.payments || detailPo.payments.length === 0) ? (
+                <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-500 text-center">
+                  Chưa có giao dịch thanh toán nào cho phiếu này.
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-800 bg-slate-950 border border-slate-800 rounded-xl">
+                  {detailPo.payments.map((pm, idx) => (
+                    <div key={idx} className="p-2.5 flex items-center justify-between">
+                      <div>
+                        <div className="font-semibold text-white">{pm.note || 'Thanh toán công nợ'}</div>
+                        <div className="text-[10px] text-slate-400">
+                          {new Date(pm.paidAt).toLocaleString('vi-VN')} • {pm.paidByName || 'Quản trị viên HQ'}
+                        </div>
+                      </div>
+                      <span className="font-mono font-bold text-emerald-400">+{formatVnd(pm.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const target = detailPo;
+                  setDetailPo(null);
+                  setPrintingPo(target);
+                }}
+                className="px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-bold inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>In Phiếu Nhập</span>
+              </button>
+              <button type="button" onClick={() => setDetailPo(null)} className="px-4 py-1.5 bg-slate-800 rounded-xl cursor-pointer">
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Print PO */}
+      {printingPo && <PoPrintReceiptModal po={printingPo} onClose={() => setPrintingPo(null)} />}
+
       {/* Modal Vendor Payment */}
       {payingVendor && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-5 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="font-bold text-sm text-white">Thanh toán công nợ: {payingVendor.name}</h3>
-              <button type="button" onClick={() => setPayingVendor(null)}>
+              <button type="button" onClick={() => setPayingVendor(null)} className="cursor-pointer">
                 <X className="w-4 h-4 text-slate-400" />
               </button>
             </div>
+
+            {modalError && (
+              <div className="p-3 rounded-xl bg-rose-950/80 border border-rose-500/50 text-rose-200 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                <span>{modalError}</span>
+              </div>
+            )}
+
             <form onSubmit={handleRecordPayment} className="space-y-3 text-xs">
               <div className="p-2.5 bg-slate-950 border border-slate-800 rounded-xl flex justify-between">
                 <span className="text-slate-400">Công nợ hiện tại:</span>
@@ -891,7 +1418,7 @@ export const HqProcurementPage = () => {
                   onChange={(e) => setPaymentForm({ ...paymentForm, purchaseOrderId: e.target.value })}
                   className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg"
                 >
-                  <option value="">-- Thanh toán công nợ tổng --</option>
+                  <option value="">-- Thanh toán công nợ tổng (Tự động gạch nợ FIFO) --</option>
                   {purchaseOrders
                     .filter(
                       (p) =>
@@ -927,7 +1454,7 @@ export const HqProcurementPage = () => {
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setPayingVendor(null)} className="px-4 py-1.5 bg-slate-800 rounded-xl">
+                <button type="button" onClick={() => setPayingVendor(null)} className="px-4 py-1.5 bg-slate-800 rounded-xl cursor-pointer">
                   Hủy
                 </button>
                 <button type="submit" className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold cursor-pointer">
