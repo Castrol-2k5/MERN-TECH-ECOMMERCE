@@ -1,9 +1,9 @@
-import { useRef } from 'react';
+import { useRef, useCallback, useMemo } from 'react';
 
 export const usePosAudio = () => {
   const audioCtxRef = useRef(null);
 
-  const getAudioContext = () => {
+  const getAudioContext = useCallback(() => {
     if (!audioCtxRef.current) {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (AudioCtx) {
@@ -14,9 +14,9 @@ export const usePosAudio = () => {
       audioCtxRef.current.resume().catch(() => {});
     }
     return audioCtxRef.current;
-  };
+  }, []);
 
-  const playSuccess = () => {
+  const playSuccess = useCallback(() => {
     try {
       const ctx = getAudioContext();
       if (!ctx) return;
@@ -38,9 +38,9 @@ export const usePosAudio = () => {
     } catch {
       // Audio not permitted or not supported
     }
-  };
+  }, [getAudioContext]);
 
-  const playError = () => {
+  const playError = useCallback(() => {
     try {
       const ctx = getAudioContext();
       if (!ctx) return;
@@ -67,14 +67,17 @@ export const usePosAudio = () => {
     } catch {
       // Audio not permitted
     }
-  };
+  }, [getAudioContext]);
 
-  return { 
-    playSuccess, 
-    playError,
-    playSuccessBeep: playSuccess,
-    playErrorBeep: playError
-  };
+  return useMemo(
+    () => ({
+      playSuccess,
+      playError,
+      playSuccessBeep: playSuccess,
+      playErrorBeep: playError
+    }),
+    [playSuccess, playError]
+  );
 };
 
 export default usePosAudio;

@@ -23,7 +23,8 @@ import {
   ClipboardCheck,
   AlertTriangle,
   Calendar,
-  BellRing
+  BellRing,
+  ChevronDown
 } from 'lucide-react';
 import { logout } from '../store/slices/authSlice.js';
 import { clearCart } from '../store/slices/posCartSlice.js';
@@ -34,6 +35,7 @@ import ApprovalAlertBell from '../features/approvals/components/ApprovalAlertBel
 
 export const PortalLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [branchMonitorOpen, setBranchMonitorOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -237,10 +239,10 @@ export const PortalLayout = () => {
     },
     {
       to: '/portal/admin/import-serials',
-      label: 'Nhập Lô Serial / IMEI',
-      badge: userRole === 'SUPER_ADMIN' ? 'Kho HQ' : 'Kho CN',
+      label: 'Nạp Tồn Đầu Kỳ (Excel)',
+      badge: 'Day-0',
       icon: Barcode,
-      roles: ['BRANCH_MANAGER', 'SUPER_ADMIN']
+      roles: ['SUPER_ADMIN']
     },
     {
       to: '/portal/admin/branches-rbac',
@@ -264,6 +266,64 @@ export const PortalLayout = () => {
       roles: ['SUPER_ADMIN']
     }
   ].filter((item) => item.roles.includes(userRole));
+
+  const superAdminExecutiveLinks = [
+    { to: '/portal/hq/command-center', label: 'Trung Tâm Điều Hành HQ', badge: 'Red Alert', icon: BellRing },
+    { to: '/portal/hq/finance', label: 'Tài Chính & P&L Chuỗi', badge: 'P&L / HH', icon: Coins },
+    { to: '/portal/admin/analytics', label: 'Báo Cáo Doanh Thu', badge: 'BI & Forecast', icon: BarChart3 },
+    { to: '/portal/settlements', label: 'Đối Soát & Bù Trừ Chuỗi', badge: 'Clearing', icon: CreditCard },
+    { to: '/portal/admin/audit-logs', label: 'Nhật Ký & Kiểm Toán', badge: '5W1H', icon: ShieldAlert }
+  ];
+
+  const superAdminSupplyLinks = [
+    { to: '/portal/hq/procurement', label: 'Kho Tổng & NCC', badge: 'PO / Công nợ', icon: Truck },
+    { to: '/portal/hq/supply-chain', label: 'Chuỗi Cung Ứng Min/Max', badge: 'Auto / 30d', icon: ArrowLeftRight },
+    { to: '/portal/branch/transfers', label: 'Điều Chuyển Kho', badge: 'P-20', icon: ArrowLeftRight },
+    { to: '/portal/admin/orders-dispatch', label: 'Điều Phối Đơn B2C', badge: 'SLA', icon: Truck }
+  ];
+
+  const superAdminMasterLinks = [
+    { to: '/portal/admin/products', label: 'Quản Trị Sản Phẩm', badge: 'Dynamic', icon: Box },
+    { to: '/portal/admin/branches-rbac', label: 'Chi Nhánh & RBAC', badge: 'Hệ thống', icon: Store },
+    { to: '/portal/admin/import-serials', label: 'Nạp Tồn Đầu Kỳ (Excel)', badge: 'Day-0', icon: Barcode }
+  ];
+
+  const superAdminBranchMonitorLinks = [
+    { to: '/portal/inventory', label: 'Kho Chi Nhánh', badge: 'Quầy kệ', icon: Layers },
+    { to: '/portal/branch/orders', label: 'Đơn Hàng Chi Nhánh', badge: 'POS & B2C', icon: ShoppingBag },
+    { to: '/portal/shifts', label: 'Két Tiền & Ca Thu Ngân', badge: 'Kiểm quỹ', icon: Coins },
+    { to: '/portal/branch/staff', label: 'Nhân Sự & KPI Đội Ngũ', badge: 'Team', icon: Users },
+    { to: '/portal/branch/analytics', label: 'Chiến Lược Chi Nhánh', badge: 'BI+', icon: BarChart3 },
+    { to: '/portal/manager/approvals', label: 'Phê Duyệt Đặc Quyền', badge: 'Duyệt', icon: ShieldCheck }
+  ];
+
+  const renderNavLink = (item, badgeColor = 'text-slate-300') => {
+    const Icon = item.icon;
+    return (
+      <NavLink
+        key={item.to}
+        to={item.to}
+        onClick={() => setSidebarOpen(false)}
+        className={({ isActive }) =>
+          `flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+            isActive
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25'
+              : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+          }`
+        }
+      >
+        <div className="flex items-center gap-2.5">
+          <Icon className="w-4 h-4" />
+          <span>{item.label}</span>
+        </div>
+        {item.badge && (
+          <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-slate-950/60 ${badgeColor}`}>
+            {item.badge}
+          </span>
+        )}
+      </NavLink>
+    );
+  };
 
   if (isPosPage) {
     return <Outlet />;
@@ -308,79 +368,77 @@ export const PortalLayout = () => {
 
           {/* Nav Links scrollable */}
           <div className="flex-1 overflow-y-auto p-3 space-y-4">
-            {/* Nhóm 1: Vận hành quầy & kho */}
-            <div>
-              <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                Vận hành quầy &amp; kho
-              </div>
-              <nav className="space-y-1 mt-1">
-                {operationsLinks.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      onClick={() => setSidebarOpen(false)}
-                      className={({ isActive }) =>
-                        `flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                          isActive
-                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25'
-                            : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                        }`
-                      }
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <Icon className="w-4 h-4" />
-                        <span>{item.label}</span>
-                      </div>
-                      {item.badge && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-slate-950/60 text-slate-300">
-                          {item.badge}
-                        </span>
-                      )}
-                    </NavLink>
-                  );
-                })}
-              </nav>
-            </div>
-
-            {/* Nhóm 2: Quản trị trụ sở (HQ ADMIN) */}
-            {hqAdminLinks.length > 0 && (
-              <div>
-                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-400/90 flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3" />
-                  <span>{userRole === 'SUPER_ADMIN' ? 'Quản trị trụ sở (HQ Admin)' : 'Điều vận đơn hàng B2C'}</span>
+            {userRole === 'SUPER_ADMIN' ? (
+              <>
+                <div>
+                  <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-400/90 flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3" />
+                    <span>Điều hành &amp; Tài chính</span>
+                  </div>
+                  <nav className="space-y-1 mt-1">
+                    {superAdminExecutiveLinks.map((item) => renderNavLink(item, 'text-cyan-300'))}
+                  </nav>
                 </div>
-                <nav className="space-y-1 mt-1">
-                  {hqAdminLinks.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <NavLink
-                        key={item.to}
-                        to={item.to}
-                        onClick={() => setSidebarOpen(false)}
-                        className={({ isActive }) =>
-                          `flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                            isActive
-                              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25'
-                              : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                          }`
-                        }
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <Icon className="w-4 h-4" />
-                          <span>{item.label}</span>
-                        </div>
-                        {item.badge && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-slate-950/60 text-cyan-300">
-                            {item.badge}
-                          </span>
-                        )}
-                      </NavLink>
-                    );
-                  })}
-                </nav>
-              </div>
+
+                <div>
+                  <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Kho Tổng &amp; Chuỗi Cung Ứng
+                  </div>
+                  <nav className="space-y-1 mt-1">
+                    {superAdminSupplyLinks.map((item) => renderNavLink(item))}
+                  </nav>
+                </div>
+
+                <div>
+                  <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Danh mục &amp; Hệ thống
+                  </div>
+                  <nav className="space-y-1 mt-1">
+                    {superAdminMasterLinks.map((item) => renderNavLink(item))}
+                  </nav>
+                </div>
+
+                <div className="pt-1 border-t border-slate-800/80">
+                  <button
+                    type="button"
+                    onClick={() => setBranchMonitorOpen((prev) => !prev)}
+                    className="w-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-200 flex items-center justify-between cursor-pointer"
+                  >
+                    <span>Giám sát Chi nhánh ({superAdminBranchMonitorLinks.length})</span>
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${branchMonitorOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {branchMonitorOpen && (
+                    <nav className="space-y-1 mt-1">
+                      {superAdminBranchMonitorLinks.map((item) => renderNavLink(item))}
+                    </nav>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Nhóm 1: Vận hành quầy & kho */}
+                <div>
+                  <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Vận hành quầy &amp; kho
+                  </div>
+                  <nav className="space-y-1 mt-1">
+                    {operationsLinks.map((item) => renderNavLink(item))}
+                  </nav>
+                </div>
+
+                {/* Nhóm 2: Điều vận / Quản trị chi nhánh */}
+                {hqAdminLinks.length > 0 && (
+                  <div>
+                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-400/90 flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3" />
+                      <span>Điều vận đơn hàng B2C</span>
+                    </div>
+                    <nav className="space-y-1 mt-1">
+                      {hqAdminLinks.map((item) => renderNavLink(item, 'text-cyan-300'))}
+                    </nav>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Nhóm 3: Storefront B2C Link */}
