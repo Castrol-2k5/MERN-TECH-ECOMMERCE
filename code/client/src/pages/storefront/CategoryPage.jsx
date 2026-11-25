@@ -6,7 +6,6 @@ import ProductCard from '../../features/products/components/ProductCard.jsx';
 import Pagination from '../../features/products/components/Pagination.jsx';
 import useProducts from '../../features/products/hooks/useProducts.js';
 import Spinner from '../../components/common/Spinner.jsx';
-import { isDevOrTest } from '../../config/dataMode.js';
 import { X, Sparkles, Search } from 'lucide-react';
 
 const CATEGORY_TITLES = {
@@ -30,7 +29,7 @@ export const CategoryPage = () => {
   const { slug = 'laptop' } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const searchKeyword = searchParams.get('search') || '';
-  const isDev = isDevOrTest();
+  const isDev = import.meta.env.DEV;
 
   const [selectedFilters, setSelectedFilters] = useState({});
   const [currentSort, setCurrentSort] = useState('popular');
@@ -237,7 +236,7 @@ export const CategoryPage = () => {
               </h4>
               <p className="text-rose-700 mb-3">
                 {isDev
-                  ? `Chi tiết lỗi: ${error.message || 'Lỗi kết nối Backend'}. Vui lòng kiểm tra server hoặc chuyển sang chế độ Mock Data.`
+                  ? `Chi tiết lỗi: ${error.message || 'Lỗi kết nối Backend'}. Vui lòng kiểm tra server Backend đang chạy.`
                   : 'Đã có lỗi xảy ra trong quá trình tải dữ liệu. Vui lòng thử lại sau.'}
               </p>
               <button

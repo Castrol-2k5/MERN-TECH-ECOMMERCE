@@ -8,74 +8,10 @@ import PickPackSlipModal from '../../features/orders/components/PickPackSlipModa
 import { orderService } from '../../features/orders/services/orderService.js';
 import branchService from '../../features/branches/services/branchService.js';
 import inventoryService from '../../features/inventory/services/inventoryService.js';
-import { isMockEnabled } from '../../config/dataMode.js';
-
-const DEMO_B2C_ORDERS = [
-  {
-    orderCode: '#T1-94821',
-    customerName: 'Nguyễn Hoàng Nam',
-    phone: '090 123 4567',
-    shippingAddress: '124 Nguyễn Huệ, P. Bến Nghé, Quận 1, TP.HCM',
-    slaRemaining: '00:18:42',
-    fulfillmentType: 'Giao 2 giờ',
-    totalAmount: 29480000,
-    status: 'PROCESSING',
-    assignedBranchName: 'TechOne Q1 • 138 Trần Quang Khải',
-    productName: 'iPhone 16 Pro Max 256GB - Sa Mạc Tự Nhiên',
-    sku: 'IP16PM-256-DESERT',
-    quantity: 1,
-    serials: []
-  },
-  {
-    orderCode: '#T1-94820',
-    customerName: 'Trần Mỹ Linh',
-    phone: '091 886 2210',
-    shippingAddress: '45 Võ Văn Ngân, TP. Thủ Đức, TP.HCM',
-    slaRemaining: '00:32:18',
-    fulfillmentType: 'Click & Collect',
-    totalAmount: 31990000,
-    status: 'PENDING',
-    assignedBranchName: 'Chưa phân bổ',
-    productName: 'Samsung Galaxy S24 Ultra 512GB',
-    sku: 'SS-S24U-512-GRAY',
-    quantity: 1,
-    serials: []
-  },
-  {
-    orderCode: '#T1-94817',
-    customerName: 'Lê Quốc Bảo',
-    phone: '098 224 7822',
-    shippingAddress: '382 Trần Hưng Đạo, Phường 11, Quận 5, TP.HCM',
-    slaRemaining: '01:04:11',
-    fulfillmentType: 'Giao tiêu chuẩn',
-    totalAmount: 7990000,
-    status: 'PENDING',
-    assignedBranchName: 'Chưa phân bổ',
-    productName: 'AirPods Pro 2 MagSafe (USB-C)',
-    sku: 'AP-PRO2-USBC',
-    quantity: 1,
-    serials: []
-  },
-  {
-    orderCode: '#T1-94815',
-    customerName: 'Phạm Thu Hà',
-    phone: '090 355 2211',
-    shippingAddress: '128 CMT8, Quận 3, TP.HCM',
-    slaRemaining: '01:22:40',
-    fulfillmentType: 'Click & Collect',
-    totalAmount: 49490000,
-    status: 'READY_FOR_SHIPPING',
-    assignedBranchName: 'TechOne Q1 • 138 Trần Quang Khải',
-    productName: 'MacBook Pro 14" M3 Pro 18GB/512GB',
-    sku: 'MBP-M3PRO-18-512',
-    quantity: 1,
-    serials: ['MBP-M3P-VN-001']
-  }
-];
 
 export const OrderDispatchPage = () => {
   const authUser = useSelector((state) => state.auth?.user);
-  const [orders, setOrders] = useState(() => (isMockEnabled() ? DEMO_B2C_ORDERS : []));
+  const [orders, setOrders] = useState([]);
   const [branches, setBranches] = useState([]);
   const [candidateBranches, setCandidateBranches] = useState([]);
   const [allocationOrder, setAllocationOrder] = useState(null);
@@ -84,10 +20,6 @@ export const OrderDispatchPage = () => {
   const [toastMsg, setToastMsg] = useState(null);
 
   const fetchLiveOrders = useCallback(async () => {
-    if (isMockEnabled()) {
-      setOrders(DEMO_B2C_ORDERS);
-      return;
-    }
     try {
       const [liveList, branchList] = await Promise.all([
         orderService.getBranchOrders({ orderType: 'B2C_ONLINE', limit: 100 }),
@@ -138,14 +70,13 @@ export const OrderDispatchPage = () => {
     }
   }, []);
 
-  // Enrich candidate branches with real SKU stock when opening allocation modal
   useEffect(() => {
     if (!allocationOrder) return;
     let ignore = false;
 
     const loadStockForOrder = async () => {
       const skuId = allocationOrder.productSkuId;
-      if (!skuId || isMockEnabled()) {
+      if (!skuId) {
         setCandidateBranches(branches);
         return;
       }
@@ -186,7 +117,7 @@ export const OrderDispatchPage = () => {
   const handleConfirmAllocation = async (orderCode, branch) => {
     try {
       const target = orders.find((o) => o.orderCode === orderCode);
-      if (target?._id && !isMockEnabled()) {
+      if (target?._id) {
         await orderService.allocateOrder(target._id, branch._id || branch.id);
       }
       setOrders((prev) =>
@@ -214,7 +145,7 @@ export const OrderDispatchPage = () => {
   const handleCompletePacking = async (orderCode, serials) => {
     try {
       const target = orders.find((o) => o.orderCode === orderCode);
-      if (target?._id && !isMockEnabled()) {
+      if (target?._id) {
         await orderService.dispatchOrder(target._id, serials);
       }
       setOrders((prev) =>
@@ -241,7 +172,6 @@ export const OrderDispatchPage = () => {
 
   return (
     <div className="space-y-5 select-none font-sans text-slate-100">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold text-blue-400 uppercase tracking-wider mb-1">
@@ -272,7 +202,6 @@ export const OrderDispatchPage = () => {
         </div>
       </div>
 
-      {/* Toast */}
       {toastMsg && (
         <div
           className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-between animate-in fade-in ${
@@ -293,7 +222,6 @@ export const OrderDispatchPage = () => {
         </div>
       )}
 
-      {/* Main Table */}
       <B2COrderDispatchTable
         orders={orders}
         userRole={authUser?.role}
@@ -302,7 +230,6 @@ export const OrderDispatchPage = () => {
         onOpenPickPackModal={(order) => setPickPackOrder(order)}
       />
 
-      {/* Branch Allocation Modal */}
       <BranchAllocationModal
         isOpen={Boolean(allocationOrder)}
         onClose={() => setAllocationOrder(null)}
@@ -317,7 +244,6 @@ export const OrderDispatchPage = () => {
         order={pickPackOrder}
       />
 
-      {/* Serial Assign Drawer */}
       <OrderSerialAssignDrawer
         isOpen={Boolean(serialAssignOrder)}
         onClose={() => setSerialAssignOrder(null)}

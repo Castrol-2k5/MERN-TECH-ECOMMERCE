@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Hash, Search, Calendar, ShieldCheck, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import inventoryService from '../services/inventoryService.js';
-import { isMockEnabled } from '../../../config/dataMode.js';
 
 export const SerialListDrawer = ({ isOpen, onClose, item, branchId }) => {
   const [search, setSearch] = useState('');
@@ -14,13 +13,6 @@ export const SerialListDrawer = ({ isOpen, onClose, item, branchId }) => {
 
     let ignore = false;
     const fetchSerials = async () => {
-      if (isMockEnabled()) {
-        if (!ignore) {
-          setLiveSerials(item.serials || []);
-        }
-        return;
-      }
-
       setIsLoading(true);
       try {
         const data = await inventoryService.getSerials({

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Hash, ScanBarcode, Check, Plus, AlertTriangle, RefreshCw } from 'lucide-react';
 import apiClient from '../../../services/api';
-import { isMockEnabled } from '../../../config/dataMode.js';
 import usePosAudio from '../hooks/usePosAudio.js';
 
 export const SerialAssignmentModal = ({
@@ -64,35 +63,33 @@ export const SerialAssignmentModal = ({
     }
 
     // Kiểm tra qua Backend API nếu nhập tay hoặc quét barcode bên ngoài
-    if (!isMockEnabled()) {
-      setIsVerifying(true);
-      try {
-        const queryParam = branchId ? `?branchId=${encodeURIComponent(branchId)}` : '';
-        const res = await apiClient.get(`/serials/scan/${encodeURIComponent(cleanSn)}${queryParam}`);
-        const data = res?.data || res;
+    setIsVerifying(true);
+    try {
+      const queryParam = branchId ? `?branchId=${encodeURIComponent(branchId)}` : '';
+      const res = await apiClient.get(`/serials/scan/${encodeURIComponent(cleanSn)}${queryParam}`);
+      const data = res?.data || res;
 
-        const targetSkuId = String(item.productSkuId?._id || item.productSkuId || '');
-        const scannedSkuId = String(data?.sku?._id || data?.productSkuId || '');
+      const targetSkuId = String(item.productSkuId?._id || item.productSkuId || '');
+      const scannedSkuId = String(data?.sku?._id || data?.productSkuId || '');
 
-        if (scannedSkuId && targetSkuId && scannedSkuId !== targetSkuId) {
-          playErrorBeep();
-          setErrorMsg(
-            `Mã Serial [${cleanSn}] thuộc biến thể "${data.product?.name || ''} (${data.sku?.sku || ''})", không khớp với sản phẩm đang chọn!`
-          );
-          return;
-        }
-      } catch (err) {
+      if (scannedSkuId && targetSkuId && scannedSkuId !== targetSkuId) {
         playErrorBeep();
         setErrorMsg(
-          err?.response?.data?.message ||
-            err?.response?.data?.error?.message ||
-            err?.message ||
-            `Mã Serial [${cleanSn}] không hợp lệ hoặc không khả dụng tại chi nhánh!`
+          `Mã Serial [${cleanSn}] thuộc biến thể "${data.product?.name || ''} (${data.sku?.sku || ''})", không khớp với sản phẩm đang chọn!`
         );
         return;
-      } finally {
-        setIsVerifying(false);
       }
+    } catch (err) {
+      playErrorBeep();
+      setErrorMsg(
+        err?.response?.data?.message ||
+          err?.response?.data?.error?.message ||
+          err?.message ||
+          `Mã Serial [${cleanSn}] không hợp lệ hoặc không khả dụng tại chi nhánh!`
+      );
+      return;
+    } finally {
+      setIsVerifying(false);
     }
 
     playSuccessBeep();

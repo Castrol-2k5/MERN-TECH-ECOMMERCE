@@ -1,94 +1,4 @@
 import axiosClient from '../../../services/axiosClient.js';
-import { isMockEnabled, isDevOrTest } from '../../../config/dataMode.js';
-
-export const DEMO_WARRANTY_ITEMS = {
-  'IP15-SOLD-VALID': {
-    serialNumber: 'IP15-SOLD-VALID',
-    productName: 'iPhone 15 Pro Max 256GB Titan Tự Nhiên',
-    sku: 'IP15PM-256-NATURAL',
-    image: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=300&auto=format&fit=crop&q=80',
-    customer: {
-      fullName: 'Trần Minh Khang',
-      phone: '0912345678',
-      email: 'khang.tran@gmail.com',
-      address: '24 Lê Lợi, Phường Bến Nghé, Quận 1, TP.HCM'
-    },
-    saleDate: '2026-08-15',
-    warrantyEndDate: '2027-08-14',
-    branchPurchased: 'TechOne Q1 • 138 Trần Quang Khải',
-    isEligible: true,
-    statusLabel: 'ĐỦ ĐIỀU KIỆN TIẾP NHẬN BẢO HÀNH CHÍNH HÃNG',
-    daysRemaining: 315,
-    history: [
-      {
-        id: 'EVT-01',
-        title: 'Xuất kho và kích hoạt bảo hành điện tử',
-        date: '2026-08-15T10:30:00Z',
-        description: 'Thiết bị kích hoạt bảo hành 12 tháng tại hệ thống TechOne Quận 1',
-        status: 'COMPLETED'
-      }
-    ]
-  },
-  'ROG-SOLD-EXPIRED': {
-    serialNumber: 'ROG-SOLD-EXPIRED',
-    productName: 'Laptop ASUS ROG Strix SCAR 16 (i9-14900HX, RTX 4080)',
-    sku: 'ROG-SCAR16-4080-32GB',
-    image: 'https://images.unsplash.com/photo-1603302576837-37561b2e2302?w=300&auto=format&fit=crop&q=80',
-    customer: {
-      fullName: 'Nguyễn Văn Long',
-      phone: '0903332211',
-      email: 'long.nguyen@gmail.com',
-      address: 'Quận 3, TP.HCM'
-    },
-    saleDate: '2023-01-15',
-    warrantyEndDate: '2024-01-14',
-    branchPurchased: 'TechOne Q5 • 382 Trần Hưng Đạo',
-    isEligible: false,
-    statusLabel: 'HẾT HẠN BẢO HÀNH CHÍNH HÃNG (Hỗ trợ sửa chữa dịch vụ tính phí)',
-    daysRemaining: 0,
-    history: []
-  },
-  'C02ZQ0ABQ6L7': {
-    serialNumber: 'C02ZQ0ABQ6L7',
-    productName: 'MacBook Air 13 M4 16GB/256GB Silver',
-    sku: 'MBA-M4-16-256-SL',
-    image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=300&auto=format&fit=crop&q=80',
-    customer: {
-      fullName: 'Lê Hoàng Yến',
-      phone: '0987654321',
-      email: 'yen.le@gmail.com',
-      address: '45 Võ Văn Ngân, Thủ Đức, TP.HCM'
-    },
-    saleDate: '2026-09-26',
-    warrantyEndDate: '2027-09-25',
-    branchPurchased: 'TechOne Q1 • 138 Trần Quang Khải',
-    isEligible: true,
-    statusLabel: 'ĐỦ ĐIỀU KIỆN TIẾP NHẬN BẢO HÀNH CHÍNH HÃNG',
-    daysRemaining: 360,
-    history: []
-  },
-  'SN-IP16-VN-9075': {
-    serialNumber: 'SN-IP16-VN-9075',
-    productName: 'iPhone 16 Pro Max 256GB - Sa Mạc Tự Nhiên',
-    sku: 'IP16PM-256-DESERT',
-    image: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=300&auto=format&fit=crop&q=80',
-    customer: {
-      fullName: 'Trần Minh Khang',
-      phone: '0912345678',
-      email: 'khang.tran@gmail.com',
-      address: '24 Lê Lợi, Phường Bến Nghé, Quận 1, TP.HCM'
-    },
-    saleDate: '2026-09-10',
-    warrantyEndDate: '2027-09-09',
-    branchPurchased: 'TechOne Q1 • 138 Trần Quang Khải',
-    isEligible: true,
-    statusLabel: 'ĐỦ ĐIỀU KIỆN TIẾP NHẬN BẢO HÀNH CHÍNH HÃNG',
-    daysRemaining: 344,
-    history: []
-  }
-};
-
-export const fallbackWarrantyData = DEMO_WARRANTY_ITEMS['IP15-SOLD-VALID'];
 
 const normalizeWarrantyResult = (raw, serialNumber) => {
   if (!raw) return null;
@@ -136,16 +46,6 @@ export const warrantyService = {
   verifySerial: async (serialNumber) => {
     const clean = String(serialNumber).trim().toUpperCase();
 
-    if (isMockEnabled()) {
-      if (DEMO_WARRANTY_ITEMS[clean]) {
-        return DEMO_WARRANTY_ITEMS[clean];
-      }
-      return {
-        ...fallbackWarrantyData,
-        serialNumber: clean
-      };
-    }
-
     try {
       const response = await axiosClient.get(`/serials/verify/${encodeURIComponent(clean)}`);
       const payloadData = response?.data || response;
@@ -154,7 +54,7 @@ export const warrantyService = {
       }
       return null;
     } catch (err) {
-      if (isDevOrTest()) {
+      if (import.meta.env.DEV) {
         console.warn(`[warrantyService] Failed to verify serial '${clean}' against live DB:`, err?.message);
       }
       throw err;
@@ -162,17 +62,6 @@ export const warrantyService = {
   },
 
   createWarrantyTicket: async (payload) => {
-    if (isMockEnabled()) {
-      const datePart = new Date().toISOString().slice(2, 10).replace(/-/g, '');
-      const randomSeq = String(Math.floor(100 + Math.random() * 900));
-      return {
-        ticketCode: `BH-Q1-${datePart}-${randomSeq}`,
-        ...payload,
-        createdAt: new Date().toISOString(),
-        status: 'RECEIVED'
-      };
-    }
-
     const apiPayload = {
       serialNumber: payload.serialNumber,
       issueDescription: payload.issueDescription,
@@ -199,35 +88,6 @@ export const warrantyService = {
   },
 
   getWarrantyTickets: async (params = {}) => {
-    if (isMockEnabled()) {
-      return [
-        {
-          _id: 'ticket-mock-01',
-          ticketCode: 'BH-Q1-261005-081',
-          serialNumber: 'SN-IP16-VN-9075',
-          productName: 'iPhone 16 Pro Max 256GB - Sa Mạc Tự Nhiên',
-          customerName: 'Trần Minh Khang',
-          customerPhone: '0912345678',
-          issueDescription: 'Màn hình chớp nháy khi mở camera góc siêu rộng',
-          accessories: ['Thân máy', 'Hộp gốc (Box)'],
-          status: 'RECEIVED',
-          createdAt: new Date().toISOString()
-        },
-        {
-          _id: 'ticket-mock-02',
-          ticketCode: 'BH-Q1-261004-032',
-          serialNumber: 'C02ZQ0ABQ6L7',
-          productName: 'MacBook Air 13 M4 16GB/256GB Silver',
-          customerName: 'Lê Hoàng Yến',
-          customerPhone: '0987654321',
-          issueDescription: 'Bàn phím kẹt phím Spacebar sau 2 tuần sử dụng',
-          accessories: ['Thân máy', 'Củ sạc chính hãng'],
-          status: 'PROCESSING',
-          createdAt: new Date(Date.now() - 86400000).toISOString()
-        }
-      ];
-    }
-
     try {
       const cleanParams = Object.fromEntries(
         Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '' && v !== 'ALL')
@@ -236,7 +96,7 @@ export const warrantyService = {
       const res = await axiosClient.get(`/warranty${query ? `?${query}` : ''}`);
       return res?.data?.tickets || res?.data || [];
     } catch (err) {
-      if (isDevOrTest()) {
+      if (import.meta.env.DEV) {
         console.warn('[warrantyService.getWarrantyTickets] Failed fetching tickets:', err?.message);
       }
       return [];
@@ -244,49 +104,31 @@ export const warrantyService = {
   },
 
   updateTicketStatus: async (ticketId, payload) => {
-    if (isMockEnabled()) {
-      return { _id: ticketId, ...payload };
-    }
     const res = await axiosClient.patch(`/warranty/${ticketId}/status`, payload);
     return res?.data?.ticket || res?.data || res;
   },
 
   diagnoseTicket: async (ticketId, payload) => {
-    if (isMockEnabled()) {
-      return { _id: ticketId, ...payload, status: payload.isUnderWarranty ? 'REPAIRING' : 'QUOTATION_PENDING' };
-    }
     const res = await axiosClient.patch(`/warranty/${ticketId}/diagnose`, payload);
     return res?.data?.ticket || res?.data || res;
   },
 
   approveQuotation: async (ticketId, payload) => {
-    if (isMockEnabled()) {
-      return { _id: ticketId, status: payload.approved ? 'REPAIRING' : 'REPAIR_REJECTED' };
-    }
     const res = await axiosClient.patch(`/warranty/${ticketId}/approve`, payload);
     return res?.data?.ticket || res?.data || res;
   },
 
   completeRepair: async (ticketId, payload) => {
-    if (isMockEnabled()) {
-      return { _id: ticketId, status: 'READY_FOR_PICKUP' };
-    }
     const res = await axiosClient.patch(`/warranty/${ticketId}/complete`, payload);
     return res?.data?.ticket || res?.data || res;
   },
 
   handoverTicket: async (ticketId, payload) => {
-    if (isMockEnabled()) {
-      return { _id: ticketId, status: 'RETURNED' };
-    }
     const res = await axiosClient.patch(`/warranty/${ticketId}/handover`, payload);
     return res?.data?.ticket || res?.data || res;
   },
 
   trackTicketPublic: async (ticketCode, phone) => {
-    if (isMockEnabled()) {
-      return fallbackWarrantyData;
-    }
     const res = await axiosClient.get('/warranty/track', {
       params: { ticketCode, phone }
     });
@@ -294,9 +136,6 @@ export const warrantyService = {
   },
 
   customerApprovePublic: async (ticketCode, payload) => {
-    if (isMockEnabled()) {
-      return { ticketCode, ...payload };
-    }
     const res = await axiosClient.patch(`/warranty/track/${ticketCode}/approve`, payload);
     return res?.data?.ticket || res?.data || res;
   }

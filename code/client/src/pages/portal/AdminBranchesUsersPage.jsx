@@ -5,13 +5,12 @@ import BranchFormModal from '../../features/branches/components/BranchFormModal'
 import UserRbacTable from '../../features/users/components/UserRbacTable';
 import UserFormModal from '../../features/users/components/UserFormModal';
 import { branchService } from '../../features/branches/services/branchService.js';
-import { userService, fallbackUsers } from '../../features/users/services/userService.js';
-import { isMockEnabled } from '../../config/dataMode.js';
+import { userService } from '../../features/users/services/userService.js';
 
 export const AdminBranchesUsersPage = () => {
   const [activeTab, setActiveTab] = useState('BRANCHES'); // 'BRANCHES' | 'USERS'
   const [branches, setBranches] = useState([]);
-  const [users, setUsers] = useState(isMockEnabled() ? fallbackUsers : []);
+  const [users, setUsers] = useState([]);
   const [editingBranch, setEditingBranch] = useState(null);
   const [showBranchModal, setShowBranchModal] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
@@ -36,7 +35,7 @@ export const AdminBranchesUsersPage = () => {
       const list = await userService.getUsers();
       setUsers(list || []);
     } catch {
-      setUsers(isMockEnabled() ? fallbackUsers : []);
+      setUsers([]);
     }
   }, []);
 

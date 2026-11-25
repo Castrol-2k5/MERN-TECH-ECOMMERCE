@@ -7,9 +7,8 @@ import {
   addToCompare,
   clearCompare,
 } from '../../store/slices/compareSlice.js';
-import productService, { fallbackProducts } from '../../features/products/services/productService.js';
+import productService from '../../features/products/services/productService.js';
 import categoryService from '../../features/categories/services/categoryService.js';
-import { isMockEnabled } from '../../config/dataMode.js';
 
 export const CompareSpecsPage = () => {
   const dispatch = useDispatch();
@@ -144,19 +143,10 @@ export const CompareSpecsPage = () => {
         const res = await productService.getProducts(params);
         if (!isMounted) return;
 
-        if (isMockEnabled()) {
-          setFetchedProducts(fallbackProducts);
-        } else {
-          // CHẾ ĐỘ LIVE DATABASE: Tuyệt đối không fallback sang mock data!
-          setFetchedProducts(res?.products || []);
-        }
+        setFetchedProducts(res?.products || []);
       } catch {
         if (!isMounted) return;
-        if (isMockEnabled()) {
-          setFetchedProducts(fallbackProducts);
-        } else {
-          setFetchedProducts([]);
-        }
+        setFetchedProducts([]);
       } finally {
         if (isMounted) {
           setIsLoadingProducts(false);

@@ -5,11 +5,10 @@ import ClickAndCollectBanner from '../../features/products/components/ClickAndCo
 import ProductCard from '../../features/products/components/ProductCard.jsx';
 import useProducts from '../../features/products/hooks/useProducts.js';
 import Spinner from '../../components/common/Spinner.jsx';
-import { isDevOrTest } from '../../config/dataMode.js';
 
 export const HomePage = () => {
   const { products, isLoading, error, refetch } = useProducts();
-  const isDev = isDevOrTest();
+  const isDev = import.meta.env.DEV;
 
   const partnerBrands = [
     'Apple',
@@ -51,7 +50,7 @@ export const HomePage = () => {
             </h4>
             <p className="text-rose-700 mb-3">
               {isDev
-                ? `Chi tiết lỗi: ${error.message || 'Network Error / Không thể kết nối tới server 5000'}. Hãy đảm bảo server đang chạy (npm run dev trong code/server) hoặc dùng nút gạt bên góc phải để chuyển về Mock Data.`
+                ? `Chi tiết lỗi: ${error.message || 'Network Error / Không thể kết nối tới server 5000'}. Hãy đảm bảo server đang chạy (npm run dev trong code/server).`
                 : 'Đã có lỗi xảy ra trong quá trình tải dữ liệu. Vui lòng thử lại sau.'}
             </p>
             <button
@@ -70,7 +69,7 @@ export const HomePage = () => {
             <p className="text-slate-600 font-medium">Chưa có sản phẩm nào trong cơ sở dữ liệu.</p>
             {isDev && (
               <p className="text-xs text-slate-400 mt-1">
-                Gợi ý: Chạy lệnh <code>npm run seed</code> trong thư mục server để tạo dữ liệu mẫu, hoặc bật chế độ Mock Data ở góc màn hình.
+                Gợi ý: Chạy lệnh <code>npm run seed</code> trong thư mục server để tạo dữ liệu mẫu.
               </p>
             )}
           </div>

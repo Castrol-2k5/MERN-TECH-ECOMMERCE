@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, ScanBarcode, CheckCircle2, PackageCheck, AlertCircle } from 'lucide-react';
 import inventoryService from '../../inventory/services/inventoryService.js';
-import { isMockEnabled } from '../../../config/dataMode.js';
 
 export const OrderSerialAssignDrawer = ({
   isOpen,
@@ -19,7 +18,7 @@ export const OrderSerialAssignDrawer = ({
     setErrorMsg('');
     setScannedSerial('');
 
-    if (!isOpen || !order || isMockEnabled()) {
+    if (!isOpen || !order) {
       setAvailableSerials([]);
       return;
     }

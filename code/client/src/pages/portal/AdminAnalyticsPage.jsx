@@ -18,11 +18,9 @@ import TopProductsTable from '../../features/analytics/components/TopProductsTab
 import { branchService } from '../../features/branches/services/branchService.js';
 import {
   analyticsService,
-  fallbackAnalyticsOverview,
   emptyAnalyticsOverview
 } from '../../features/analytics/services/analyticsService.js';
 import { hqService } from '../../features/hq/services/hqService.js';
-import { isMockEnabled } from '../../config/dataMode.js';
 
 const URGENCY_BADGES = {
   CRITICAL: 'bg-rose-500/20 text-rose-300 border border-rose-500/40',
@@ -40,9 +38,7 @@ export const AdminAnalyticsPage = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [branches, setBranches] = useState([]);
-  const [analyticsData, setAnalyticsData] = useState(() =>
-    isMockEnabled() ? fallbackAnalyticsOverview : emptyAnalyticsOverview
-  );
+  const [analyticsData, setAnalyticsData] = useState(emptyAnalyticsOverview);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -64,7 +60,7 @@ export const AdminAnalyticsPage = () => {
       setAnalyticsData(data);
     } catch (err) {
       setErrorMsg(err.response?.data?.message || err.message || 'Không thể tải dữ liệu phân tích.');
-      setAnalyticsData(isMockEnabled() ? fallbackAnalyticsOverview : emptyAnalyticsOverview);
+      setAnalyticsData(emptyAnalyticsOverview);
     } finally {
       setIsLoading(false);
     }
@@ -144,7 +140,7 @@ export const AdminAnalyticsPage = () => {
       })
       .catch(() => {
         if (!ignore) {
-          setAnalyticsData(isMockEnabled() ? fallbackAnalyticsOverview : emptyAnalyticsOverview);
+          setAnalyticsData(emptyAnalyticsOverview);
         }
       });
 
@@ -191,15 +187,9 @@ export const AdminAnalyticsPage = () => {
             <h1 className="text-xl font-black text-slate-100 tracking-tight">
               Báo Cáo Doanh Thu Đa Kênh &amp; Dự Báo Nhập Hàng Chuỗi
             </h1>
-            {isMockEnabled() ? (
-              <span className="px-2.5 py-0.5 bg-amber-500/15 text-amber-300 border border-amber-500/30 rounded-full text-[11px] font-bold">
-                Dữ liệu thử nghiệm / Demo Preview
-              </span>
-            ) : (
-              <span className="px-2.5 py-0.5 bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-full text-[11px] font-bold">
-                Dữ liệu trực tiếp / Live Database
-              </span>
-            )}
+            <span className="px-2.5 py-0.5 bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-full text-[11px] font-bold">
+              Dữ liệu trực tiếp / Live Database
+            </span>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
             Tăng trưởng kỳ trước, tỷ lệ hoàn &amp; biên lợi nhuận tính từ đơn hàng thực tế • Dự báo nhập hàng Run-rate &amp; Days of Cover
