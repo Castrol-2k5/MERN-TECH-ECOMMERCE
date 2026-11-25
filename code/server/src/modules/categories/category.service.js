@@ -74,15 +74,39 @@ export class CategoryService {
     }
 
     const nameMap = new Map();
+    const childrenMap = new Map();
     for (const cat of categories) {
-      nameMap.set(cat._id.toString(), cat.name);
+      const idStr = cat._id.toString();
+      nameMap.set(idStr, cat.name);
+      if (cat.parentId) {
+        const pStr = cat.parentId.toString();
+        if (!childrenMap.has(pStr)) childrenMap.set(pStr, []);
+        childrenMap.get(pStr).push(idStr);
+      }
     }
 
-    const enrichedCategories = categories.map((cat) => ({
-      ...cat,
-      parentName: cat.parentId ? nameMap.get(cat.parentId.toString()) || null : null,
-      productCount: countMap.get(cat._id.toString()) || 0
-    }));
+    const computeRolledUpCount = (catIdStr, visited = new Set()) => {
+      if (visited.has(catIdStr)) return 0;
+      visited.add(catIdStr);
+      let total = countMap.get(catIdStr) || 0;
+      const children = childrenMap.get(catIdStr) || [];
+      for (const childIdStr of children) {
+        total += computeRolledUpCount(childIdStr, visited);
+      }
+      return total;
+    };
+
+    const enrichedCategories = categories.map((cat) => {
+      const idStr = cat._id.toString();
+      const directCount = countMap.get(idStr) || 0;
+      return {
+        ...cat,
+        parentName: cat.parentId ? nameMap.get(cat.parentId.toString()) || null : null,
+        directProductCount: directCount,
+        productCount: computeRolledUpCount(idStr),
+        hasChildren: (childrenMap.get(idStr) || []).length > 0
+      };
+    });
 
     if (tree === true || tree === 'true') {
       const categoryMap = new Map();

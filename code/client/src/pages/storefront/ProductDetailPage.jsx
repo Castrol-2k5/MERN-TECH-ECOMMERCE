@@ -20,7 +20,7 @@ import SpecsTable from '../../features/products/components/SpecsTable.jsx';
 import MultiBranchStockBox from '../../features/inventory/components/MultiBranchStockBox.jsx';
 import ProductCard from '../../features/products/components/ProductCard.jsx';
 import AccessoryRecommendations from '../../features/products/components/AccessoryRecommendations.jsx';
-import productService, { fallbackProducts } from '../../features/products/services/productService.js';
+import productService from '../../features/products/services/productService.js';
 import { createCartItem } from '../../features/products/services/productAdapter.js';
 import { addToCart } from '../../store/slices/cartSlice.js';
 import { addToCompare } from '../../store/slices/compareSlice.js';
@@ -40,8 +40,9 @@ export const ProductDetailPage = () => {
   const [stockSummary, setStockSummary] = useState({ totalStock: null, branches: [] });
 
   const defaultOptions = useMemo(() => {
-    if (product?.skus?.[0]?.options && Object.keys(product.skus[0].options).length > 0) {
-      return product.skus[0].options;
+    const defaultSku = product?.skus?.find((s) => s.isDefault) || product?.skus?.[0];
+    if (defaultSku?.options && Object.keys(defaultSku.options).length > 0) {
+      return defaultSku.options;
     }
     if (product?.options?.length > 0) {
       const init = {};
@@ -59,7 +60,8 @@ export const ProductDetailPage = () => {
 
   const matchedSku = useMemo(() => {
     if (!product?.skus || product.skus.length === 0) return null;
-    if (!product?.options || product.options.length === 0) return product.skus[0];
+    const defaultSku = product.skus.find((s) => s.isDefault) || product.skus[0];
+    if (!product?.options || product.options.length === 0) return defaultSku;
     return (
       product.skus.find((s) => {
         if (!s.options || Object.keys(s.options).length === 0) return false;
@@ -69,7 +71,7 @@ export const ProductDetailPage = () => {
   }, [product, selectedOptions]);
 
   const isVariantAvailable = Boolean(matchedSku);
-  const activeSku = matchedSku || product?.skus?.[0];
+  const activeSku = matchedSku || product?.skus?.find((s) => s.isDefault) || product?.skus?.[0];
 
   const currentPrice =
     activeSku?.salePrice && activeSku.salePrice > 0
@@ -81,10 +83,11 @@ export const ProductDetailPage = () => {
   );
 
   const currentSkuCode = activeSku?.sku || activeSku?.code || product?.skuCode || 'MBA-M4-16-256';
-  const currentImages =
-    Array.isArray(activeSku?.images) && activeSku.images.length > 0
-      ? activeSku.images
-      : product?.images;
+  const currentImages = useMemo(() => {
+    const skuImgs = Array.isArray(activeSku?.images) ? activeSku.images.filter(Boolean) : [];
+    const prodImgs = Array.isArray(product?.images) ? product.images.filter(Boolean) : [];
+    return Array.from(new Set([...skuImgs, ...prodImgs]));
+  }, [activeSku, product]);
 
   const isOutOfStockAllBranches =
     product?.stockStatus === 'OUT_OF_STOCK_ONLINE' ||
@@ -183,20 +186,16 @@ export const ProductDetailPage = () => {
       .getProducts({ category: product.category, limit: 5 })
       .then((res) => {
         if (isMounted) {
-          const list = res.products || fallbackProducts;
+          const list = res.products || [];
           const filtered = list
             .filter((p) => (p._id || p.id) !== (product._id || product.id))
             .slice(0, 4);
-          setRelatedProducts(filtered.length > 0 ? filtered : fallbackProducts.slice(0, 4));
+          setRelatedProducts(filtered);
         }
       })
       .catch(() => {
         if (isMounted) {
-          setRelatedProducts(
-            fallbackProducts
-              .filter((p) => (p._id || p.id) !== (product._id || product.id))
-              .slice(0, 4)
-          );
+          setRelatedProducts([]);
         }
       });
 

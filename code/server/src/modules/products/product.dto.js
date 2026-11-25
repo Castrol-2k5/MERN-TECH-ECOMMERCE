@@ -33,6 +33,7 @@ export const skuSchema = z
       .default(0),
     images: z.array(z.string().trim()).optional().default([]),
     optionValues: z.array(skuOptionValueSchema).optional().default([]),
+    isDefault: z.boolean().optional().default(false),
     isActive: z.boolean().optional().default(true)
   })
   .strict()
@@ -81,6 +82,7 @@ export const createProductSchema = z
       .string({ required_error: 'Thương hiệu là bắt buộc' })
       .trim()
       .min(1, 'Thương hiệu không được để trống'),
+    unit: z.string().trim().min(1).max(30).optional().default('Cái'),
     description: z.string().optional().default(''),
     images: z.array(z.string().trim()).optional().default([]),
     isSerialManaged: z.boolean().optional().default(true),
@@ -103,6 +105,7 @@ export const updateProductSchema = z
       .regex(/^[0-9a-fA-F]{24}$/, 'Mã danh mục (categoryId) phải là ObjectId hợp lệ')
       .optional(),
     brand: z.string().trim().min(1).optional(),
+    unit: z.string().trim().min(1).max(30).optional(),
     description: z.string().optional(),
     images: z.array(z.string().trim()).optional(),
     isSerialManaged: z.boolean().optional(),

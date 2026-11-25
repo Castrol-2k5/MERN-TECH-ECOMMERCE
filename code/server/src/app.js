@@ -1,4 +1,5 @@
 import express from 'express';
+import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -33,8 +34,12 @@ import reviewRoutes from './modules/reviews/review.routes.js';
 
 const app = express();
 
-// Security HTTP headers
-app.use(helmet());
+// Security HTTP headers (cho phép nạp ảnh static cross-origin từ Frontend)
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
+  })
+);
 
 // CORS configuration
 app.use(
@@ -50,6 +55,9 @@ app.use(
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
+
+// Static files for uploaded product images
+app.use('/uploads', express.static(path.resolve('uploads')));
 
 // Development logging
 if (env.NODE_ENV === 'development') {

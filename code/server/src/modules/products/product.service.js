@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { Product } from './product.model.js';
 import { Category } from '../categories/category.model.js';
 import { BranchInventory } from '../inventory/inventory.model.js';
+import { Serial } from '../serials/serial.model.js';
 import { USER_ROLES } from '../users/user.model.js';
 import { AuditLogService } from '../audit/auditLog.service.js';
 import { AUDIT_ACTIONS } from '../audit/auditLog.model.js';
@@ -13,6 +14,16 @@ export class ProductService {
     return Boolean(
       currentUser && [USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER].includes(currentUser.role)
     );
+  }
+
+  static normalizeDefaultSku(skus = []) {
+    if (!Array.isArray(skus) || skus.length === 0) return [];
+    let defaultIdx = skus.findIndex((s) => Boolean(s.isDefault));
+    if (defaultIdx === -1) defaultIdx = 0;
+    return skus.map((s, idx) => ({
+      ...s,
+      isDefault: idx === defaultIdx
+    }));
   }
 
   static sanitizeProductCostPrice(product, currentUser = null) {
@@ -109,11 +120,13 @@ export class ProductService {
       );
     }
 
+    const finalSkus = this.normalizeDefaultSku(normalizedSkus);
+
     const created = await Product.create({
       ...productData,
       slug,
       attributes: normalizedAttributes,
-      skus: normalizedSkus,
+      skus: finalSkus,
       isSerialManaged:
         productData.isSerialManaged !== undefined ? productData.isSerialManaged : true,
       isActive: productData.isActive !== undefined ? productData.isActive : true
@@ -390,6 +403,31 @@ export class ProductService {
       this.sanitizeProductCostPrice(p, currentUser)
     );
 
+    if (this.canViewCostPrice(currentUser) && sanitizedProducts.length > 0) {
+      const productIds = sanitizedProducts.map((p) => p._id);
+      const [invRows, serialRows] = await Promise.all([
+        BranchInventory.find({ productId: { $in: productIds }, quantity: { $gt: 0 } })
+          .select('productId productSkuId')
+          .lean(),
+        Serial.find({ productId: { $in: productIds } })
+          .select('productId productSkuId')
+          .lean()
+      ]);
+
+      const inUseByProduct = new Map();
+      for (const row of [...invRows, ...serialRows]) {
+        if (!row.productId || !row.productSkuId) continue;
+        const pid = String(row.productId);
+        if (!inUseByProduct.has(pid)) inUseByProduct.set(pid, new Set());
+        inUseByProduct.get(pid).add(String(row.productSkuId));
+      }
+
+      for (const prod of sanitizedProducts) {
+        const set = inUseByProduct.get(String(prod._id));
+        prod.inUseSkuIds = set ? Array.from(set) : [];
+      }
+    }
+
     return {
       products: sanitizedProducts,
       total,
@@ -494,25 +532,60 @@ export class ProductService {
     );
 
     if (updateData.skus) {
-      updateData.skus = updateData.skus.map((sku) => {
-        const skuCode = sku.sku.trim().toUpperCase();
-        const prevSku = oldSkuMap.get(skuCode);
-        const price = Number(sku.price);
-        const salePrice =
-          sku.salePrice !== undefined && sku.salePrice !== null ? Number(sku.salePrice) : price;
-        const costPrice =
-          sku.costPrice !== undefined && sku.costPrice !== null
-            ? Math.max(0, Number(sku.costPrice))
-            : Number(prevSku?.costPrice || 0);
+      const incomingIds = new Set(
+        updateData.skus.map((s) => (s._id ? String(s._id) : null)).filter(Boolean)
+      );
+      const incomingCodes = new Set(updateData.skus.map((s) => s.sku.trim().toUpperCase()));
+      const removedSkus = (existingProduct.skus || []).filter(
+        (oldS) =>
+          !incomingIds.has(String(oldS._id)) &&
+          !incomingCodes.has(String(oldS.sku || '').toUpperCase())
+      );
 
-        return {
-          ...sku,
-          sku: skuCode,
-          price,
-          salePrice,
-          costPrice
-        };
-      });
+      if (removedSkus.length > 0) {
+        const removedSkuIds = removedSkus.map((s) => s._id).filter(Boolean);
+        const [invInUse, serialInUse] = await Promise.all([
+          BranchInventory.exists({
+            productId,
+            productSkuId: { $in: removedSkuIds },
+            quantity: { $gt: 0 }
+          }),
+          Serial.exists({
+            productId,
+            productSkuId: { $in: removedSkuIds }
+          })
+        ]);
+
+        if (invInUse || serialInUse) {
+          throw new AppError(
+            'Không thể xóa biến thể SKU đang có tồn kho hoặc mã Serial trong hệ thống. Vui lòng chuyển sang trạng thái Ngừng kinh doanh.',
+            400,
+            'SKU_IN_USE'
+          );
+        }
+      }
+
+      updateData.skus = this.normalizeDefaultSku(
+        updateData.skus.map((sku) => {
+          const skuCode = sku.sku.trim().toUpperCase();
+          const prevSku = oldSkuMap.get(skuCode);
+          const price = Number(sku.price);
+          const salePrice =
+            sku.salePrice !== undefined && sku.salePrice !== null ? Number(sku.salePrice) : price;
+          const costPrice =
+            sku.costPrice !== undefined && sku.costPrice !== null
+              ? Math.max(0, Number(sku.costPrice))
+              : Number(prevSku?.costPrice || 0);
+
+          return {
+            ...sku,
+            sku: skuCode,
+            price,
+            salePrice,
+            costPrice
+          };
+        })
+      );
 
       const skuCodes = updateData.skus.map((s) => s.sku);
       if (new Set(skuCodes).size !== skuCodes.length) {

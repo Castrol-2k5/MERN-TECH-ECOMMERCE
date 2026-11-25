@@ -84,6 +84,10 @@ const productSkuSchema = new Schema({
     type: [skuOptionValueSchema],
     default: []
   },
+  isDefault: {
+    type: Boolean,
+    default: false
+  },
   isActive: {
     type: Boolean,
     default: true
@@ -112,6 +116,11 @@ const productSchema = new Schema(
       type: String,
       required: [true, 'Thương hiệu là bắt buộc'],
       trim: true
+    },
+    unit: {
+      type: String,
+      trim: true,
+      default: 'Cái'
     },
     description: {
       type: String,

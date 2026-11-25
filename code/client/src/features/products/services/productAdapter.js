@@ -2,6 +2,33 @@
  * Product Adapter: Chuẩn hóa dữ liệu sản phẩm và SKU biến thể từ Backend API
  */
 
+const stripAccents = (str = '') =>
+  String(str)
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9\s-]/g, '')
+    .trim();
+
+export const generateAutoSkuCode = (brand = '', productName = '', optionsDict = {}, fallbackIdx = 1) => {
+  const cleanBrand = stripAccents(brand).replace(/\s+/g, '').toUpperCase().slice(0, 3) || 'PRO';
+  const nameTokens = stripAccents(productName)
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 3)
+    .map((w) => w.slice(0, 3).toUpperCase())
+    .join('');
+  const cleanName = nameTokens || 'ITEM';
+
+  const optPart = Object.values(optionsDict || {})
+    .map((v) => stripAccents(v).replace(/\s+/g, '').toUpperCase().slice(0, 6))
+    .filter(Boolean)
+    .join('-');
+
+  return optPart ? `${cleanBrand}-${cleanName}-${optPart}` : `${cleanBrand}-${cleanName}-${fallbackIdx}`;
+};
+
 export const normalizeProductSkus = (skus, basePrice, baseOriginalPrice, productId) => {
   if (!Array.isArray(skus)) return [];
 
@@ -61,6 +88,7 @@ export const normalizeProductSkus = (skus, basePrice, baseOriginalPrice, product
       options: optionsDict,
       optionValues,
       images: Array.isArray(s.images) ? s.images : [],
+      isDefault: Boolean(s.isDefault),
       isActive: s.isActive !== undefined ? Boolean(s.isActive) : true,
     };
   });
@@ -71,7 +99,7 @@ export const normalizeProduct = (p) => {
 
   // 1. Skus & Prices
   const rawSkus = Array.isArray(p.skus) && p.skus.length > 0 ? p.skus : [];
-  const primarySku = rawSkus[0] || {};
+  const primarySku = rawSkus.find((s) => s.isDefault) || rawSkus[0] || {};
 
   const price =
     p.price !== undefined && p.price !== null
@@ -163,6 +191,7 @@ export const normalizeProduct = (p) => {
     category: categorySlug,
     categoryName,
     brand: p.brand || '',
+    unit: p.unit || 'Cái',
     description: p.description || '',
     isSerialManaged: p.isSerialManaged !== undefined ? Boolean(p.isSerialManaged) : true,
     isActive: p.isActive !== undefined ? Boolean(p.isActive) : true,

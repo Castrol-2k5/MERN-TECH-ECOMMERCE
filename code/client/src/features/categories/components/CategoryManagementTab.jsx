@@ -1,5 +1,17 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Plus, Edit2, Trash2, FolderTree, Tag, CheckCircle2, AlertCircle, CornerDownRight } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  FolderTree,
+  Tag,
+  CheckCircle2,
+  AlertCircle,
+  ChevronRight,
+  ChevronDown,
+  Folder,
+  FolderOpen,
+} from 'lucide-react';
 import categoryService from '../services/categoryService.js';
 
 export const CategoryManagementTab = ({ onCategoriesChanged }) => {
@@ -8,6 +20,7 @@ export const CategoryManagementTab = ({ onCategoriesChanged }) => {
   const [toastMsg, setToastMsg] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [expandedIds, setExpandedIds] = useState(new Set());
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
@@ -19,7 +32,10 @@ export const CategoryManagementTab = ({ onCategoriesChanged }) => {
     setIsLoading(true);
     try {
       const data = await categoryService.getCategories();
-      setCategories(data || []);
+      const list = data || [];
+      setCategories(list);
+      // Mở sẵn cấp 1 mặc định để dễ quan sát cây
+      setExpandedIds(new Set(list.filter((c) => !c.parentId).map((c) => String(c._id))));
     } catch (err) {
       setToastMsg({
         type: 'error',
@@ -32,40 +48,91 @@ export const CategoryManagementTab = ({ onCategoriesChanged }) => {
 
   useEffect(() => {
     let ignore = false;
-    const fetchCats = async () => {
-      setIsLoading(true);
-      try {
-        const data = await categoryService.getCategories();
+    categoryService
+      .getCategories()
+      .then((data) => {
         if (!ignore) {
-          setCategories(data || []);
+          const list = data || [];
+          setCategories(list);
+          setExpandedIds(new Set(list.filter((c) => !c.parentId).map((c) => String(c._id))));
         }
-      } catch (err) {
+      })
+      .catch((err) => {
         if (!ignore) {
           setToastMsg({
             type: 'error',
             message: 'Lỗi tải danh mục: ' + (err.response?.data?.message || err.message),
           });
         }
-      } finally {
-        if (!ignore) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    fetchCats();
-
+      });
     return () => {
       ignore = true;
     };
   }, []);
 
-  const handleOpenAdd = () => {
+  // Xây dựng cây phân cấp danh mục
+  const { treeNodes, flattenedTree } = useMemo(() => {
+    const map = new Map();
+    categories.forEach((c) => {
+      map.set(String(c._id), { ...c, children: [] });
+    });
+
+    const roots = [];
+    categories.forEach((c) => {
+      const node = map.get(String(c._id));
+      const pId = c.parentId ? String(c.parentId) : null;
+      if (pId && map.has(pId)) {
+        map.get(pId).children.push(node);
+      } else {
+        roots.push(node);
+      }
+    });
+
+    const flat = [];
+    const walk = (nodes, depth = 0) => {
+      nodes.forEach((n) => {
+        flat.push({ ...n, depth });
+        if (n.children?.length) walk(n.children, depth + 1);
+      });
+    };
+    walk(roots);
+
+    return { treeNodes: roots, flattenedTree: flat };
+  }, [categories]);
+
+  // Tập ID của chính danh mục đang sửa và toàn bộ con cháu của nó (chặn vòng lặp cha-con)
+  const disallowedParentIds = useMemo(() => {
+    if (!editingCategory) return new Set();
+    const blocked = new Set([String(editingCategory._id)]);
+    let added = true;
+    while (added) {
+      added = false;
+      categories.forEach((c) => {
+        if (c.parentId && blocked.has(String(c.parentId)) && !blocked.has(String(c._id))) {
+          blocked.add(String(c._id));
+          added = true;
+        }
+      });
+    }
+    return blocked;
+  }, [editingCategory, categories]);
+
+  const toggleExpand = (catId) => {
+    const idStr = String(catId);
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(idStr)) next.delete(idStr);
+      else next.add(idStr);
+      return next;
+    });
+  };
+
+  const handleOpenAdd = (defaultParentId = '') => {
     setEditingCategory(null);
     setFormData({
       name: '',
       slug: '',
-      parentId: '',
+      parentId: defaultParentId ? String(defaultParentId) : '',
       attributeKeys: '',
     });
     setIsModalOpen(true);
@@ -118,266 +185,293 @@ export const CategoryManagementTab = ({ onCategoriesChanged }) => {
         message: 'Lỗi khi lưu danh mục: ' + (err.response?.data?.message || err.message),
       });
     }
+    setTimeout(() => setToastMsg(null), 3500);
   };
 
-  const handleDelete = async (id, name) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa danh mục "${name}"?`)) return;
+  const handleDelete = async (cat) => {
+    if (!window.confirm(`Bạn có chắc muốn xóa danh mục "${cat.name}"?`)) return;
     try {
-      await categoryService.deleteCategory(id);
-      setToastMsg({ type: 'success', message: `Đã xóa danh mục "${name}"!` });
+      await categoryService.deleteCategory(cat._id);
+      setToastMsg({ type: 'success', message: `Đã xóa danh mục "${cat.name}"` });
       await loadCategories();
       onCategoriesChanged?.();
     } catch (err) {
       setToastMsg({
         type: 'error',
-        message: 'Lỗi khi xóa: ' + (err.response?.data?.message || err.message),
+        message: 'Không thể xóa: ' + (err.response?.data?.message || err.message),
       });
     }
+    setTimeout(() => setToastMsg(null), 3500);
   };
 
-  // Danh sách danh mục có thể chọn làm cha (không bao gồm chính nó khi đang chỉnh sửa)
-  const parentOptions = categories.filter(
-    (c) => !editingCategory || String(c._id) !== String(editingCategory._id)
-  );
+  const renderTreeRows = (nodes, depth = 0) =>
+    nodes.flatMap((cat) => {
+      const idStr = String(cat._id);
+      const hasChildren = cat.children && cat.children.length > 0;
+      const isExpanded = expandedIds.has(idStr);
+
+      const row = (
+        <tr key={idStr} className="hover:bg-slate-800/40 transition-colors">
+          <td className="py-3 px-4 font-bold text-slate-100">
+            <div className="flex items-center gap-2" style={{ paddingLeft: `${depth * 22}px` }}>
+              {hasChildren ? (
+                <button
+                  type="button"
+                  onClick={() => toggleExpand(idStr)}
+                  className="p-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
+                >
+                  {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                </button>
+              ) : (
+                <span className="w-5 inline-block text-center text-slate-600">{depth > 0 ? '└' : ''}</span>
+              )}
+
+              {hasChildren ? (
+                isExpanded ? (
+                  <FolderOpen className="w-4 h-4 text-amber-400 shrink-0" />
+                ) : (
+                  <Folder className="w-4 h-4 text-amber-400 shrink-0" />
+                )
+              ) : (
+                <Tag className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+              )}
+
+              <span>{cat.name}</span>
+
+              <span
+                className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                  depth === 0
+                    ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                    : 'bg-slate-800 text-slate-400'
+                }`}
+              >
+                Cấp {depth + 1}
+              </span>
+            </div>
+          </td>
+          <td className="py-3 px-4 font-mono text-slate-400">/{cat.slug}</td>
+          <td className="py-3 px-4">
+            <div className="flex flex-wrap gap-1">
+              {(cat.attributeKeys || []).length === 0 ? (
+                <span className="text-slate-600 italic text-[11px]">Không có</span>
+              ) : (
+                cat.attributeKeys.map((key) => (
+                  <span
+                    key={key}
+                    className="px-2 py-0.5 bg-slate-950 border border-slate-800 rounded text-[10px] font-mono text-cyan-400"
+                  >
+                    {key}
+                  </span>
+                ))
+              )}
+            </div>
+          </td>
+          <td className="py-3 px-4 text-center">
+            <span className="px-2.5 py-0.5 bg-slate-800 rounded-full text-[11px] font-bold text-slate-200">
+              {cat.productCount || 0} SP
+            </span>
+            {hasChildren && (
+              <span className="block text-[10px] text-slate-500 mt-0.5">
+                (gồm {cat.children.length} nhánh con)
+              </span>
+            )}
+          </td>
+          <td className="py-3 px-4 text-right space-x-1 whitespace-nowrap">
+            <button
+              type="button"
+              onClick={() => handleOpenAdd(cat._id)}
+              title="Thêm danh mục con"
+              className="p-1.5 text-slate-400 hover:text-emerald-400 rounded-lg hover:bg-slate-800 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleOpenEdit(cat)}
+              title="Sửa danh mục"
+              className="p-1.5 text-slate-400 hover:text-blue-400 rounded-lg hover:bg-slate-800 cursor-pointer"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDelete(cat)}
+              title="Xóa danh mục"
+              className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-800 cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </td>
+        </tr>
+      );
+
+      const childRows = hasChildren && isExpanded ? renderTreeRows(cat.children, depth + 1) : [];
+      return [row, ...childRows];
+    });
 
   return (
-    <div className="space-y-4">
-      {/* Toast */}
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 text-slate-100">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+        <div>
+          <h2 className="text-base font-black text-slate-100 flex items-center gap-2">
+            <FolderTree className="w-4 h-4 text-blue-400" />
+            <span>Quản Lý Danh Mục Đa Cấp &amp; Thuộc Tính Động</span>
+          </h2>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Hiển thị cây phân cấp cha-con trực quan; số lượng sản phẩm tự động cộng dồn từ các nhánh con.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => handleOpenAdd('')}
+          className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-lg shadow-blue-600/20"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>Thêm danh mục gốc</span>
+        </button>
+      </div>
+
       {toastMsg && (
         <div
-          className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-between animate-in slide-in-from-top-2 ${
+          className={`p-3 rounded-xl border text-xs font-semibold flex items-center gap-2 ${
             toastMsg.type === 'success'
               ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-300'
               : 'bg-rose-950/80 border-rose-500/50 text-rose-300'
           }`}
         >
-          <div className="flex items-center gap-2">
-            {toastMsg.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            ) : (
-              <AlertCircle className="w-4 h-4 text-rose-400" />
-            )}
-            <span>{toastMsg.message}</span>
-          </div>
-          <button onClick={() => setToastMsg(null)} className="opacity-70 hover:opacity-100">✕</button>
+          {toastMsg.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          ) : (
+            <AlertCircle className="w-4 h-4 text-rose-400" />
+          )}
+          <span>{toastMsg.message}</span>
         </div>
       )}
 
-      {/* Header Bar */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-        <div>
-          <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-            <FolderTree className="w-4 h-4 text-blue-400" />
-            Quản lý Danh mục đa cấp &amp; Khóa thuộc tính (UC-AD04)
-          </h3>
-          <p className="text-xs text-slate-400">
-            Cấu hình cây danh mục (Cha - Con) và tập khóa thuộc tính chuẩn (attributeKeys) cho sản phẩm
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={handleOpenAdd}
-          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow transition-colors cursor-pointer"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>Thêm Danh Mục</span>
-        </button>
-      </div>
-
-      {/* Table */}
-      <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-950">
-        <table className="w-full text-xs text-left">
-          <thead className="bg-slate-900 border-b border-slate-800 text-slate-400 font-semibold uppercase tracking-wider">
-            <tr>
-              <th className="py-2.5 px-4">Tên danh mục</th>
-              <th className="py-2.5 px-4">Danh mục cha</th>
-              <th className="py-2.5 px-4">Slug</th>
-              <th className="py-2.5 px-4">Khóa thuộc tính (attributeKeys)</th>
-              <th className="py-2.5 px-4 text-center">Sản phẩm</th>
-              <th className="py-2.5 px-4 text-right">Thao tác</th>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              <th className="py-3 px-4">Tên danh mục (Cây phân cấp)</th>
+              <th className="py-3 px-4">Đường dẫn (Slug)</th>
+              <th className="py-3 px-4">Khóa thuộc tính (attributeKeys)</th>
+              <th className="py-3 px-4 text-center">Tổng sản phẩm</th>
+              <th className="py-3 px-4 text-right">Thao tác</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/60 font-mono text-slate-200">
+          <tbody className="divide-y divide-slate-800/60 text-xs">
             {isLoading ? (
               <tr>
-                <td colSpan="6" className="py-6 text-center text-slate-400">
+                <td colSpan={5} className="py-8 text-center text-slate-500">
                   Đang tải danh mục...
                 </td>
               </tr>
-            ) : categories.length === 0 ? (
+            ) : treeNodes.length === 0 ? (
               <tr>
-                <td colSpan="6" className="py-6 text-center text-slate-400">
-                  Chưa có danh mục nào. Hãy tạo mới.
+                <td colSpan={5} className="py-8 text-center text-slate-500">
+                  Chưa có danh mục nào trong hệ thống.
                 </td>
               </tr>
             ) : (
-              categories.map((cat) => (
-                <tr key={cat._id} className="hover:bg-slate-900/60 transition-colors">
-                  <td className="py-2.5 px-4 font-sans font-medium text-white">
-                    <div className="flex items-center gap-2">
-                      {cat.parentId ? (
-                        <CornerDownRight className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                      ) : (
-                        <span className="w-2 h-2 rounded-full bg-blue-500 inline-block shrink-0"></span>
-                      )}
-                      <span>{cat.name}</span>
-                    </div>
-                  </td>
-                  <td className="py-2.5 px-4 font-sans">
-                    {cat.parentName ? (
-                      <span className="px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/30 text-blue-300 text-[11px]">
-                        {cat.parentName}
-                      </span>
-                    ) : (
-                      <span className="text-slate-500 text-[11px]">Gốc (Root)</span>
-                    )}
-                  </td>
-                  <td className="py-2.5 px-4 text-blue-400">{cat.slug}</td>
-                  <td className="py-2.5 px-4 font-sans">
-                    <div className="flex flex-wrap gap-1 max-w-md">
-                      {cat.attributeKeys && cat.attributeKeys.length > 0 ? (
-                        cat.attributeKeys.map((key) => (
-                          <span
-                            key={key}
-                            className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] font-mono text-cyan-300"
-                          >
-                            {key}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-slate-500 text-[11px] italic">Không giới hạn</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-2.5 px-4 text-center text-slate-300 font-sans font-semibold">
-                    {cat.productCount || 0}
-                  </td>
-                  <td className="py-2.5 px-4 text-right space-x-2 font-sans">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEdit(cat)}
-                      className="p-1 hover:bg-slate-800 text-slate-300 hover:text-blue-400 rounded transition-colors cursor-pointer"
-                      title="Chỉnh sửa"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(cat._id, cat.name)}
-                      className="p-1 hover:bg-slate-800 text-slate-400 hover:text-rose-400 rounded transition-colors cursor-pointer"
-                      title="Xóa danh mục"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </td>
-                </tr>
-              ))
+              renderTreeRows(treeNodes)
             )}
           </tbody>
         </table>
       </div>
 
-      {/* Modal Add / Edit */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 w-full max-w-md space-y-4 shadow-2xl">
-            <h4 className="text-sm font-bold text-white flex items-center gap-2">
-              <Tag className="w-4 h-4 text-blue-400" />
-              {editingCategory ? 'Chỉnh sửa Danh Mục' : 'Thêm Danh Mục Mới'}
-            </h4>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4">
+          <form
+            onSubmit={handleSave}
+            className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl p-6 space-y-4 shadow-2xl"
+          >
+            <h3 className="text-base font-black text-slate-100 border-b border-slate-800 pb-3">
+              {editingCategory ? `Chỉnh sửa danh mục: ${editingCategory.name}` : 'Thêm danh mục mới'}
+            </h3>
 
-            <form onSubmit={handleSave} className="space-y-3 text-xs">
+            <div className="space-y-3">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Tên danh mục *</label>
+                <label className="text-xs font-bold text-slate-300 block mb-1">Tên danh mục *</label>
                 <input
                   type="text"
                   required
-                  placeholder="Ví dụ: Laptop, Laptop Gaming..."
                   value={formData.name}
                   onChange={(e) => {
                     const name = e.target.value;
                     setFormData((prev) => ({
                       ...prev,
                       name,
-                      slug: editingCategory
-                        ? prev.slug
-                        : name
-                            .toLowerCase()
-                            .replace(/đ/g, 'd')
-                            .normalize('NFD')
-                            .replace(/[\u0300-\u036f]/g, '')
-                            .replace(/[^\w\s-]/g, '')
-                            .trim()
-                            .replace(/\s+/g, '-'),
+                      slug: prev.slug || name.toLowerCase().replace(/\s+/g, '-'),
                     }));
                   }}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-blue-500"
+                  placeholder="VD: Laptop Gaming"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Slug URL *</label>
+                <label className="text-xs font-bold text-slate-300 block mb-1">Đường dẫn (Slug) *</label>
                 <input
                   type="text"
                   required
-                  placeholder="laptop, laptop-gaming..."
                   value={formData.slug}
                   onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-blue-400 font-mono focus:outline-none focus:border-blue-500"
+                  placeholder="laptop-gaming"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs font-mono text-blue-300 focus:outline-none focus:border-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">
-                  Danh mục cha (Phân cấp đa tầng)
-                </label>
+                <label className="text-xs font-bold text-slate-300 block mb-1">Danh mục cha (Tùy chọn)</label>
                 <select
                   value={formData.parentId}
                   onChange={(e) => setFormData({ ...formData, parentId: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-blue-500"
                 >
-                  <option value="">-- Danh mục gốc (Root Category) --</option>
-                  {parentOptions.map((pCat) => (
-                    <option key={pCat._id} value={pCat._id}>
-                      {pCat.parentName ? `${pCat.parentName} › ${pCat.name}` : pCat.name} ({pCat.slug})
-                    </option>
-                  ))}
+                  <option value="">-- Không có (Là danh mục gốc Cấp 1) --</option>
+                  {flattenedTree
+                    .filter((c) => !disallowedParentIds.has(String(c._id)))
+                    .map((c) => (
+                      <option key={c._id} value={c._id}>
+                        {c.depth > 0 ? `${'— '.repeat(c.depth)}${c.name}` : c.name} (Cấp {c.depth + 1})
+                      </option>
+                    ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">
-                  Tập khóa thuộc tính cho phép (attributeKeys, cách nhau bởi dấu phẩy)
+                <label className="text-xs font-bold text-slate-300 block mb-1">
+                  Các khóa thuộc tính kỹ thuật (cách nhau bởi dấu phẩy)
                 </label>
-                <input
-                  type="text"
-                  placeholder="cpu, ram, storage, screen, gpu..."
-                  value={formData.attributeKeys}
-                  onChange={(e) => setFormData({ ...formData, attributeKeys: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-cyan-300 font-mono focus:outline-none focus:border-blue-500"
-                />
-                <span className="text-[10px] text-slate-400 mt-1 block">
-                  Sản phẩm thuộc danh mục này sẽ chỉ được phép sử dụng các key thuộc tính nằm trong danh sách trên.
-                </span>
+                <div className="flex items-center gap-2 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2">
+                  <Tag className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <input
+                    type="text"
+                    value={formData.attributeKeys}
+                    onChange={(e) => setFormData({ ...formData, attributeKeys: e.target.value })}
+                    placeholder="cpu, ram, storage, vga, screen_size"
+                    className="w-full bg-transparent text-xs font-mono text-cyan-300 focus:outline-none"
+                  />
+                </div>
               </div>
+            </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-colors cursor-pointer"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-colors cursor-pointer"
-                >
-                  {editingCategory ? 'Lưu thay đổi' : 'Tạo mới'}
-                </button>
-              </div>
-            </form>
-          </div>
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold cursor-pointer"
+              >
+                Lưu danh mục
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

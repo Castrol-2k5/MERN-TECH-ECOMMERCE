@@ -3,6 +3,18 @@ import { catchAsync } from '../../utils/catchAsync.js';
 import { sendSuccess } from '../../utils/response.js';
 
 export class ProductController {
+  static uploadImages = catchAsync(async (req, res) => {
+    const files = Array.isArray(req.files) ? req.files : [];
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const urls = files.map((file) => `${baseUrl}/uploads/products/${file.filename}`);
+
+    return sendSuccess(res, {
+      statusCode: 201,
+      message: `Tải lên thành công ${urls.length} hình ảnh`,
+      data: { urls }
+    });
+  });
+
   static createProduct = catchAsync(async (req, res) => {
     const product = await ProductService.createProduct(req.body);
 

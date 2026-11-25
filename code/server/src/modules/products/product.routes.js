@@ -9,9 +9,19 @@ import {
 import { validateDto } from '../../middlewares/validate.middleware.js';
 import { protect, attachUserIfAuthenticated } from '../../middlewares/auth.middleware.js';
 import { authorize } from '../../middlewares/rbac.middleware.js';
+import { uploadProductImages } from '../../middlewares/upload.middleware.js';
 import { USER_ROLES } from '../users/user.model.js';
 
 const router = Router();
+
+// Admin image upload route
+router.post(
+  '/upload-images',
+  protect,
+  authorize(USER_ROLES.SUPER_ADMIN),
+  uploadProductImages,
+  ProductController.uploadImages
+);
 
 // Public routes (attach user softly to decide whether internal costPrice should be visible)
 router.get('/', attachUserIfAuthenticated, validateDto(queryProductSchema, 'query'), ProductController.getAllProducts);
