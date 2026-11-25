@@ -48,6 +48,14 @@ export const createBranchSchema = z
     isWarehouse: z.boolean().optional().default(false),
     region: z.enum(Object.values(BRANCH_REGIONS)).optional().default(BRANCH_REGIONS.KHAC),
     monthlyRevenueTarget: z.number().min(0, 'Chỉ tiêu doanh thu tháng không được âm').optional().default(0),
+    bankInfo: z
+      .object({
+        bankBin: z.string().trim().max(20).optional().default(''),
+        bankName: z.string().trim().max(100).optional().default(''),
+        accountNumber: z.string().trim().max(40).optional().default(''),
+        accountName: z.string().trim().max(100).optional().default('')
+      })
+      .optional(),
     bootstrapInventory: z.boolean().optional().default(false),
     bootstrapFromBranchId: z
       .string()

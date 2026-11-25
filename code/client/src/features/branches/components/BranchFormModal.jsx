@@ -1,5 +1,16 @@
 import { useState } from 'react';
-import { X, Store, Navigation, Check } from 'lucide-react';
+import { X, Store, Navigation, Check, QrCode } from 'lucide-react';
+
+const VIETQR_BANK_PRESETS = [
+  { bin: '970422', name: 'MB Bank (MB)' },
+  { bin: '970436', name: 'Vietcombank (VCB)' },
+  { bin: '970407', name: 'Techcombank (TCB)' },
+  { bin: '970415', name: 'VietinBank (CTG)' },
+  { bin: '970418', name: 'BIDV' },
+  { bin: '970416', name: 'ACB' },
+  { bin: '970432', name: 'VPBank' },
+  { bin: '970423', name: 'TPBank' }
+];
 
 const REGION_OPTIONS = [
   { value: 'HCM', label: 'TP. Hồ Chí Minh' },
@@ -40,6 +51,10 @@ export const BranchFormModal = ({
   const [bootstrapInventory, setBootstrapInventory] = useState(() => !branch);
   const [bootstrapFromBranchId, setBootstrapFromBranchId] = useState('');
   const [isActive, setIsActive] = useState(() => branch?.isActive !== false);
+  const [bankBin, setBankBin] = useState(() => branch?.bankInfo?.bankBin || '');
+  const [bankName, setBankName] = useState(() => branch?.bankInfo?.bankName || '');
+  const [accountNumber, setAccountNumber] = useState(() => branch?.bankInfo?.accountNumber || '');
+  const [accountName, setAccountName] = useState(() => branch?.bankInfo?.accountName || '');
   const [errorMsg, setErrorMsg] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -77,6 +92,12 @@ export const BranchFormModal = ({
       isHeadquarter,
       isWarehouse: Boolean(isWarehouse || isHeadquarter),
       isActive,
+      bankInfo: {
+        bankBin: bankBin.trim(),
+        bankName: bankName.trim(),
+        accountNumber: accountNumber.trim(),
+        accountName: accountName.trim().toUpperCase()
+      },
       ...(!branch
         ? {
             bootstrapInventory: Boolean(bootstrapInventory),
@@ -256,6 +277,56 @@ export const BranchFormModal = ({
                   className="w-full px-2.5 py-1 bg-slate-900 border border-slate-700 rounded text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-500"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* VietQR Bank Config (SUPER_ADMIN Only) */}
+          <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-2">
+            <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
+              <QrCode className="w-3.5 h-3.5" />
+              Tài khoản Ngân hàng nhận VietQR tại quầy (tùy chọn):
+            </span>
+            <div className="grid grid-cols-2 gap-2.5">
+              <div>
+                <label className="text-[10px] text-slate-400 block mb-0.5">Ngân hàng:</label>
+                <select
+                  value={bankBin}
+                  onChange={(e) => {
+                    const bin = e.target.value;
+                    setBankBin(bin);
+                    const preset = VIETQR_BANK_PRESETS.find((b) => b.bin === bin);
+                    if (preset) setBankName(preset.name);
+                  }}
+                  className="w-full px-2.5 py-1 bg-slate-900 border border-slate-700 rounded text-xs text-slate-100 focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="">-- Mặc định TechOne (MB Bank) --</option>
+                  {VIETQR_BANK_PRESETS.map((b) => (
+                    <option key={b.bin} value={b.bin}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-400 block mb-0.5">Số tài khoản:</label>
+                <input
+                  type="text"
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value)}
+                  placeholder="0901234567"
+                  className="w-full px-2.5 py-1 bg-slate-900 border border-slate-700 rounded text-xs font-mono text-slate-100 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] text-slate-400 block mb-0.5">Tên chủ tài khoản (không dấu):</label>
+              <input
+                type="text"
+                value={accountName}
+                onChange={(e) => setAccountName(e.target.value.toUpperCase())}
+                placeholder="CONG TY CO PHAN TECHONE"
+                className="w-full px-2.5 py-1 bg-slate-900 border border-slate-700 rounded text-xs font-mono text-slate-100 focus:outline-none focus:border-emerald-500"
+              />
             </div>
           </div>
 

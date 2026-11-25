@@ -9,6 +9,7 @@ export const ORDER_TYPES = {
 
 export const PAYMENT_METHODS = {
   CASH: 'CASH',
+  BANK_TRANSFER: 'BANK_TRANSFER',
   VNPAY: 'VNPAY',
   STRIPE: 'STRIPE'
 };

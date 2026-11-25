@@ -2,11 +2,13 @@ import { Trash2, Plus, Minus, Hash, AlertCircle, ShoppingCart } from 'lucide-rea
 
 export const PosCartTable = ({
   items = [],
+  productVariantsMap = {},
   onUpdateQuantity,
   onRemoveItem,
   onClearCart,
   onOpenSerialModal,
-  onRemoveSerial
+  onRemoveSerial,
+  onSwitchSku
 }) => {
   const formatPrice = (p) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(p || 0);
 
@@ -63,6 +65,32 @@ export const PosCartTable = ({
                     <p className="text-[11px] font-mono text-slate-400">
                       {item.sku}
                     </p>
+                    {(() => {
+                      const variants = productVariantsMap[String(item.productId)] || [];
+                      const selectableVariants = variants.filter(
+                        (v) => Number(v.stock || 0) > 0 || String(v.skuId) === String(item.productSkuId)
+                      );
+                      if (!onSwitchSku || selectableVariants.length <= 1) return null;
+                      return (
+                        <select
+                          value={String(item.productSkuId)}
+                          onChange={(e) => {
+                            const nextVariant = selectableVariants.find(
+                              (v) => String(v.skuId) === String(e.target.value)
+                            );
+                            if (nextVariant) onSwitchSku(item.productSkuId, nextVariant);
+                          }}
+                          title="Đổi nhanh biến thể SKU"
+                          className="mt-1 max-w-full bg-slate-950 border border-slate-700/80 rounded-md px-1.5 py-0.5 text-[10px] font-mono text-cyan-300 focus:outline-none focus:border-blue-500 cursor-pointer"
+                        >
+                          {selectableVariants.map((v) => (
+                            <option key={v.skuId} value={String(v.skuId)} className="bg-slate-900 text-slate-100">
+                              Đổi SKU: {v.sku} (Kho: {v.stock})
+                            </option>
+                          ))}
+                        </select>
+                      );
+                    })()}
                     <div className="text-xs font-mono font-semibold text-slate-300 mt-1">
                       {formatPrice(item.price)}
                     </div>

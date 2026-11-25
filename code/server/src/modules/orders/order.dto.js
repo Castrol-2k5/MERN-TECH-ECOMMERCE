@@ -53,8 +53,8 @@ export const posCheckoutSchema = z
       .array(posOrderItemSchema, { required_error: 'Danh sách sản phẩm là bắt buộc' })
       .min(1, 'Đơn hàng POS phải chứa ít nhất 1 sản phẩm'),
     paymentMethod: z
-      .enum([PAYMENT_METHODS.CASH, PAYMENT_METHODS.VNPAY], {
-        errorMap: () => ({ message: 'Phương thức thanh toán POS chỉ chấp nhận CASH hoặc VNPAY' })
+      .enum([PAYMENT_METHODS.CASH, PAYMENT_METHODS.BANK_TRANSFER, PAYMENT_METHODS.VNPAY], {
+        errorMap: () => ({ message: 'Phương thức thanh toán POS chỉ chấp nhận CASH, BANK_TRANSFER hoặc VNPAY' })
       })
       .optional()
       .default(PAYMENT_METHODS.CASH),

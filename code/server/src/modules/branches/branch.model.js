@@ -64,6 +64,12 @@ const branchSchema = new Schema(
       default: 0,
       min: [0, 'Chỉ tiêu doanh thu tháng không được âm']
     },
+    bankInfo: {
+      bankBin: { type: String, trim: true, default: '' },
+      bankName: { type: String, trim: true, default: '' },
+      accountNumber: { type: String, trim: true, default: '' },
+      accountName: { type: String, trim: true, default: '' }
+    },
     isActive: {
       type: Boolean,
       default: true

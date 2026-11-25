@@ -101,6 +101,33 @@ export const posCartSlice = createSlice({
     removeSerialFromItem: (state, action) => {
       posCartSlice.caseReducers.removeSerial(state, action);
     },
+    switchItemSku: (state, action) => {
+      const { oldSkuId, newSkuItem } = action.payload || {};
+      const oldId = getCleanSkuId(oldSkuId);
+      const newId = getCleanSkuId(newSkuItem?.productSkuId || newSkuItem?.skuId || newSkuItem?._id);
+      if (!oldId || !newId || oldId === newId) return;
+
+      const oldIdx = state.items.findIndex((i) => getCleanSkuId(i.productSkuId) === oldId);
+      if (oldIdx === -1) return;
+      const oldItem = state.items[oldIdx];
+
+      const targetIdx = state.items.findIndex((i) => getCleanSkuId(i.productSkuId) === newId);
+      if (targetIdx !== -1) {
+        state.items[targetIdx].quantity += oldItem.quantity;
+        state.items.splice(oldIdx, 1);
+      } else {
+        state.items[oldIdx] = {
+          ...oldItem,
+          productSkuId: newId,
+          sku: newSkuItem.sku || newSkuItem.skuCode || oldItem.sku,
+          price: Number(newSkuItem.price ?? oldItem.price),
+          hasSerial: Boolean(newSkuItem.hasSerial ?? oldItem.hasSerial),
+          image: newSkuItem.image || oldItem.image,
+          availableSerials: Array.isArray(newSkuItem.availableSerials) ? newSkuItem.availableSerials : [],
+          serialsAssigned: []
+        };
+      }
+    },
     setCustomerInfo: (state, action) => {
       state.customerInfo = { ...state.customerInfo, ...action.payload };
     },
@@ -143,6 +170,7 @@ export const {
   assignSerialToItem,
   removeSerial,
   removeSerialFromItem,
+  switchItemSku,
   setCustomerInfo,
   setDiscount,
   setCustomerPaid,

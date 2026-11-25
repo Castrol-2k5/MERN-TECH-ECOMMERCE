@@ -6,6 +6,7 @@ import {
   updateQuantity, 
   assignSerials, 
   removeSerial, 
+  switchItemSku,
   clearCart, 
   setDiscount, 
   setCustomerPaid, 
@@ -29,6 +30,7 @@ import SerialAssignmentModal from '../../features/pos/components/SerialAssignmen
 import InvoiceK80Modal from '../../features/pos/components/InvoiceK80Modal';
 import ShiftControlModal from '../../features/pos/components/ShiftControlModal';
 import ProductSpecModal from '../../features/pos/components/ProductSpecModal';
+import PosVariantPickerModal from '../../features/pos/components/PosVariantPickerModal';
 import CrossSellStrip from '../../features/pos/components/CrossSellStrip';
 import posShiftService from '../../features/pos/services/posShiftService';
 import { toPosCheckoutPayload } from '../../features/orders/services/orderAdapter';
@@ -66,6 +68,23 @@ export const PosPage = () => {
   const [scanNotification, setScanNotification] = useState(null);
   const [currentShift, setCurrentShift] = useState(null);
   const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
+  const [variantPickerProduct, setVariantPickerProduct] = useState(null);
+
+  const activeBranch = useMemo(
+    () => branches.find((b) => String(b._id) === String(activeBranchId)) || null,
+    [branches, activeBranchId]
+  );
+
+  const productVariantsMap = useMemo(() => {
+    const map = {};
+    products.forEach((p) => {
+      const pid = String(p._id || '');
+      if (!pid) return;
+      if (!map[pid]) map[pid] = [];
+      map[pid].push(p);
+    });
+    return map;
+  }, [products]);
 
   // Load current shift on mount and branch change
   const reloadShift = useCallback(async () => {
@@ -224,8 +243,7 @@ export const PosPage = () => {
     }
   }, [dispatch, playErrorBeep, playSuccessBeep, activeBranchId]);
 
-  // Handle clicking product in catalog
-  const handleSelectProduct = (product) => {
+  const addSingleSkuToCart = (product) => {
     const skuId = String(product.skuId || product._id);
     const prodId = String(product._id);
     dispatch(addItem({
@@ -236,6 +254,7 @@ export const PosPage = () => {
       barcode: product.barcode,
       name: product.name,
       price: product.price,
+      image: product.image,
       hasSerial: product.hasSerial,
       availableSerials: Array.isArray(product.availableSerials) ? product.availableSerials : []
     }));
@@ -244,6 +263,15 @@ export const PosPage = () => {
     if (mainDevicePattern.test(`${product.category || ''} ${product.categorySlug || ''} ${product.name || ''}`)) {
       setCrossSellTrigger({ skuId, name: product.name });
     }
+  };
+
+  // Handle clicking product in catalog (mở modal chọn biến thể nếu có > 1 SKU)
+  const handleSelectProduct = (product) => {
+    if (Array.isArray(product.variants) && product.variants.length > 1) {
+      setVariantPickerProduct(product);
+      return;
+    }
+    addSingleSkuToCart(product);
   };
 
   // Perform POS Checkout
@@ -378,21 +406,38 @@ export const PosPage = () => {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Cart Items Table & Checkout Panel (40%) */}
-        <div className="w-full lg:w-[620px] xl:w-[680px] flex flex-col md:flex-row bg-slate-900 shrink-0">
+        {/* RIGHT COLUMN: Cart Items Table & Checkout Panel */}
+        <div className="w-full lg:w-[680px] xl:w-[760px] 2xl:w-[840px] flex flex-col md:flex-row bg-slate-900 shrink-0">
           {/* Cart Table (md:flex-1) */}
           <div className="flex-1 flex flex-col border-b md:border-b-0 md:border-r border-slate-800 min-h-0">
             <PosCartTable
               items={cart.items}
+              productVariantsMap={productVariantsMap}
               onUpdateQuantity={(skuId, qty) => dispatch(updateQuantity({ productSkuId: skuId, quantity: qty }))}
               onRemoveItem={(skuId) => dispatch(removeItem(skuId))}
               onClearCart={() => dispatch(clearCart())}
               onOpenSerialModal={(item) => setActiveSerialModalItem(item)}
               onRemoveSerial={(skuId, sn) => dispatch(removeSerial({ productSkuId: skuId, serialNumber: sn }))}
+              onSwitchSku={(oldSkuId, nextVariant) => {
+                dispatch(
+                  switchItemSku({
+                    oldSkuId,
+                    newSkuItem: {
+                      productSkuId: nextVariant.skuId,
+                      sku: nextVariant.sku,
+                      price: nextVariant.price,
+                      hasSerial: nextVariant.hasSerial,
+                      image: nextVariant.image,
+                      availableSerials: Array.isArray(nextVariant.availableSerials) ? nextVariant.availableSerials : []
+                    }
+                  })
+                );
+                playSuccessBeep();
+              }}
             />
           </div>
 
-          {/* Checkout Panel (w-full md:w-80) */}
+          {/* Checkout Panel (w-full md:w-80 lg:w-88) */}
           <PosCheckoutPanel
             customerInfo={cart.customerInfo}
             onUpdateCustomer={(info) => dispatch(setCustomerInfo(info))}
@@ -410,6 +455,7 @@ export const PosPage = () => {
             isProcessing={isCheckingOut}
             missingSerialCount={missingSerialCount}
             itemCount={cart.items.length}
+            branchBankInfo={activeBranch?.bankInfo}
             customerInputRef={customerInputRef}
             discountInputRef={discountInputRef}
           />
@@ -462,6 +508,14 @@ export const PosPage = () => {
           handleSelectProduct(p);
           setSpecProduct(null);
         }}
+      />
+
+      {/* Variant Picker Modal (chọn SKU cho sản phẩm nhiều biến thể) */}
+      <PosVariantPickerModal
+        isOpen={Boolean(variantPickerProduct)}
+        onClose={() => setVariantPickerProduct(null)}
+        groupedProduct={variantPickerProduct}
+        onSelectVariant={(variant) => addSingleSkuToCart(variant)}
       />
     </div>
   );

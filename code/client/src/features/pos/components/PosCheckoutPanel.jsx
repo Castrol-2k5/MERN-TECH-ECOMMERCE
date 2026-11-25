@@ -3,11 +3,14 @@ import {
   User, 
   Banknote, 
   QrCode, 
+  Landmark,
   Tag, 
   AlertTriangle,
   Search,
   History,
-  ShieldCheck
+  ShieldCheck,
+  ZoomIn,
+  X
 } from 'lucide-react';
 import posService from '../services/posService.js';
 
@@ -30,10 +33,12 @@ export const PosCheckoutPanel = ({
   isProcessing = false,
   missingSerialCount = 0,
   itemCount = 0,
+  branchBankInfo = null,
   customerInputRef,
   discountInputRef
 }) => {
   const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [isQrZoomed, setIsQrZoomed] = useState(false);
   const [phoneInput, setPhoneInput] = useState(customerInfo?.phone || '');
   const [nameInput, setNameInput] = useState(customerInfo?.fullName || '');
   const [addressInput, setAddressInput] = useState(customerInfo?.address || '');
@@ -183,31 +188,44 @@ export const PosCheckoutPanel = ({
           <label className="text-xs font-semibold text-slate-400 block mb-2">
             Phương thức thanh toán:
           </label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-1.5">
             <button
               type="button"
               onClick={() => onSelectPaymentMethod('CASH')}
-              className={`p-2.5 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer ${
+              className={`p-2 rounded-xl border flex flex-col items-center justify-center gap-1 text-[11px] font-bold transition-all cursor-pointer ${
                 paymentMethod === 'CASH'
                   ? 'bg-emerald-600/20 border-emerald-500 text-emerald-400 shadow-md shadow-emerald-500/10'
                   : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
               }`}
             >
               <Banknote className="w-4 h-4" />
-              Tiền mặt (CASH)
+              <span>Tiền mặt</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectPaymentMethod('BANK_TRANSFER')}
+              className={`p-2 rounded-xl border flex flex-col items-center justify-center gap-1 text-[11px] font-bold transition-all cursor-pointer ${
+                paymentMethod === 'BANK_TRANSFER'
+                  ? 'bg-cyan-600/20 border-cyan-500 text-cyan-300 shadow-md shadow-cyan-500/10'
+                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+              }`}
+            >
+              <Landmark className="w-4 h-4" />
+              <span>VietQR / CK</span>
             </button>
 
             <button
               type="button"
               onClick={() => onSelectPaymentMethod('VNPAY')}
-              className={`p-2.5 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer ${
+              className={`p-2 rounded-xl border flex flex-col items-center justify-center gap-1 text-[11px] font-bold transition-all cursor-pointer ${
                 paymentMethod === 'VNPAY'
                   ? 'bg-blue-600/20 border-blue-500 text-blue-400 shadow-md shadow-blue-500/10'
                   : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
               }`}
             >
               <QrCode className="w-4 h-4" />
-              VNPAY QR
+              <span>VNPAY QR</span>
             </button>
           </div>
         </div>
@@ -257,6 +275,129 @@ export const PosCheckoutPanel = ({
               </p>
             )}
           </div>
+        ) : paymentMethod === 'BANK_TRANSFER' ? (
+          (() => {
+            const hasCustomBank = Boolean(branchBankInfo?.bankBin && branchBankInfo?.accountNumber);
+            const bankBin = hasCustomBank ? branchBankInfo.bankBin : '970422';
+            const bankName = hasCustomBank ? (branchBankInfo.bankName || 'Ngân hàng Chi nhánh') : 'MB Bank (TechOne HQ)';
+            const accountNumber = hasCustomBank ? branchBankInfo.accountNumber : '0901234567';
+            const accountName = hasCustomBank ? (branchBankInfo.accountName || 'TECHONE') : 'CONG TY CO PHAN TECHONE';
+            const transferNote = `TECHONE POS ${customerInfo?.phone || 'KHACH LE'}`;
+            const qrAmount = Math.max(0, Math.round(total || 0));
+            const vietQrUrl = `https://img.vietqr.io/image/${encodeURIComponent(bankBin)}-${encodeURIComponent(accountNumber)}-compact2.png?amount=${qrAmount}&addInfo=${encodeURIComponent(transferNote)}&accountName=${encodeURIComponent(accountName)}`;
+
+            return (
+              <div className="bg-slate-950 p-3 rounded-xl border border-cyan-500/30 space-y-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsQrZoomed(true)}
+                  title="Bấm để phóng to mã VietQR"
+                  className="group relative w-40 h-40 mx-auto bg-white p-1.5 rounded-xl flex items-center justify-center shadow-md overflow-hidden cursor-pointer ring-2 ring-transparent hover:ring-cyan-400 transition-all"
+                >
+                  <img
+                    src={vietQrUrl}
+                    alt="Mã VietQR chuyển khoản"
+                    className="w-full h-full object-contain"
+                  />
+                  <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-slate-900/85 text-cyan-300 text-[10px] font-bold inline-flex items-center gap-1 opacity-90 group-hover:opacity-100">
+                    <ZoomIn className="w-3 h-3" />
+                    <span>Phóng to</span>
+                  </span>
+                </button>
+                <div className="text-[11px] space-y-1 bg-slate-900/90 border border-slate-800 rounded-lg p-2.5">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-slate-400">Ngân hàng:</span>
+                    <span className="font-bold text-cyan-300 text-right">{bankName}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-slate-400">Số TK:</span>
+                    <span className="font-mono font-bold text-white">{accountNumber}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-slate-400">Chủ TK:</span>
+                    <span className="font-semibold text-slate-200 text-right">{accountName}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-slate-400">Số tiền:</span>
+                    <span className="font-mono font-bold text-emerald-400">{formatVnd(qrAmount)}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-slate-400">Nội dung:</span>
+                    <span className="font-mono text-amber-300 text-right">{transferNote}</span>
+                  </div>
+                </div>
+                <p className="text-[10px] text-center text-slate-400">
+                  Bấm vào mã QR để phóng to cho khách dễ quét, kiểm tra tiền vào rồi bấm Thanh toán [F9].
+                </p>
+
+                {/* Modal Phóng to Mã VietQR */}
+                {isQrZoomed && (
+                  <div
+                    onClick={() => setIsQrZoomed(false)}
+                    className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm"
+                  >
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="bg-slate-900 border border-cyan-500/40 rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl"
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div className="flex items-center gap-2">
+                          <Landmark className="w-4 h-4 text-cyan-400" />
+                          <h3 className="text-sm font-bold text-white">Quét Mã VietQR Thanh Toán</h3>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsQrZoomed(false)}
+                          className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div className="w-72 h-72 sm:w-80 sm:h-80 mx-auto bg-white p-3 rounded-2xl shadow-lg flex items-center justify-center">
+                        <img
+                          src={vietQrUrl}
+                          alt="Mã VietQR phóng to"
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+
+                      <div className="text-xs space-y-1.5 bg-slate-950 border border-slate-800 rounded-2xl p-3.5">
+                        <div className="flex justify-between gap-2">
+                          <span className="text-slate-400">Ngân hàng:</span>
+                          <span className="font-bold text-cyan-300">{bankName}</span>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <span className="text-slate-400">Số tài khoản:</span>
+                          <span className="font-mono font-bold text-white">{accountNumber}</span>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <span className="text-slate-400">Chủ tài khoản:</span>
+                          <span className="font-semibold text-slate-200">{accountName}</span>
+                        </div>
+                        <div className="flex justify-between gap-2 pt-1 border-t border-slate-800">
+                          <span className="text-slate-400">Số tiền thanh toán:</span>
+                          <span className="font-mono font-black text-base text-emerald-400">{formatVnd(qrAmount)}</span>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <span className="text-slate-400">Nội dung CK:</span>
+                          <span className="font-mono font-bold text-amber-300">{transferNote}</span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setIsQrZoomed(false)}
+                        className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold cursor-pointer"
+                      >
+                        Đóng màn hình phóng to
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()
         ) : (
           <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center space-y-2">
             <div className="w-28 h-28 mx-auto bg-white p-2 rounded-lg flex items-center justify-center shadow-md">

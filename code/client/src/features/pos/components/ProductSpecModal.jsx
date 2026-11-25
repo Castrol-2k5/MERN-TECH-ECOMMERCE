@@ -22,7 +22,9 @@ export const ProductSpecModal = ({ isOpen, onClose, product, onAddToCart }) => {
   if (!isOpen || !product) return null;
 
   const attributes = Array.isArray(product.attributes) ? product.attributes : [];
-  const isOutOfStock = Number(product.stock || 0) <= 0;
+  const variants = Array.isArray(product.variants) && product.variants.length > 0 ? product.variants : [product];
+  const totalStock = variants.reduce((sum, v) => sum + Math.max(0, Number(v.stock || 0)), 0);
+  const isOutOfStock = totalStock <= 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
@@ -77,7 +79,7 @@ export const ProductSpecModal = ({ isOpen, onClose, product, onAddToCart }) => {
                       : 'bg-emerald-500/20 text-emerald-400'
                   }`}
                 >
-                  Tồn tại quầy: {product.stock}
+                  Tổng tồn tại quầy: {totalStock}
                 </span>
               </div>
             </div>
@@ -88,6 +90,57 @@ export const ProductSpecModal = ({ isOpen, onClose, product, onAddToCart }) => {
               {product.description}
             </div>
           )}
+
+          {/* Biến thể & Tồn kho từng SKU */}
+          <div>
+            <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+              Các biến thể đang có ({variants.length} SKU • Tổng tồn: {totalStock})
+            </h5>
+            <div className="rounded-2xl border border-slate-800 overflow-hidden bg-slate-950">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-slate-800 text-[10px] uppercase text-slate-400 bg-slate-900/60">
+                    <th className="py-2 px-3 text-left">SKU / Biến thể</th>
+                    <th className="py-2 px-3 text-right">Giá bán</th>
+                    <th className="py-2 px-3 text-right">Tồn kho</th>
+                    <th className="py-2 px-3 text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/80">
+                  {variants.map((v) => {
+                    const vStock = Math.max(0, Number(v.stock || 0));
+                    return (
+                      <tr key={v.skuId || v.sku} className="hover:bg-slate-900/60">
+                        <td className="py-2 px-3">
+                          <div className="font-mono font-bold text-cyan-300">{v.sku}</div>
+                          {v.optionLabel && <div className="text-[10px] text-slate-400">{v.optionLabel}</div>}
+                        </td>
+                        <td className="py-2 px-3 text-right font-mono font-bold text-blue-400">
+                          {formatPrice(v.price)}
+                        </td>
+                        <td className="py-2 px-3 text-right font-mono font-bold">
+                          <span className={vStock > 0 ? 'text-emerald-400' : 'text-rose-400'}>{vStock}</span>
+                        </td>
+                        <td className="py-2 px-3 text-right">
+                          <button
+                            type="button"
+                            disabled={vStock <= 0}
+                            onClick={() => {
+                              onAddToCart?.(v);
+                              onClose();
+                            }}
+                            className="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-[10px] font-bold cursor-pointer"
+                          >
+                            + Thêm
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
           <div>
             <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">

@@ -344,6 +344,28 @@ describe('Order & POS Checkout Module Integration Tests', () => {
       expect(res.status).toBe(403);
       expect(res.body.errorCode).toBe('FORBIDDEN');
     });
+
+    test('Happy Path: Thanh toán POS bằng Chuyển khoản VietQR (BANK_TRANSFER) -> 201 COMPLETED & PAID', async () => {
+      const res = await request(app)
+        .post('/api/v1/orders/pos/checkout')
+        .set('Authorization', `Bearer ${staffAToken}`)
+        .send({
+          items: [
+            {
+              productId: productIpad._id.toString(),
+              productSkuId: skuIpad._id.toString(),
+              quantity: 1,
+              serialsAssigned: [validSerial1.serialNumber]
+            }
+          ],
+          paymentMethod: PAYMENT_METHODS.BANK_TRANSFER
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.data.order.paymentMethod).toBe(PAYMENT_METHODS.BANK_TRANSFER);
+      expect(res.body.data.order.paymentStatus).toBe(PAYMENT_STATUS.PAID);
+      expect(res.body.data.order.orderStatus).toBe(ORDER_STATUS.COMPLETED);
+    });
   });
 
   describe('POST /api/v1/orders/b2c/checkout (B2C Online Checkout)', () => {
