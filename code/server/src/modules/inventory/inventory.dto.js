@@ -27,6 +27,25 @@ export const adjustStockSchema = z
   })
   .strict();
 
+export const bulkImportSchema = z
+  .object({
+    branchId: z
+      .string({ required_error: 'Mã chi nhánh (branchId) là bắt buộc' })
+      .trim()
+      .regex(/^[0-9a-fA-F]{24}$/, 'Mã chi nhánh (branchId) không hợp lệ'),
+    reason: z.string().trim().optional().default('Nhập kho hàng loạt từ bảng tính'),
+    items: z
+      .array(
+        z.object({
+          sku: z.string().trim().min(1, 'Mã SKU là bắt buộc').transform((v) => v.toUpperCase()),
+          quantity: z.coerce.number().int().min(0).optional().default(0),
+          serials: z.array(z.string().trim().toUpperCase()).optional().default([])
+        })
+      )
+      .min(1, 'Danh sách sản phẩm nhập kho không được trống')
+  })
+  .strict();
+
 export const createTransferSchema = z
   .object({
     branchId: z

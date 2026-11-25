@@ -35,6 +35,16 @@ export class InventoryController {
     });
   });
 
+  static bulkImport = catchAsync(async (req, res) => {
+    const result = await InventoryService.bulkImport(req.body, req.user);
+
+    return sendSuccess(res, {
+      statusCode: 201,
+      message: `Nhập lô thành công ${result.importedSkusCount} SKU (${result.totalUnitsImported} đơn vị)`,
+      data: result
+    });
+  });
+
   static createTransfer = catchAsync(async (req, res) => {
     const transfer = await InventoryService.createTransfer(req.body, req.user);
 

@@ -87,7 +87,6 @@ export const AppRoutes = () => {
 
           {/* Branch Manager & Super Admin Operations */}
           <Route element={<RoleProtectedRoute allowedRoles={['BRANCH_MANAGER', 'SUPER_ADMIN']} />}>
-            <Route path="admin/import-serials" element={<SerialImportPage />} />
             <Route path="settlements" element={<InterBranchSettlementPage />} />
             <Route path="branch/staff" element={<BranchStaffPage />} />
             <Route path="branch/analytics" element={<BranchAnalyticsPage />} />
@@ -99,6 +98,7 @@ export const AppRoutes = () => {
             <Route path="hq/procurement" element={<HqProcurementPage />} />
             <Route path="hq/supply-chain" element={<HqSupplyChainPage />} />
             <Route path="hq/finance" element={<HqFinancePage />} />
+            <Route path="admin/import-serials" element={<SerialImportPage />} />
             <Route path="admin/products" element={<AdminProductsPage />} />
             <Route path="admin/branches-rbac" element={<AdminBranchesUsersPage />} />
             <Route path="admin/analytics" element={<AdminAnalyticsPage />} />

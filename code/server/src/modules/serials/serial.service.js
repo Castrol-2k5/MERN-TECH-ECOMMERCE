@@ -34,6 +34,14 @@ export class SerialService {
       throw new AppError('Không tìm thấy sản phẩm yêu cầu.', 404, 'PRODUCT_NOT_FOUND');
     }
 
+    if (product.isSerialManaged === false) {
+      throw new AppError(
+        'Sản phẩm này quản lý theo số lượng tổng, không hỗ trợ nhập mã Serial/IMEI.',
+        400,
+        'NOT_SERIAL_MANAGED'
+      );
+    }
+
     const targetSku = product.skus?.find((s) => s._id.toString() === productSkuId.toString());
     if (!targetSku) {
       throw new AppError('Không tìm thấy mã biến thể SKU của sản phẩm.', 400, 'SKU_NOT_FOUND');

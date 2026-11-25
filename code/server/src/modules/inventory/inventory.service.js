@@ -82,6 +82,163 @@ export class InventoryService {
   }
 
   /**
+   * Bulk import mixed items (Serial-managed + Quantity-managed) into a branch (All-or-Nothing)
+   */
+  static async bulkImport({ branchId, items, reason = 'Nhập kho hàng loạt từ bảng tính' }, currentUser) {
+    if (
+      currentUser &&
+      currentUser.role === USER_ROLES.BRANCH_MANAGER &&
+      currentUser.branchId &&
+      currentUser.branchId.toString() !== branchId.toString()
+    ) {
+      throw new AppError('Nhân viên cố tình thao tác chéo chi nhánh.', 403, 'CROSS_BRANCH_ACCESS_DENIED');
+    }
+
+    const branch = await Branch.findById(branchId).lean();
+    if (!branch) {
+      throw new AppError('Không tìm thấy chi nhánh yêu cầu.', 404, 'BRANCH_NOT_FOUND');
+    }
+
+    const skuCodes = items.map((it) => String(it.sku || '').trim().toUpperCase()).filter(Boolean);
+    const products = await Product.find({ 'skus.sku': { $in: skuCodes }, isActive: true }).lean();
+
+    const skuLookup = new Map();
+    for (const p of products) {
+      for (const s of p.skus || []) {
+        skuLookup.set(String(s.sku || '').toUpperCase(), { product: p, skuObj: s });
+      }
+    }
+
+    const allSerialsToInsert = [];
+    const seenSerialsInBatch = new Set();
+    const resolvedItems = [];
+
+    for (const rawItem of items) {
+      const code = String(rawItem.sku || '').trim().toUpperCase();
+      const found = skuLookup.get(code);
+      if (!found) {
+        throw new AppError(`Mã SKU '${code}' không tồn tại hoặc đã ngừng kinh doanh.`, 400, 'SKU_NOT_FOUND');
+      }
+
+      const { product, skuObj } = found;
+      const isSerialManaged = product.isSerialManaged !== false;
+
+      if (isSerialManaged) {
+        const cleanSerials = (rawItem.serials || [])
+          .map((sn) => String(sn || '').trim().toUpperCase())
+          .filter(Boolean);
+
+        if (cleanSerials.length === 0) {
+          throw new AppError(
+            `Sản phẩm '${product.name}' (${code}) quản lý theo Serial/IMEI nhưng thiếu danh sách mã Serial.`,
+            400,
+            'SERIAL_REQUIRED'
+          );
+        }
+
+        for (const sn of cleanSerials) {
+          if (seenSerialsInBatch.has(sn)) {
+            throw new AppError(
+              `Mã Serial/IMEI '${sn}' bị trùng lặp trong lô nhập.`,
+              400,
+              'DUPLICATE_SERIAL_IN_BATCH'
+            );
+          }
+          seenSerialsInBatch.add(sn);
+          allSerialsToInsert.push({
+            serialNumber: sn,
+            productId: product._id,
+            productSkuId: skuObj._id,
+            branchId: branch._id,
+            status: SERIAL_STATUS.IN_STOCK
+          });
+        }
+
+        resolvedItems.push({
+          productId: product._id,
+          productSkuId: skuObj._id,
+          sku: code,
+          qtyDelta: cleanSerials.length,
+          isSerialManaged: true
+        });
+      } else {
+        if (Array.isArray(rawItem.serials) && rawItem.serials.length > 0) {
+          throw new AppError(
+            `Sản phẩm '${product.name}' (${code}) quản lý theo Số lượng, không được gán mã Serial/IMEI.`,
+            400,
+            'NOT_SERIAL_MANAGED'
+          );
+        }
+        const qty = Number(rawItem.quantity || 0);
+        if (!Number.isInteger(qty) || qty <= 0) {
+          throw new AppError(
+            `Số lượng nhập cho SKU '${code}' phải là số nguyên dương.`,
+            400,
+            'INVALID_QUANTITY'
+          );
+        }
+        resolvedItems.push({
+          productId: product._id,
+          productSkuId: skuObj._id,
+          sku: code,
+          qtyDelta: qty,
+          isSerialManaged: false
+        });
+      }
+    }
+
+    // Check duplicate serials in DB before mutating anything (All-or-Nothing)
+    if (allSerialsToInsert.length > 0) {
+      const serialStrings = allSerialsToInsert.map((s) => s.serialNumber);
+      const existing = await Serial.find({ serialNumber: { $in: serialStrings } })
+        .select('serialNumber')
+        .lean();
+      if (existing.length > 0) {
+        throw new AppError(
+          `Mã Serial/IMEI đã tồn tại trong hệ thống: ${existing.map((e) => e.serialNumber).join(', ')}`,
+          400,
+          'DUPLICATE_SERIAL'
+        );
+      }
+      await Serial.insertMany(allSerialsToInsert);
+    }
+
+    // Increment branch inventories atomically
+    let totalUnits = 0;
+    for (const item of resolvedItems) {
+      totalUnits += item.qtyDelta;
+      await BranchInventory.findOneAndUpdate(
+        { branchId: branch._id, productId: item.productId, productSkuId: item.productSkuId },
+        { $inc: { quantity: item.qtyDelta } },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      ).lean();
+    }
+
+    if (currentUser) {
+      AuditLogService.record({
+        actor: currentUser,
+        action: AUDIT_ACTIONS.STOCK_ADJUST,
+        target: {
+          model: 'BranchInventory',
+          entityId: branch._id,
+          code: branch.branchCode || branch.name,
+          name: `Nhập lô đa sản phẩm (${resolvedItems.length} SKU / ${totalUnits} ĐV)`
+        },
+        context: {
+          branchId: branch._id,
+          notes: `${reason} — Tổng cộng ${allSerialsToInsert.length} Serial & ${totalUnits - allSerialsToInsert.length} SP số lượng`
+        }
+      });
+    }
+
+    return {
+      importedSkusCount: resolvedItems.length,
+      importedSerialsCount: allSerialsToInsert.length,
+      totalUnitsImported: totalUnits
+    };
+  }
+
+  /**
    * Manual inventory adjustment (OCC & Atomic $inc operation with Zero Overselling check)
    */
   static async adjustStock({ branchId, productId, productSkuId, quantityDelta, reason }, currentUser) {
@@ -105,6 +262,14 @@ export class InventoryService {
     const product = await Product.findById(productId).lean();
     if (!product) {
       throw new AppError('Không tìm thấy sản phẩm yêu cầu.', 404, 'PRODUCT_NOT_FOUND');
+    }
+
+    if (product.isSerialManaged !== false) {
+      throw new AppError(
+        'Sản phẩm quản lý theo Serial/IMEI không được điều chỉnh số lượng thủ công; vui lòng dùng Nhập lô Serial hoặc Kiểm kê Serial.',
+        400,
+        'SERIAL_MANAGED_ADJUST_FORBIDDEN'
+      );
     }
 
     const targetSku = product.skus?.find((s) => s._id.toString() === productSkuId.toString());

@@ -415,12 +415,12 @@ export const BranchStockTable = ({
                           <span>{isLow || isOut ? 'Tìm nguồn xin hàng' : 'Tồn chuỗi'}</span>
                         </button>
 
-                        {canAdjust && (
+                        {canAdjust && !item.hasSerial && (
                           <button
                             type="button"
                             onClick={() => onOpenAdjust(item)}
                             className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer border border-slate-700/60"
-                            title="Kiểm kê / Điều chỉnh số lượng tồn"
+                            title="Kiểm kê / Điều chỉnh số lượng tồn (chỉ dành cho hàng quản lý theo số lượng)"
                           >
                             <SlidersHorizontal className="w-3 h-3 text-blue-400" />
                             <span>Điều chỉnh</span>

@@ -21,8 +21,10 @@ describe('Inventory Module Integration Tests', () => {
   let branchA;
   let branchB;
   let productIphone;
+  let productAccessory;
   let sku1;
   let sku2;
+  let skuAccessory;
 
   beforeEach(async () => {
     // 1. Create Branches
@@ -94,6 +96,26 @@ describe('Inventory Module Integration Tests', () => {
         { name: 'color', displayType: 'color_picker', values: ['Black Titanium', 'White Titanium'] }
       ],
       skus: [sku1, sku2],
+      isSerialManaged: true,
+      isActive: true
+    });
+
+    skuAccessory = {
+      _id: new mongoose.Types.ObjectId(),
+      sku: 'CHG-ANKER-65W',
+      price: 1090000,
+      salePrice: 1090000,
+      images: [],
+      optionValues: [],
+      isActive: true
+    };
+    productAccessory = await Product.create({
+      name: 'Củ sạc Anker 65W',
+      slug: 'cu-sac-anker-65w',
+      categoryId: category._id,
+      brand: 'Anker',
+      isSerialManaged: false,
+      skus: [skuAccessory],
       isActive: true
     });
 
@@ -272,7 +294,7 @@ describe('Inventory Module Integration Tests', () => {
   });
 
   describe('POST /api/v1/inventory/adjust (Manual Stock Adjustment & Atomic OCC)', () => {
-    test('Happy Path: should allow SUPER_ADMIN to adjust stock upwards (initial import/restock)', async () => {
+    test('Security / Business Rule: should forbid adjusting stock for Serial-managed product', async () => {
       const res = await request(app)
         .post('/api/v1/inventory/adjust')
         .set('Authorization', `Bearer ${superAdminToken}`)
@@ -280,6 +302,22 @@ describe('Inventory Module Integration Tests', () => {
           branchId: branchA._id.toString(),
           productId: productIphone._id.toString(),
           productSkuId: sku1._id.toString(),
+          quantityDelta: 5,
+          reason: 'Cố tình tăng số lượng máy có Serial'
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.errorCode).toBe('SERIAL_MANAGED_ADJUST_FORBIDDEN');
+    });
+
+    test('Happy Path: should allow SUPER_ADMIN to adjust stock upwards for quantity-managed product', async () => {
+      const res = await request(app)
+        .post('/api/v1/inventory/adjust')
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .send({
+          branchId: branchA._id.toString(),
+          productId: productAccessory._id.toString(),
+          productSkuId: skuAccessory._id.toString(),
           quantityDelta: 20,
           reason: 'Nhập kho ban đầu từ nhà phân phối'
         });
@@ -290,7 +328,7 @@ describe('Inventory Module Integration Tests', () => {
 
       const recordInDb = await BranchInventory.findOne({
         branchId: branchA._id,
-        productSkuId: sku1._id
+        productSkuId: skuAccessory._id
       });
       expect(recordInDb.quantity).toBe(20);
     });
@@ -299,8 +337,8 @@ describe('Inventory Module Integration Tests', () => {
       // 1. Seed initial stock: 10
       await BranchInventory.create({
         branchId: branchA._id,
-        productId: productIphone._id,
-        productSkuId: sku1._id,
+        productId: productAccessory._id,
+        productSkuId: skuAccessory._id,
         quantity: 10
       });
 
@@ -310,8 +348,8 @@ describe('Inventory Module Integration Tests', () => {
         .set('Authorization', `Bearer ${superAdminToken}`)
         .send({
           branchId: branchA._id.toString(),
-          productId: productIphone._id.toString(),
-          productSkuId: sku1._id.toString(),
+          productId: productAccessory._id.toString(),
+          productSkuId: skuAccessory._id.toString(),
           quantityDelta: -4,
           reason: 'Xuất kho trả hàng bảo hành cho hãng'
         });
@@ -322,7 +360,7 @@ describe('Inventory Module Integration Tests', () => {
 
       const recordInDb = await BranchInventory.findOne({
         branchId: branchA._id,
-        productSkuId: sku1._id
+        productSkuId: skuAccessory._id
       });
       expect(recordInDb.quantity).toBe(6);
     });
@@ -331,8 +369,8 @@ describe('Inventory Module Integration Tests', () => {
       // Stock is only 3
       await BranchInventory.create({
         branchId: branchA._id,
-        productId: productIphone._id,
-        productSkuId: sku1._id,
+        productId: productAccessory._id,
+        productSkuId: skuAccessory._id,
         quantity: 3
       });
 
@@ -342,8 +380,8 @@ describe('Inventory Module Integration Tests', () => {
         .set('Authorization', `Bearer ${superAdminToken}`)
         .send({
           branchId: branchA._id.toString(),
-          productId: productIphone._id.toString(),
-          productSkuId: sku1._id.toString(),
+          productId: productAccessory._id.toString(),
+          productSkuId: skuAccessory._id.toString(),
           quantityDelta: -5,
           reason: 'Kiểm kê kho sai sót'
         });
@@ -355,7 +393,7 @@ describe('Inventory Module Integration Tests', () => {
       // Verify stock in DB remains 3 unchanged
       const recordInDb = await BranchInventory.findOne({
         branchId: branchA._id,
-        productSkuId: sku1._id
+        productSkuId: skuAccessory._id
       });
       expect(recordInDb.quantity).toBe(3);
     });
@@ -365,9 +403,9 @@ describe('Inventory Module Integration Tests', () => {
         .post('/api/v1/inventory/adjust')
         .set('Authorization', `Bearer ${branchManagerAToken}`)
         .send({
-          branchId: branchB._id.toString(), // Manager of Branch A attempts to adjust Branch B
-          productId: productIphone._id.toString(),
-          productSkuId: sku1._id.toString(),
+          branchId: branchB._id.toString(),
+          productId: productAccessory._id.toString(),
+          productSkuId: skuAccessory._id.toString(),
           quantityDelta: 5,
           reason: 'Cố tình can thiệp kho chi nhánh khác'
         });
@@ -382,8 +420,8 @@ describe('Inventory Module Integration Tests', () => {
         .set('Authorization', `Bearer ${staffAToken}`)
         .send({
           branchId: branchA._id.toString(),
-          productId: productIphone._id.toString(),
-          productSkuId: sku1._id.toString(),
+          productId: productAccessory._id.toString(),
+          productSkuId: skuAccessory._id.toString(),
           quantityDelta: 5,
           reason: 'Nhân viên không có quyền kiểm kê'
         });
@@ -398,14 +436,60 @@ describe('Inventory Module Integration Tests', () => {
         .set('Authorization', `Bearer ${superAdminToken}`)
         .send({
           branchId: branchA._id.toString(),
-          productId: productIphone._id.toString(),
-          productSkuId: sku1._id.toString(),
+          productId: productAccessory._id.toString(),
+          productSkuId: skuAccessory._id.toString(),
           quantityDelta: 0,
           reason: 'Delta bằng 0 không hợp lệ'
         });
 
       expect(res.status).toBe(400);
       expect(res.body.errorCode).toBe('VALIDATION_ERROR');
+    });
+  });
+
+  describe('POST /api/v1/inventory/bulk-import (Mixed Serial & Quantity All-or-Nothing)', () => {
+    test('Happy Path: should bulk import both Serial-managed and Quantity-managed items in one batch', async () => {
+      const res = await request(app)
+        .post('/api/v1/inventory/bulk-import')
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .send({
+          branchId: branchA._id.toString(),
+          reason: 'Nhập lô Excel test',
+          items: [
+            { sku: sku1.sku, quantity: 2, serials: ['BULK-SN-001', 'BULK-SN-002'] },
+            { sku: skuAccessory.sku, quantity: 25, serials: [] }
+          ]
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.data.importedSkusCount).toBe(2);
+      expect(res.body.data.importedSerialsCount).toBe(2);
+      expect(res.body.data.totalUnitsImported).toBe(27);
+
+      const invIphone = await BranchInventory.findOne({ branchId: branchA._id, productSkuId: sku1._id });
+      const invAcc = await BranchInventory.findOne({ branchId: branchA._id, productSkuId: skuAccessory._id });
+      expect(invIphone.quantity).toBe(2);
+      expect(invAcc.quantity).toBe(25);
+    });
+
+    test('All-or-Nothing: should reject entire batch if any serial duplicates within batch', async () => {
+      const res = await request(app)
+        .post('/api/v1/inventory/bulk-import')
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .send({
+          branchId: branchA._id.toString(),
+          items: [
+            { sku: skuAccessory.sku, quantity: 10, serials: [] },
+            { sku: sku1.sku, quantity: 2, serials: ['DUP-SN-1', 'DUP-SN-1'] }
+          ]
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.errorCode).toBe('DUPLICATE_SERIAL_IN_BATCH');
+
+      // Verify accessory stock was NOT incremented (All-or-Nothing)
+      const invAcc = await BranchInventory.findOne({ branchId: branchA._id, productSkuId: skuAccessory._id });
+      expect(invAcc).toBeNull();
     });
   });
 

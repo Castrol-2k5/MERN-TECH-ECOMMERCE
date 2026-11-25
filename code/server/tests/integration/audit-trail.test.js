@@ -71,10 +71,11 @@ describe('Audit Trail & Activity Tracking Integration Tests', () => {
 
     testSkuId = new mongoose.Types.ObjectId();
     testProduct = await Product.create({
-      name: 'MacBook Pro 16 M3 Max Audit Test',
-      slug: 'macbook-pro-16-m3-max-audit',
+      name: 'Chuột Logitech Audit Test',
+      slug: 'chuot-logitech-audit',
       categoryId: category._id,
-      brand: 'Apple',
+      brand: 'Logitech',
+      isSerialManaged: false,
       isActive: true,
       skus: [
         {

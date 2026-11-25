@@ -1,7 +1,12 @@
 import { Router } from 'express';
 import { InventoryController } from './inventory.controller.js';
 import { InventoryControlController } from './inventoryControl.controller.js';
-import { adjustStockSchema, createTransferSchema, receiveTransferSchema } from './inventory.dto.js';
+import {
+  adjustStockSchema,
+  bulkImportSchema,
+  createTransferSchema,
+  receiveTransferSchema
+} from './inventory.dto.js';
 import {
   createStocktakeSchema,
   scanStocktakeSchema,
@@ -36,6 +41,15 @@ router.post(
   authorize(USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER),
   validateDto(adjustStockSchema),
   InventoryController.adjustStock
+);
+
+// Protected: Bulk import mixed products (Serial + Quantity)
+router.post(
+  '/bulk-import',
+  protect,
+  authorize(USER_ROLES.SUPER_ADMIN, USER_ROLES.BRANCH_MANAGER),
+  validateDto(bulkImportSchema),
+  InventoryController.bulkImport
 );
 
 // Protected: Điều chuyển tồn kho liên chi nhánh (Stock Transfers)
